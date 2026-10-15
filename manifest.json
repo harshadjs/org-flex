@@ -1,0 +1,9 @@
+{
+  "id": "org-flex",
+  "name": "Org Flex",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Edit Org mode files in Obsidian: live preview, folding, checklists, journal, backlinks, made for the phone as much as the desktop.",
+  "author": "Harshad Shirwadkar",
+  "isDesktopOnly": false
+}

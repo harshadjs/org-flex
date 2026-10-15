@@ -1,0 +1,608 @@
+/* Org Flex. Everything that touches the editor is scoped to the org view
+   (.org-flex-view, [data-type="org-flex"]) so Markdown notes never change
+   (MOB-6). */
+
+/* ---------------------------------------------------------------- layout */
+
+/* MOB-2, MOB-5: sticky header and content stop scroll-into-view from moving the window */
+.workspace-leaf-content[data-type="org-flex"] > .view-header {
+  position: sticky !important;
+  top: 0 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 2;
+}
+.workspace-leaf-content[data-type="org-flex"] > .view-header .view-header-title-container,
+.workspace-leaf-content[data-type="org-flex"] > .view-header .view-header-title {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* MOB-2: on phones with floating navigation Obsidian floats the header over
+   the content and pushes every view down by its height; this header is
+   sticky and already takes its place, so drop the push as Markdown does */
+.is-phone .mod-root .workspace-leaf-content[data-type="org-flex"] {
+  --view-top-spacing: 0;
+}
+
+/* MOB-1: flex children with siblings never use height: 100% */
+.workspace-leaf-content[data-type="org-flex"] > .view-content.org-flex-view {
+  position: sticky !important;
+  top: 0 !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding: 0;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.org-flex-view .cm-editor {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  color: var(--text-normal);
+  background-color: var(--background-primary);
+}
+.org-flex-view .cm-editor.cm-focused {
+  outline: none;
+}
+
+.org-flex-view .cm-scroller {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  font-family: inherit;
+  line-height: var(--line-height-normal);
+  overflow-y: auto;
+}
+
+/* MOB-3: on phones .cm-scroller is the one scrolling element */
+.is-mobile .org-flex-view .cm-scroller {
+  overflow-y: scroll !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  touch-action: pan-y !important;
+}
+
+.org-flex-view .cm-content {
+  padding: var(--size-4-4) 0 var(--size-4-8);
+  max-width: var(--file-line-width);
+  caret-color: var(--caret-color, var(--text-normal));
+}
+.is-readable-line-width .org-flex-view .cm-content,
+.org-flex-view .cm-content {
+  margin: 0 auto;
+}
+.org-flex-view .cm-line {
+  padding: 0 var(--size-4-2);
+}
+.org-flex-view .cm-selectionBackground,
+.org-flex-view .cm-content ::selection {
+  background-color: var(--text-selection) !important;
+}
+
+/* ---------------------------------------------------------------- gutters */
+
+/* FOLD-3: no background, no border */
+.org-flex-view .cm-gutters {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+}
+.org-flex-view .org-fold-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 100%;
+  cursor: var(--cursor);
+  color: var(--text-faint);
+}
+.org-flex-view .org-fold-marker:hover {
+  color: var(--text-normal);
+}
+.org-flex-view .cm-foldPlaceholder {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  padding: 0 4px;
+  cursor: var(--cursor);
+}
+
+/* DRAG-1: the grip, faint until used */
+.org-flex-view .org-drag-gutter .cm-gutterElement {
+  display: flex;
+  align-items: flex-start;
+}
+.org-flex-view .org-drag-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  min-height: 1.5em;
+  color: var(--text-faint);
+  opacity: 0.35;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.org-flex-view .org-drag-grip svg {
+  width: 14px;
+  height: 14px;
+}
+.org-flex-view .org-drag-grip:hover,
+.org-flex-view .org-dragging .org-drag-grip {
+  opacity: 1;
+}
+.org-flex-view .org-dragging,
+.org-flex-view .org-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.org-flex-view .org-drop-line {
+  position: absolute;
+  height: 2px;
+  background-color: var(--interactive-accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 10;
+}
+.org-flex-view .org-drop-line.is-hidden {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- headings */
+
+/* LP-6: size on the line only, so em sizes don't multiply */
+.org-flex-view .cm-line.cm-org-level-1 { font-size: var(--h1-size); line-height: var(--h1-line-height); }
+.org-flex-view .cm-line.cm-org-level-2 { font-size: var(--h2-size); line-height: var(--h2-line-height); }
+.org-flex-view .cm-line.cm-org-level-3 { font-size: var(--h3-size); line-height: var(--h3-line-height); }
+.org-flex-view .cm-line.cm-org-level-4 { font-size: var(--h4-size); line-height: var(--h4-line-height); }
+.org-flex-view .cm-line.cm-org-level-5 { font-size: var(--h5-size); line-height: var(--h5-line-height); }
+.org-flex-view .cm-line.cm-org-level-6 { font-size: var(--h6-size); line-height: var(--h6-line-height); }
+
+.org-flex-view .org-heading-1 { color: var(--h1-color); font-weight: var(--h1-weight); font-family: var(--h1-font); }
+.org-flex-view .org-heading-2 { color: var(--h2-color); font-weight: var(--h2-weight); font-family: var(--h2-font); }
+.org-flex-view .org-heading-3 { color: var(--h3-color); font-weight: var(--h3-weight); font-family: var(--h3-font); }
+.org-flex-view .org-heading-4 { color: var(--h4-color); font-weight: var(--h4-weight); font-family: var(--h4-font); }
+.org-flex-view .org-heading-5 { color: var(--h5-color); font-weight: var(--h5-weight); font-family: var(--h5-font); }
+.org-flex-view .org-heading-6 { color: var(--h6-color); font-weight: var(--h6-weight); font-family: var(--h6-font); }
+.org-flex-view .org-heading-stars {
+  color: var(--text-faint);
+  font-weight: normal;
+}
+
+.org-flex-view .org-keyword {
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--color-red);
+}
+.org-flex-view .org-keyword-done {
+  color: var(--color-green);
+}
+.org-flex-view .org-priority {
+  color: var(--color-orange);
+  font-size: 0.85em;
+}
+.org-flex-view .org-tags {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-weight: normal;
+}
+
+/* ---------------------------------------------------------------- text */
+
+.org-flex-view .org-text-bold { font-weight: var(--bold-weight, 700); }
+.org-flex-view .org-text-italic { font-style: italic; }
+.org-flex-view .org-text-underline { text-decoration: underline; }
+.org-flex-view .org-text-strikethrough { text-decoration: line-through; color: var(--text-muted); }
+.org-flex-view .org-text-verbatim,
+.org-flex-view .org-text-code {
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  background-color: var(--code-background);
+  border-radius: var(--radius-s);
+  padding: 0.1em 0.25em;
+}
+.org-flex-view .org-markup-marker {
+  color: var(--text-faint);
+}
+
+.org-flex-view .org-link {
+  color: var(--link-color);
+  text-decoration: var(--link-decoration);
+  cursor: var(--cursor-link, pointer);
+}
+.org-flex-view .org-link:hover {
+  color: var(--link-color-hover);
+}
+.org-flex-view .org-link-source {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.org-flex-view .org-image {
+  max-width: 100%;
+  display: block;
+  margin: var(--size-4-1) 0;
+  border-radius: var(--radius-s);
+}
+
+.org-flex-view .org-planning {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+.org-flex-view .org-propertydrawer,
+.org-flex-view .org-drawer {
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+.org-flex-view .org-comment {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.org-flex-view .org-meta-line {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+
+/* LP-4: blocks */
+.org-flex-view .cm-line.org-block {
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  background-color: var(--code-background);
+}
+.org-flex-view .cm-line.org-block-quote,
+.org-flex-view .cm-line.org-block-verse {
+  font-family: inherit;
+  font-size: inherit;
+  border-left: 3px solid var(--blockquote-border-color, var(--interactive-accent));
+  font-style: italic;
+}
+.org-flex-view .org-block-header {
+  color: var(--text-faint);
+  font-size: 0.85em;
+}
+
+/* PARSE-4: source tokens use Obsidian's code colours */
+.org-flex-view .org-tok-keyword { color: var(--code-keyword); }
+.org-flex-view .org-tok-string { color: var(--code-string); }
+.org-flex-view .org-tok-comment { color: var(--code-comment); font-style: italic; }
+.org-flex-view .org-tok-value { color: var(--code-value); }
+.org-flex-view .org-tok-function { color: var(--code-function); }
+.org-flex-view .org-tok-type { color: var(--code-important, var(--code-function)); }
+.org-flex-view .org-tok-property { color: var(--code-property); }
+.org-flex-view .org-tok-tag { color: var(--code-tag); }
+.org-flex-view .org-tok-operator { color: var(--code-operator); }
+.org-flex-view .org-tok-meta { color: var(--code-important); }
+.org-flex-view .org-tok-punctuation { color: var(--code-punctuation); }
+.org-flex-view .org-tok-definition { color: var(--code-normal); }
+
+/* ---------------------------------------------------------------- checkboxes */
+
+.org-flex-view .org-checkbox {
+  margin: 0 0.3em 0 0;
+  vertical-align: middle;
+  cursor: var(--cursor);
+}
+.org-flex-view .org-checkbox-done {
+  text-decoration: var(--checklist-done-decoration, line-through);
+  color: var(--checklist-done-color, var(--text-muted));
+}
+
+/* ---------------------------------------------------------------- front matter */
+
+.org-flex-view .org-front-matter {
+  padding: 0 var(--size-4-2) var(--size-4-3);
+  font-family: var(--font-text);
+}
+.org-flex-view .org-front-matter-title {
+  font-size: var(--inline-title-size);
+  font-weight: var(--inline-title-weight);
+  line-height: var(--inline-title-line-height);
+  font-family: var(--inline-title-font);
+  color: var(--inline-title-color);
+  margin-bottom: var(--size-4-2);
+  cursor: text;
+}
+.org-flex-view .org-properties-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: var(--cursor);
+  user-select: none;
+  -webkit-user-select: none;
+  padding: var(--size-2-2) 0;
+}
+.org-flex-view .org-properties-chevron,
+.org-flex-view .org-backlinks-chevron {
+  display: inline-flex;
+}
+.org-flex-view .org-properties-chevron svg,
+.org-flex-view .org-backlinks-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+.org-flex-view .org-properties-count,
+.org-flex-view .org-backlinks-count {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  background-color: var(--background-modifier-hover);
+  border-radius: var(--radius-s);
+  padding: 0 var(--size-2-2);
+}
+.org-flex-view .org-property {
+  display: grid;
+  grid-template-columns: 20px minmax(80px, 30%) 1fr;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-2) 0;
+  font-size: var(--font-ui-small);
+  cursor: text;
+}
+.org-flex-view .org-property-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.org-flex-view .org-property-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.org-flex-view .org-property-key {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.org-flex-view .org-property-value {
+  overflow-wrap: anywhere;
+}
+.org-flex-view .org-property-value.is-empty {
+  color: var(--text-faint);
+}
+.org-flex-view .org-property-pill {
+  display: inline-block;
+  margin: 0 var(--size-2-2) var(--size-2-1) 0;
+  padding: 0 var(--size-4-2);
+  border-radius: var(--tag-radius, 2em);
+  background-color: var(--tag-background, var(--background-modifier-hover));
+  color: var(--tag-color, var(--text-accent));
+  font-size: var(--font-ui-smaller);
+}
+
+/* ---------------------------------------------------------------- shortcut bar */
+
+/* BAR-1: below the text, one row that scrolls sideways. The app shrinks
+   above the keyboard, so the bar rides on top of it. */
+.org-flex-view .cm-panels-bottom {
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+/* the floating navigation bar covers the bottom of the view while the
+   keyboard is closed; --view-bottom-spacing goes negative once it opens */
+.is-phone.is-floating-nav .org-flex-view .cm-panels-bottom,
+.is-phone.auto-full-screen .org-flex-view .cm-panels-bottom {
+  margin-bottom: max(0px, var(--view-bottom-spacing));
+}
+.is-phone.is-floating-nav .org-flex-view .cm-panels-bottom {
+  margin-bottom: max(0px, calc(var(--view-bottom-spacing) - var(--safe-area-inset-bottom) + var(--navbar-bottom-offset) + var(--size-2-2)));
+}
+.org-flex-view .org-shortcut-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--size-2-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--size-2-2) var(--size-4-2);
+  scrollbar-width: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+.org-flex-view .org-shortcut-bar::-webkit-scrollbar {
+  display: none;
+}
+.org-flex-view .org-shortcut-button {
+  flex: 0 0 auto;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 var(--size-4-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  color: var(--icon-color);
+}
+.org-flex-view .org-shortcut-button.is-disabled {
+  opacity: 0.35;
+}
+
+/* ---------------------------------------------------------------- backlinks */
+
+.org-flex-view .org-backlinks {
+  margin-top: var(--size-4-8);
+  padding: var(--size-4-3) var(--size-4-2) 0;
+  border-top: 1px solid var(--background-modifier-border);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+}
+.org-flex-view .org-backlinks-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  color: var(--text-muted);
+  font-weight: var(--font-semibold);
+  padding: var(--size-4-1) 0;
+  cursor: var(--cursor);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.org-flex-view .org-backlinks-list {
+  padding-left: var(--size-4-4);
+  margin-bottom: var(--size-4-2);
+}
+.org-flex-view .org-backlinks-file {
+  margin: var(--size-4-1) 0 var(--size-4-2);
+}
+.org-flex-view .org-backlinks-title {
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+  cursor: var(--cursor);
+  padding: var(--size-2-1) 0;
+}
+.org-flex-view .org-backlinks-line {
+  color: var(--text-muted);
+  padding: var(--size-2-2) var(--size-4-2);
+  border-radius: var(--radius-s);
+  background-color: var(--background-secondary);
+  margin: var(--size-2-1) 0;
+  cursor: var(--cursor);
+  overflow-wrap: anywhere;
+}
+.org-flex-view .org-backlinks-mention {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+.org-flex-view .org-backlinks-mention-text {
+  flex: 1 1 auto;
+}
+.org-flex-view .org-backlinks-link-button {
+  flex: 0 0 auto;
+  font-size: var(--font-ui-smaller);
+  padding: var(--size-2-1) var(--size-4-2);
+  height: auto;
+}
+.org-flex-view .org-backlinks-empty {
+  color: var(--text-faint);
+  padding: var(--size-2-2) 0;
+}
+
+/* ---------------------------------------------------------------- dialogs */
+
+.org-date-picker .org-date-input {
+  width: 100%;
+  font-size: var(--font-ui-medium);
+}
+.org-new-note-folder {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: var(--size-4-2);
+}
+.org-new-note-title {
+  width: 100%;
+}
+.org-new-note-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+  min-height: 1.5em;
+  margin-top: var(--size-4-1);
+}
+
+.org-calendar-modal .org-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-bottom: var(--size-4-3);
+}
+.org-calendar-modal .org-calendar-month {
+  flex: 1 1 auto;
+  text-align: center;
+  font-weight: var(--font-semibold);
+}
+.org-calendar-modal .org-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--size-2-2);
+}
+.org-calendar-modal .org-calendar-weekday {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.org-calendar-modal .org-calendar-day {
+  position: relative;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--radius-s);
+}
+.org-calendar-modal .org-calendar-day:hover {
+  background-color: var(--background-modifier-hover);
+}
+.org-calendar-modal .org-calendar-day.is-outside {
+  color: var(--text-faint);
+}
+.org-calendar-modal .org-calendar-day.is-today {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.org-calendar-modal .org-calendar-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background-color: var(--text-accent);
+}
+.org-calendar-modal .org-calendar-day.is-today .org-calendar-dot {
+  background-color: var(--text-on-accent);
+}
+
+.org-icon-preview {
+  display: inline-flex;
+  color: var(--icon-color);
+  margin-right: var(--size-4-2);
+}
+input.org-icon-invalid {
+  border-color: var(--text-error) !important;
+}
+
+/* ---------------------------------------------------------------- task lists in Markdown */
+
+.org-tasks .org-tasks-day {
+  font-weight: var(--font-semibold);
+  margin-top: var(--size-4-3);
+}
+.org-tasks .org-tasks-day.is-overdue {
+  color: var(--text-error);
+}
+.org-tasks .org-keyword {
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--color-red);
+  margin-right: var(--size-4-1);
+}
+.org-tasks .org-keyword-done {
+  color: var(--color-green);
+}
+.org-tasks .org-priority {
+  color: var(--color-orange);
+  margin-right: var(--size-4-1);
+}
+.org-tasks .org-tasks-date {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-left: var(--size-4-2);
+}
+.org-tasks .org-tasks-error {
+  color: var(--text-error);
+}
