@@ -3,32 +3,28 @@
 
 import { Notice, setIcon, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { Compartment, EditorSelection, EditorState, Extension, Prec, StateField } from "@codemirror/state";
-import { EditorView, keymap, scrollPastEnd } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
+import { EditorView } from "@codemirror/view";
+import { redo, undo } from "@codemirror/commands";
 import { foldedRanges, unfoldEffect } from "@codemirror/language";
-import { searchKeymap, search } from "@codemirror/search";
 import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
-import { BUTTONS, ButtonId } from "./settings";
+import { barButtons, ButtonId } from "./settings";
 import { nextVisibility, VISIBILITY_NAMES } from "./org/folding";
 import {
   cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { linkDescription, mentionLink, Mention } from "./org/vault-index";
-import { docInfo, OrgHost, orgConfig, orgHost } from "./editor/state";
-import { livePreview } from "./editor/preview";
-import { srcHighlight } from "./editor/src-highlight";
-import { applyVisibility, orgFolding, visibilityField } from "./editor/folding";
-import { checklists } from "./editor/checklists";
+import { OrgHost, orgConfig, orgHost } from "./editor/state";
+import { applyVisibility, visibilityField } from "./editor/folding";
 import { frontMatterPanel } from "./editor/front-matter-panel";
 import { BacklinksData, backlinksSection, setBacklinks } from "./editor/backlinks";
 import { headingDrag } from "./editor/heading-drag";
 import { shortcutBar } from "./editor/shortcut-bar";
-import { orgCompletion } from "./editor/completion";
+import { coreExtensions, externalChange, lockOuterScroll, VIEW_TYPE } from "./editor/setup";
 import { DatePickerModal } from "./ui/modals";
 
-export const VIEW_TYPE = "org-flex";
+export { VIEW_TYPE };
 
 export class OrgFlexView extends TextFileView {
   editor: EditorView | null = null;
@@ -92,16 +88,8 @@ export class OrgFlexView extends TextFileView {
       return;
     }
     // VIEW-9: a change on disk is applied as an edit, keeping cursor, folds and history
-    const old = this.editor.state.doc.toString();
-    if (old === data) return;
-    let start = 0;
-    while (start < old.length && start < data.length && old[start] === data[start]) start++;
-    let end = 0;
-    while (end < old.length - start && end < data.length - start && old[old.length - 1 - end] === data[data.length - 1 - end]) end++;
-    this.editor.dispatch({
-      changes: { from: start, to: old.length - end, insert: data.slice(start, data.length - end) },
-      userEvent: "external",
-    });
+    const changes = externalChange(this.editor.state.doc.toString(), data);
+    if (changes) this.editor.dispatch({ changes, userEvent: "external" });
   }
 
   clear() {
@@ -163,7 +151,7 @@ export class OrgFlexView extends TextFileView {
     const s = this.plugin.settings;
     if (!s.showShortcutBar) return [];
     return shortcutBar({
-      buttons: BUTTONS.filter((b) => s.shortcutBarButtons.includes(b.id)),
+      buttons: barButtons(s.shortcutBarButtons),
       icon: (def) => this.plugin.buttonIcon(def),
       setIcon,
       run: (id, view) => this.runButton(id, view),
@@ -187,20 +175,7 @@ export class OrgFlexView extends TextFileView {
         this.vimCompartment.of(this.vimOn ? Prec.highest(vim()) : []),
         this.configCompartment.of(this.configExtension()),
         orgHost.of(this.host()),
-        docInfo,
-        history(),
-        search({ top: true }),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
-        EditorView.lineWrapping,
-        scrollPastEnd(),
-        EditorView.contentAttributes.of(spell
-          ? { spellcheck: "true", autocorrect: "on", autocapitalize: "on" }
-          : { spellcheck: "false" }),
-        livePreview(),
-        srcHighlight,
-        orgFolding(),
-        checklists(),
-        orgCompletion(),
+        coreExtensions({ spellcheck: spell }),
         this.featureCompartment.of(this.featureExtension()),
         this.barCompartment.of(this.barExtension()),
         EditorView.updateListener.of((update) => {
@@ -373,21 +348,12 @@ export class OrgFlexView extends TextFileView {
   // MOB-4: only .cm-scroller scrolls
 
   private lockOuterScroll() {
-    const reset = () => {
-      for (const el of [this.contentEl, this.containerEl, (this.leaf as unknown as { containerEl?: HTMLElement }).containerEl, this.editor?.dom, document.scrollingElement]) {
-        if (el && el.scrollTop !== 0) el.scrollTop = 0;
-      }
-    };
-    for (const el of [this.contentEl, this.containerEl]) {
-      this.registerDomEvent(el, "scroll", reset);
-    }
-    this.registerDomEvent(document, "scroll", reset, { capture: false });
-    this.registerDomEvent(this.contentEl, "focusin", () => window.setTimeout(reset, 0));
-    const vv = window.visualViewport;
-    if (vv) {
-      const onResize = () => reset();
-      vv.addEventListener("resize", onResize);
-      this.register(() => vv.removeEventListener("resize", onResize));
-    }
+    const leafEl = (this.leaf as unknown as { containerEl?: HTMLElement }).containerEl;
+    this.register(lockOuterScroll(
+      () => [this.contentEl, this.containerEl, leafEl, this.editor?.dom, document.scrollingElement],
+      [this.contentEl, this.containerEl],
+      this.contentEl,
+      window,
+    ));
   }
 }

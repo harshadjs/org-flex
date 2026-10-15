@@ -1,7 +1,7 @@
 // Org Flex: Org mode files in Obsidian, on the desktop and the phone.
 
 import { getIcon, Notice, Plugin, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
-import { ButtonDef, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
+import { ButtonDef, buttonIconName, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
 import { Keywords, classifyLink } from "./org/syntax";
 import { readNote, VaultIndex } from "./org/vault-index";
 import { journalEntries, journalFileContent, journalPathForDate } from "./org/journal";
@@ -80,8 +80,7 @@ export default class OrgFlexPlugin extends Plugin {
 
   /** BAR-7: the custom icon when Lucide knows it, else the default. */
   buttonIcon(def: ButtonDef): string {
-    const custom = this.settings.shortcutCustomIcons[def.id]?.trim();
-    return custom && getIcon(custom) ? custom : def.icon;
+    return buttonIconName(def, this.settings.shortcutCustomIcons[def.id], (name) => Boolean(getIcon(name)));
   }
 
   forEachView(fn: (view: OrgFlexView) => void) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseTasks, toggleTaskInText } from "../src/org/tasks";
+import { parseTasks, taskBlockConfig, toggleTaskInText } from "../src/org/tasks";
 import { agenda, overdueLabel, parseQuery, QueryError, runQuery } from "../src/org/query";
 
 const kw = { todo: ["TODO", "NEXT"], done: ["DONE", "CANCELLED"] };
@@ -95,4 +95,11 @@ describe("queries", () => {
     expect(overdueLabel("de-DE")).toBe("Überfällig");
     expect(overdueLabel("xx")).toBe("Overdue");
   });
+});
+
+test("a task block needs filepath: and defaults its query", () => {
+  expect(taskBlockConfig({ filepath: " tasks.org " })).toEqual({ filepath: "tasks.org", query: "it.todo or it.done" });
+  expect(taskBlockConfig({ filepath: "t.org", query: "it.todo o.p" })).toEqual({ filepath: "t.org", query: "it.todo o.p" });
+  expect(() => taskBlockConfig({ query: "it.todo" })).toThrow("filepath: is required");
+  expect(() => taskBlockConfig(null)).toThrow("filepath: is required");
 });

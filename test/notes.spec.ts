@@ -1,13 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { Text } from "@codemirror/state";
 import { analyze } from "../src/org/syntax";
-import { foldAt, visibilityFolds } from "../src/org/folding";
+import { foldAt, nextVisibility, visibilityFolds } from "../src/org/folding";
 import { displayValue, parseFrontMatter, propertyIcon, simplifyValue } from "../src/org/front-matter";
 import {
   calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, journalPathForDate,
 } from "../src/org/journal";
 import { notePath, noteFileContent, titleProblem } from "../src/org/new-note";
-import { mergeSettings, migrateShortcutButtons, parseKeywordList, DEFAULT_SETTINGS } from "../src/settings";
+import {
+  barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, parseKeywordList, DEFAULT_SETTINGS,
+} from "../src/settings";
 
 function folds(lines: string[]) {
   const doc = Text.of(lines);
@@ -45,6 +47,12 @@ describe("folding", () => {
     expect(f.at(3)).toBe("\n1\n#+end_src");
     // FOLD-7: the front matter drawer is locked while the panel is on
     expect(f.at(0, 0)).toBeNull();
+  });
+
+  test("nextVisibility goes fold all, outline, expand all and back", () => {
+    expect(nextVisibility("foldall")).toBe("outline");
+    expect(nextVisibility("outline")).toBe("expandall");
+    expect(nextVisibility("expandall")).toBe("foldall");
   });
 
   test("visibility cycling: fold all, outline, expand all", () => {
@@ -167,6 +175,28 @@ describe("settings", () => {
   test("migrateShortcutButtons replaces id-link with wiki-link in place", () => {
     expect(migrateShortcutButtons(["undo", "id-link", "todo"], 3).buttons).toEqual(["undo", "wiki-link", "todo"]);
     expect(migrateShortcutButtons(["undo", "todo"], 3).buttons).toEqual(["undo", "todo"]);
+  });
+
+  test("bar buttons keep BUTTONS order and ignore unknown ids", () => {
+    expect(BUTTONS.map((b) => b.id)).toEqual([
+      "undo", "redo", "visibility", "demote", "promote", "todo", "schedule", "deadline",
+      "checkbox", "wiki-link", "journal", "journal-picker", "journal-calendar", "new-note",
+    ]);
+    expect(barButtons(["todo", "stars", "undo"]).map((b) => b.id)).toEqual(["undo", "todo"]);
+  });
+
+  test("a fresh bar has the editing buttons on and the journal and note buttons off", () => {
+    expect(DEFAULT_SETTINGS.shortcutBarButtons).toEqual([
+      "undo", "redo", "visibility", "demote", "promote", "todo", "schedule", "deadline", "checkbox", "wiki-link",
+    ]);
+  });
+
+  test("a custom icon is used only when it names a known icon", () => {
+    const todo = BUTTONS.find((b) => b.id === "todo")!;
+    const known = (name: string) => name === "star";
+    expect(buttonIconName(todo, " star ", known)).toBe("star");
+    expect(buttonIconName(todo, "no-such-icon", known)).toBe("circle-check");
+    expect(buttonIconName(todo, undefined, known)).toBe("circle-check");
   });
 
   test("keyword lists accept commas or newlines", () => {

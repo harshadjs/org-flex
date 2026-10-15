@@ -71,3 +71,11 @@ export function toggleTaskInText(text: string, task: OrgTask, keywords: Keywords
     : line.slice(0, parts.stars.to) + next + " " + line.slice(parts.stars.to);
   return lines.join("\n");
 }
+
+/** TASK-1: the block's settings from its parsed YAML; `filepath:` is required. */
+export function taskBlockConfig(yaml: unknown): { filepath: string; query: string } {
+  const config = (yaml && typeof yaml === "object" ? yaml : {}) as Record<string, unknown>;
+  if (typeof config.filepath !== "string" || !config.filepath.trim()) throw new Error("filepath: is required");
+  const query = config.query === undefined || config.query === null ? "it.todo or it.done" : String(config.query);
+  return { filepath: config.filepath.trim(), query };
+}

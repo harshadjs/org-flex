@@ -2,10 +2,8 @@
 
 import { MarkdownPostProcessorContext, MarkdownRenderChild, moment, parseYaml, TFile } from "obsidian";
 import type OrgFlexPlugin from "../main";
-import { parseTasks, OrgTask, toggleTaskInText } from "../org/tasks";
+import { parseTasks, OrgTask, taskBlockConfig, toggleTaskInText } from "../org/tasks";
 import { agenda, overdueLabel, parseQuery, runQuery } from "../org/query";
-
-const DEFAULT_QUERY = "it.todo or it.done";
 
 class TaskList extends MarkdownRenderChild {
   constructor(el: HTMLElement, private plugin: OrgFlexPlugin, private source: string, private sourcePath: string) {
@@ -20,10 +18,7 @@ class TaskList extends MarkdownRenderChild {
   }
 
   private config(): { filepath: string; query: string } {
-    const yaml = (parseYaml(this.source) ?? {}) as Record<string, unknown>;
-    if (typeof yaml.filepath !== "string" || !yaml.filepath.trim()) throw new Error("filepath: is required");
-    const query = yaml.query === undefined ? DEFAULT_QUERY : String(yaml.query);
-    return { filepath: yaml.filepath.trim(), query };
+    return taskBlockConfig(parseYaml(this.source));
   }
 
   private file(): TFile | null {

@@ -4,14 +4,14 @@
 This repository contains the Org Flex Obsidian plugin (ID: `org-flex`): Org mode editing, live preview, folding, checklists, a journal, backlinks and task lists in Obsidian, built on its own bundled CodeMirror 6 editor and made to work as well on a phone as on the desktop.
 
 ## Behaviour Spec
-`SPEC.md` is the contract for how the plugin behaves. Read the sections your change touches before changing anything. Any change that alters behaviour must update the matching rule in the same commit. Finish with the checks in its §15 (tests, type-check, build).
+`SPEC.md` is the contract for how the plugin behaves. Read the sections your change touches before changing anything. Any change that alters behaviour must update the matching rule in the same commit. Finish with the checks in its §15 (tests, type-check, build). Every rule must be testable: it names its tests (**Test:**) or says why only a person in Obsidian can check it (**Manual:**, with a line in the §16 checklist); `test/spec.spec.ts` enforces this. Keep logic out of the Obsidian-importing files (`src/view.ts`, `src/main.ts`, `src/ui/`) so it can be tested.
 
 ## Layout
 - `src/org/` — pure Org logic (parsing, lists, editing commands, folding rules, front matter, journal, notes, index, task queries). No Obsidian imports; tested directly.
 - `src/editor/` — CodeMirror extensions (live preview, folding, checklists, front matter panel, backlinks, heading drag, shortcut bar, completion).
 - `src/ui/` — Obsidian dialogs, the settings tab and the `orgmode-tasks` block.
 - `src/view.ts` — the org file view; `src/main.ts` — the plugin.
-- `test/` — vitest; `test/dom.spec.ts` mounts the whole editor in happy-dom.
+- `test/` — vitest; `dom.spec.ts` and `ui.spec.ts` run the editor in happy-dom, `packaging.spec.ts` reads the manifest, build config and CSS, `spec.spec.ts` checks SPEC.md.
 
 ## Obsidian Vault Integration & Deployment
 

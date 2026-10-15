@@ -35,6 +35,17 @@ export const BUTTONS: ButtonDef[] = [
   { id: "new-note", name: "New org note", icon: "file-plus", enabled: false, refocus: false },
 ];
 
+/** BAR-2: the buttons to show, always in `BUTTONS` order; unknown ids are ignored. */
+export function barButtons(enabled: string[]): ButtonDef[] {
+  return BUTTONS.filter((b) => enabled.includes(b.id));
+}
+
+/** BAR-7: a custom icon when it names a known icon, else the button's default. */
+export function buttonIconName(def: ButtonDef, custom: string | undefined, known: (name: string) => boolean): string {
+  const name = custom?.trim();
+  return name && known(name) ? name : def.icon;
+}
+
 export interface OrgFlexSettings {
   todoKeywords: string[];
   doneKeywords: string[];
