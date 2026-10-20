@@ -80,22 +80,17 @@
 .org-flex-view .cm-content {
   margin: 0 auto;
 }
+/* FOLD-3: the left padding is the margin the fold arrows hang in */
 .org-flex-view .cm-line {
-  padding: 0 var(--size-4-2);
+  padding: 0 var(--size-4-2) 0 24px;
 }
 .org-flex-view .cm-selectionBackground,
 .org-flex-view .cm-content ::selection {
   background-color: var(--text-selection) !important;
 }
 
-/* ---------------------------------------------------------------- gutters */
+/* ---------------------------------------------------------------- folding */
 
-/* FOLD-3: no background, no border */
-.org-flex-view .cm-gutters {
-  background: transparent;
-  border: none;
-  color: var(--text-faint);
-}
 .org-flex-view .org-fold-marker {
   display: inline-flex;
   align-items: center;
@@ -108,55 +103,40 @@
 .org-flex-view .org-fold-marker:hover {
   color: var(--text-normal);
 }
+/* FOLD-3: the arrow hangs in the line's left margin, so text stays aligned */
+.org-flex-view .org-fold-toggle {
+  position: absolute;
+  width: 22px;
+  height: 1lh;
+  margin-left: -22px;
+  opacity: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.org-flex-view .org-fold-toggle.is-shown {
+  opacity: 1;
+}
+@media (hover: hover) {
+  .org-flex-view .cm-line:hover > .org-fold-toggle {
+    opacity: 1;
+  }
+}
+/* FOLD-3: a target taller than the line, still tappable while invisible */
+.org-flex-view .org-fold-toggle::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -2px;
+  right: 0;
+}
 .org-flex-view .cm-foldPlaceholder {
   background: transparent;
   border: none;
   color: var(--text-faint);
   padding: 0 4px;
   cursor: var(--cursor);
-}
-
-/* DRAG-1: the grip, faint until used */
-.org-flex-view .org-drag-gutter .cm-gutterElement {
-  display: flex;
-  align-items: flex-start;
-}
-.org-flex-view .org-drag-grip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  min-height: 1.5em;
-  color: var(--text-faint);
-  opacity: 0.35;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.org-flex-view .org-drag-grip svg {
-  width: 14px;
-  height: 14px;
-}
-.org-flex-view .org-drag-grip:hover,
-.org-flex-view .org-dragging .org-drag-grip {
-  opacity: 1;
-}
-.org-flex-view .org-dragging,
-.org-flex-view .org-dragging * {
-  cursor: grabbing !important;
-  user-select: none;
-}
-.org-flex-view .org-drop-line {
-  position: absolute;
-  height: 2px;
-  background-color: var(--interactive-accent);
-  border-radius: 1px;
-  pointer-events: none;
-  z-index: 10;
-}
-.org-flex-view .org-drop-line.is-hidden {
-  display: none;
 }
 
 /* ---------------------------------------------------------------- headings */
@@ -304,7 +284,8 @@
 /* ---------------------------------------------------------------- front matter */
 
 .org-flex-view .org-front-matter {
-  padding: 0 var(--size-4-2) var(--size-4-3);
+  /* left edge lines up with the text (FOLD-3's margin) */
+  padding: 0 var(--size-4-2) var(--size-4-3) 24px;
   font-family: var(--font-text);
 }
 .org-flex-view .org-front-matter-title {
@@ -385,14 +366,14 @@
 
 /* ---------------------------------------------------------------- shortcut bar */
 
-/* BAR-1: below the text, one row that scrolls sideways. The app shrinks
-   above the keyboard, so the bar rides on top of it. */
+/* BAR-1: below the text. The app shrinks above the keyboard, so the bar
+   rides on top of it. */
 .org-flex-view .cm-panels-bottom {
   border-top: 1px solid var(--background-modifier-border);
   background-color: var(--background-primary);
 }
 /* the floating navigation bar covers the bottom of the view while the
-   keyboard is closed; --view-bottom-spacing goes negative once it opens */
+   keyboard is closed */
 .is-phone.is-floating-nav .org-flex-view .cm-panels-bottom,
 .is-phone.auto-full-screen .org-flex-view .cm-panels-bottom {
   margin-bottom: max(0px, var(--view-bottom-spacing));
@@ -400,13 +381,22 @@
 .is-phone.is-floating-nav .org-flex-view .cm-panels-bottom {
   margin-bottom: max(0px, calc(var(--view-bottom-spacing) - var(--safe-area-inset-bottom) + var(--navbar-bottom-offset) + var(--size-2-2)));
 }
+/* BAR-1: flush on the keyboard while it is open (trackKeyboard), with no
+   gap left for the navigation bar it hides */
+.is-phone .org-flex-view.org-keyboard-open .cm-panels-bottom,
+.is-phone.auto-full-screen .org-flex-view.org-keyboard-open .cm-panels-bottom,
+.is-phone.is-floating-nav .org-flex-view.org-keyboard-open .cm-panels-bottom {
+  margin-bottom: 0;
+}
+/* BAR-1: one row that scrolls sideways. BAR-9: the buttons touch, so there
+   is no dead space between them to miss in */
 .org-flex-view .org-shortcut-bar {
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--size-2-2);
+  gap: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: var(--size-2-2) var(--size-4-2);
+  padding: var(--size-2-1) var(--size-4-1);
   scrollbar-width: none;
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
@@ -416,8 +406,8 @@
 }
 .org-flex-view .org-shortcut-button {
   flex: 0 0 auto;
-  min-width: 36px;
-  height: 32px;
+  min-width: 40px;
+  height: 36px;
   padding: 0 var(--size-4-1);
   display: inline-flex;
   align-items: center;
@@ -425,7 +415,34 @@
   background: transparent;
   box-shadow: none;
   border: none;
+  border-radius: var(--radius-m);
   color: var(--icon-color);
+  -webkit-tap-highlight-color: transparent;
+}
+.org-flex-view .org-shortcut-button svg {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
+/* BAR-9: phones get full-size touch targets and bigger icons */
+.is-mobile .org-flex-view .org-shortcut-button {
+  min-width: 48px;
+  height: 44px;
+}
+.is-mobile .org-flex-view .org-shortcut-button svg {
+  width: var(--icon-l);
+  height: var(--icon-l);
+  stroke-width: 2px;
+}
+/* BAR-9: a tap shows at once that it landed */
+.org-flex-view .org-shortcut-button:active {
+  background-color: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  color: var(--icon-color-active, var(--text-normal));
+}
+@media (hover: hover) {
+  .org-flex-view .org-shortcut-button:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--icon-color-hover);
+  }
 }
 .org-flex-view .org-shortcut-button.is-disabled {
   opacity: 0.35;
@@ -435,7 +452,8 @@
 
 .org-flex-view .org-backlinks {
   margin-top: var(--size-4-8);
-  padding: var(--size-4-3) var(--size-4-2) 0;
+  /* left edge lines up with the text (FOLD-3's margin) */
+  padding: var(--size-4-3) var(--size-4-2) 0 24px;
   border-top: 1px solid var(--background-modifier-border);
   font-family: var(--font-interface);
   font-size: var(--font-ui-small);
@@ -605,4 +623,66 @@ input.org-icon-invalid {
 }
 .org-tasks .org-tasks-error {
   color: var(--text-error);
+}
+
+/* LP-10: the create entry's section needs no header; its detail says it all */
+.org-completion-section {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- zoom */
+
+/* ZOOM-2: the breadcrumb strip above the text while zoomed; one row that
+   scrolls sideways, like the shortcut bar */
+.org-flex-view .cm-panels-top {
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+.org-flex-view .org-zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: var(--size-2-2) var(--size-4-2) var(--size-2-2) 24px;
+  font-size: var(--font-ui-small);
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.org-flex-view .org-zoom-bar::-webkit-scrollbar {
+  display: none;
+}
+.org-flex-view .org-zoom-crumb {
+  color: var(--text-accent);
+  cursor: pointer;
+  /* a comfortable tap target without making the strip taller */
+  padding: var(--size-2-1) 0;
+}
+.org-flex-view .org-zoom-crumb.is-current {
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+  cursor: default;
+}
+.org-flex-view .org-zoom-sep {
+  color: var(--text-faint);
+}
+.org-flex-view .org-shortcut-button.is-active {
+  color: var(--text-accent);
+  background-color: var(--background-modifier-hover);
+}
+
+/* FIND-1: the node finder's rows: title, then where it lives */
+.org-node-choice {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-4-2);
+}
+.org-node-detail {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.org-node-create .org-node-icon {
+  align-self: center;
+  display: flex;
+  color: var(--text-accent);
 }

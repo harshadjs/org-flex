@@ -15,7 +15,7 @@ export interface NoteId {
 const DEFAULT_KEYWORDS: Keywords = { todo: ["TODO"], done: ["DONE"] };
 
 /** A heading's title as a reader sees it: no keyword, priority or tags, links as their text. */
-function headingTitle(line: string, keywords: Keywords): string {
+export function headingTitle(line: string, keywords: Keywords): string {
   const parts = parseHeading(line, keywords);
   if (!parts) return line.trim();
   return line.slice(parts.title.from, parts.title.to)

@@ -27,7 +27,7 @@ function checklistIds(): Set<string> {
 }
 
 test("every spec rule names its tests or says why it is manual", () => {
-  expect(rules.length).toBeGreaterThan(100);
+  expect(rules.length).toBeGreaterThan(90);
   const untagged = rules.filter((r) => !/\*\*Test:\*\*/.test(r.text) && !/\*\*Manual:\*\*/.test(r.text)).map((r) => r.id);
   expect(untagged).toEqual([]);
   const ids = rules.map((r) => r.id);

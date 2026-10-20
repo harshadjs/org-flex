@@ -2,26 +2,27 @@
 // editor.
 
 import { Notice, setIcon, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
-import { Compartment, EditorSelection, EditorState, Extension, Prec, StateField } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState, Extension, Prec, StateEffect, StateField } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { redo, undo } from "@codemirror/commands";
 import { foldedRanges, unfoldEffect } from "@codemirror/language";
 import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
 import { barButtons, ButtonId } from "./settings";
-import { nextVisibility, VISIBILITY_NAMES } from "./org/folding";
+import { nextVisibility } from "./org/folding";
 import {
-  cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
+  assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { linkDescription, mentionLink, Mention } from "./org/vault-index";
 import { OrgHost, orgConfig, orgHost } from "./editor/state";
+import { revealZoomEffects, toggleZoom, zoomToHeadingAt } from "./editor/zoom";
 import { applyVisibility, visibilityField } from "./editor/folding";
 import { frontMatterPanel } from "./editor/front-matter-panel";
 import { BacklinksData, backlinksSection, setBacklinks } from "./editor/backlinks";
-import { headingDrag } from "./editor/heading-drag";
 import { shortcutBar } from "./editor/shortcut-bar";
-import { coreExtensions, externalChange, lockOuterScroll, VIEW_TYPE } from "./editor/setup";
+import { insertLinkWithCompletion } from "./editor/completion";
+import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard, VIEW_TYPE } from "./editor/setup";
 import { DatePickerModal } from "./ui/modals";
 
 export { VIEW_TYPE };
@@ -63,6 +64,8 @@ export class OrgFlexView extends TextFileView {
   async onOpen() {
     this.contentEl.addClass("org-flex-view");
     this.lockOuterScroll();
+    // BAR-1: the bar sits flush on the keyboard
+    this.register(trackKeyboard(this.contentEl, window));
   }
 
   async onClose() {
@@ -124,6 +127,8 @@ export class OrgFlexView extends TextFileView {
         });
         return [...titled, ...files];
       },
+      createNote: (title) => this.plugin.createNoteFromLink(title),
+      title: () => (this.file && this.plugin.index.notes.get(this.file.path)?.title) || this.file?.basename || "",
       idCompletions: () => this.plugin.index.ids().map(({ id, path }) => ({ label: id, detail: path, target: id, type: "constant" })),
     };
   }
@@ -143,7 +148,6 @@ export class OrgFlexView extends TextFileView {
     return [
       s.frontMatterPanel ? frontMatterPanel() : [],
       s.backlinks ? this.backlinksField : [],
-      s.headingDragHandles ? headingDrag() : [],
     ];
   }
 
@@ -252,7 +256,7 @@ export class OrgFlexView extends TextFileView {
     const editor = this.editor;
     if (!editor) return;
     pos = Math.min(pos, editor.state.doc.length);
-    const effects: ReturnType<typeof unfoldEffect.of>[] = [];
+    const effects: StateEffect<unknown>[] = revealZoomEffects(editor.state, pos);
     foldedRanges(editor.state).between(pos, pos, (from, to) => {
       if (from <= pos && to >= pos) effects.push(unfoldEffect.of({ from, to }));
     });
@@ -261,6 +265,11 @@ export class OrgFlexView extends TextFileView {
       selection: EditorSelection.cursor(pos),
     });
     if (options.focus) editor.focus();
+  }
+
+  /** ZOOM-5: show the heading at `pos` zoomed in, scrolled to the top; anything else is revealed as usual. */
+  revealHeading(pos: number) {
+    if (this.editor && !zoomToHeadingAt(this.editor, pos)) this.revealPosition(pos, { top: true });
   }
 
   revealLine(line: number, options: { top?: boolean; focus?: boolean } = {}) {
@@ -279,13 +288,19 @@ export class OrgFlexView extends TextFileView {
       case "undo": undo(view); break;
       case "redo": redo(view); break;
       case "visibility": this.cycleVisibility(); break;
+      case "zoom": toggleZoom(view); break;
+      case "new-heading": this.run(insertHeading(state)); break;
       case "demote": this.run(increaseHeadingLevel(state)); break;
       case "promote": this.run(decreaseHeadingLevel(state)); break;
       case "todo": this.run(cycleTaskState(state, keywords)); break;
       case "schedule": this.pickDate("SCHEDULED"); break;
       case "deadline": this.pickDate("DEADLINE"); break;
       case "checkbox": this.run(toggleCheckbox(state)); break;
-      case "wiki-link": this.run(insertWikiLink(state)); break;
+      case "src-block": this.run(insertBlock(state, "src")); break;
+      case "quote-block": this.run(insertBlock(state, "quote")); break;
+      case "wiki-link": insertLinkWithCompletion(view, insertWikiLink(state)); break;
+      case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
+      case "node-find": this.plugin.findNode(); break;
       case "journal": void this.plugin.openJournal(new Date()); break;
       case "journal-picker": this.plugin.browseJournal(); break;
       case "journal-calendar": this.plugin.openCalendar(); break;
@@ -298,19 +313,28 @@ export class OrgFlexView extends TextFileView {
   }
 
   /** Commands that edit (§9.3). */
-  command(name: "stars" | "demote" | "promote" | "todo" | "checkbox" | "id-link" | "wiki-link") {
+  command(name: "stars" | "new-heading" | "demote" | "promote" | "todo" | "checkbox" | "src-block" | "quote-block" | "id-link" | "wiki-link" | "heading-id") {
     const editor = this.editor;
     if (!editor) return;
     const state = editor.state;
     switch (name) {
       case "stars": this.run(toggleLeadingStars(state)); break;
+      case "new-heading": this.run(insertHeading(state)); break;
       case "demote": this.run(increaseHeadingLevel(state)); break;
       case "promote": this.run(decreaseHeadingLevel(state)); break;
       case "todo": this.run(cycleTaskState(state, this.plugin.keywords())); break;
       case "checkbox": this.run(toggleCheckbox(state)); break;
-      case "id-link": this.run(insertIdLink(state)); break;
-      case "wiki-link": this.run(insertWikiLink(state)); break;
+      case "src-block": this.run(insertBlock(state, "src")); break;
+      case "quote-block": this.run(insertBlock(state, "quote")); break;
+      case "id-link": insertLinkWithCompletion(editor, insertIdLink(state)); break;
+      case "wiki-link": insertLinkWithCompletion(editor, insertWikiLink(state)); break;
+      case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
     }
+  }
+
+  /** ZOOM-1, ZOOM-3 */
+  toggleZoom() {
+    if (this.editor) toggleZoom(this.editor);
   }
 
   /** FOLD-6 */
@@ -319,7 +343,6 @@ export class OrgFlexView extends TextFileView {
     if (!editor) return;
     const next = nextVisibility(editor.state.field(visibilityField));
     applyVisibility(editor, next);
-    new Notice(`Visibility: ${VISIBILITY_NAMES[next]}`);
   }
 
   /** ACT-4 */

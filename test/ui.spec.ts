@@ -5,12 +5,12 @@ import { Compartment, EditorSelection, EditorState, Extension } from "@codemirro
 import { EditorView } from "@codemirror/view";
 import { foldedRanges } from "@codemirror/language";
 import { DEFAULT_CONFIG, onTap, OrgHost, orgConfig, orgHost } from "../src/editor/state";
-import { coreExtensions, externalChange, lockOuterScroll } from "../src/editor/setup";
+import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard } from "../src/editor/setup";
 import { applyVisibility } from "../src/editor/folding";
 import { frontMatterPanel } from "../src/editor/front-matter-panel";
 import { BacklinksActions, backlinksSection, setBacklinks } from "../src/editor/backlinks";
-import { headingDrag } from "../src/editor/heading-drag";
 import { shortcutBar } from "../src/editor/shortcut-bar";
+import { revealZoomEffects, toggleZoom, zoomField, zoomToHeadingAt } from "../src/editor/zoom";
 import { BUTTONS, ButtonId } from "../src/settings";
 
 const views: EditorView[] = [];
@@ -128,6 +128,70 @@ test("lockOuterScroll puts outer containers back at the top", () => {
   expect(outer.scrollTop).toBe(40);
 });
 
+test("trackKeyboard marks the view while the keyboard takes the bottom of the screen", () => {
+  const vv = new EventTarget() as EventTarget & { height: number };
+  const win = Object.assign(new EventTarget(), {
+    innerWidth: 400, innerHeight: 780, screen: { availHeight: 800 }, visualViewport: vv,
+  }) as unknown as Window & { innerHeight: number; innerWidth: number };
+  vv.height = 780;
+  const el = document.createElement("div");
+  const stop = trackKeyboard(el, win);
+  const open = () => el.classList.contains("org-keyboard-open");
+  expect(open()).toBe(false);
+  // Android: the window shrinks
+  win.innerHeight = 450;
+  win.dispatchEvent(new Event("resize"));
+  expect(open()).toBe(true);
+  win.innerHeight = 780;
+  win.dispatchEvent(new Event("resize"));
+  expect(open()).toBe(false);
+  // iOS: only the visual viewport shrinks
+  vv.height = 430;
+  vv.dispatchEvent(new Event("resize"));
+  expect(open()).toBe(true);
+  vv.height = 780;
+  vv.dispatchEvent(new Event("resize"));
+  // turned sideways: a shorter screen without the keyboard is not the keyboard
+  Object.assign(win, { innerWidth: 800, innerHeight: 380, screen: { availHeight: 400 } });
+  vv.height = 380;
+  win.dispatchEvent(new Event("resize"));
+  expect(open()).toBe(false);
+  vv.height = 200;
+  vv.dispatchEvent(new Event("resize"));
+  expect(open()).toBe(true);
+  stop();
+  expect(open()).toBe(false);
+  // opened with the keyboard already up
+  Object.assign(win, { innerWidth: 400, innerHeight: 450, screen: { availHeight: 800 } });
+  vv.height = 450;
+  const again = document.createElement("div");
+  const stop2 = trackKeyboard(again, win);
+  expect(again.classList.contains("org-keyboard-open")).toBe(true);
+  stop2();
+});
+
+test("trackKeyboard follows the Obsidian app's keyboard events over the height", () => {
+  const win = Object.assign(new EventTarget(), {
+    innerWidth: 400, innerHeight: 780, screen: { availHeight: 800 }, visualViewport: null,
+  }) as unknown as Window;
+  const el = document.createElement("div");
+  const stop = trackKeyboard(el, win);
+  const open = () => el.classList.contains("org-keyboard-open");
+  // the window doesn't shrink, but the app says the keyboard is up
+  win.dispatchEvent(new Event("keyboardWillShow"));
+  expect(open()).toBe(true);
+  win.dispatchEvent(new Event("resize"));
+  expect(open()).toBe(true);
+  // attaching a hardware keyboard isn't the on-screen one closing
+  win.dispatchEvent(Object.assign(new Event("keyboardWillHide"), { hasPhysicalKeyboard: true }));
+  expect(open()).toBe(true);
+  win.dispatchEvent(new Event("keyboardWillHide"));
+  expect(open()).toBe(false);
+  stop();
+  win.dispatchEvent(new Event("keyboardWillShow"));
+  expect(open()).toBe(false);
+});
+
 test("onTap runs on a still tap or a click, never on a swipe, and keeps focus away", () => {
   const el = document.body.appendChild(document.createElement("button"));
   let runs = 0;
@@ -240,28 +304,64 @@ test("tapping a rendered link opens it; a raw link or a swipe doesn't", () => {
 
 // ---------------------------------------------------------------- folding and dragging
 
-test("fold markers are SVG arrows and folded text shows as …", () => {
-  const { view } = mount("* a\ntext\n* b\nmore", [], 0);
-  // the gutter's hidden spacer holds one more marker, for sizing
-  const markers = () => Array.from(view.dom.querySelectorAll(".cm-foldGutter .org-fold-marker"))
-    .filter((m) => (m.closest(".cm-gutterElement") as HTMLElement).style.visibility !== "hidden");
-  expect(markers().length).toBe(2);
-  expect(markers().every((m) => m.querySelector("svg") && m.classList.contains("is-open"))).toBe(true);
+test("fold arrows hang at the start of foldable lines, and there is no fold gutter", () => {
+  const doc = "* a\ntext\n:LOGBOOK:\nx\n:END:\n* b\nmore\n* leaf";
+  const { view } = mount(doc, [], doc.length, { hideStars: true });
+  expect(view.dom.querySelector(".cm-foldGutter")).toBeNull();
+  const toggle = (n: number) => lineEl(view, n).querySelector(".org-fold-toggle") as HTMLElement | null;
+  expect(toggle(1)!.querySelector("svg")).not.toBeNull();
+  expect(toggle(1)!.classList.contains("is-open")).toBe(true);
+  // first on the line, before the (hidden) stars and the title
+  expect(lineEl(view, 1).firstElementChild).toBe(toggle(1));
+  expect(lineEl(view, 1).textContent).toBe("a");
+  expect(toggle(3)).not.toBeNull();
+  // nothing to fold, no arrow
+  expect(toggle(2)).toBeNull();
+  expect(toggle(8)).toBeNull();
   applyVisibility(view, "foldall");
-  expect(markers().every((m) => m.classList.contains("is-folded"))).toBe(true);
+  expect(toggle(1)!.classList.contains("is-folded")).toBe(true);
   expect(view.dom.querySelector(".cm-foldPlaceholder")?.textContent).toBe("…");
 });
 
-test("every heading has a drag grip in its own gutter, right of the fold gutter", () => {
-  const { view, opened } = mount("* a\ntext\n** b\nc", headingDrag());
-  const gutters = Array.from(view.dom.querySelectorAll(".cm-gutter")).map((g) => g.className);
-  const fold = gutters.findIndex((c) => c.includes("cm-foldGutter"));
-  const drag = gutters.findIndex((c) => c.includes("org-drag-gutter"));
-  expect(fold).toBeGreaterThanOrEqual(0);
-  expect(drag).toBeGreaterThan(fold);
-  const grips = Array.from(view.dom.querySelectorAll(".org-drag-gutter .org-drag-grip")) as HTMLElement[];
-  expect(grips.length).toBe(2);
-  expect(grips.map((g) => opened.icons.get(g))).toEqual(["grip-vertical", "grip-vertical"]);
+test("only folded headings and the cursor's line show their arrow", () => {
+  const doc = "* a\ntext\n:LOGBOOK:\nx\n:END:\n* b\nmore";
+  const { view } = mount(doc, [], doc.length);
+  const shown = (n: number) => lineEl(view, n).querySelector(".org-fold-toggle")!.classList.contains("is-shown");
+  expect(shown(1)).toBe(false);
+  expect(shown(3)).toBe(false);
+  view.dispatch({ selection: { anchor: 1 } });
+  expect(shown(1)).toBe(true);
+  view.dispatch({ selection: { anchor: doc.indexOf("* b") } });
+  expect(shown(1)).toBe(false);
+  expect(shown(6)).toBe(true);
+  applyVisibility(view, "foldall");
+  expect(shown(1)).toBe(true);
+  // a folded drawer stays quiet; its … says it's folded
+  applyVisibility(view, "expandall");
+  view.dispatch({ selection: { anchor: doc.length } });
+  tap(lineEl(view, 3).querySelector(".org-fold-toggle")!);
+  expect(lineEl(view, 3).querySelector(".org-fold-toggle")!.classList.contains("is-folded")).toBe(true);
+  expect(shown(3)).toBe(false);
+});
+
+test("tapping a fold arrow folds and opens it without moving the cursor or focusing", () => {
+  const doc = "* a\ntext\n* b\nmore";
+  const { view } = mount(doc, [], doc.length);
+  const toggle = () => lineEl(view, 1).querySelector(".org-fold-toggle") as HTMLElement;
+  // invisible, but still takes the tap
+  expect(toggle().classList.contains("is-shown")).toBe(false);
+  expect(tap(toggle()).defaultPrevented).toBe(true);
+  expect(foldedRanges(view.state).size).toBe(1);
+  expect(toggle().classList.contains("is-folded")).toBe(true);
+  expect(view.state.selection.main.head).toBe(doc.length);
+  expect(view.hasFocus).toBe(false);
+  // a swipe does nothing, a mouse click opens it again
+  tap(toggle(), 30);
+  expect(foldedRanges(view.state).size).toBe(1);
+  expect(mouse(toggle(), "mousedown").defaultPrevented).toBe(true);
+  mouse(toggle(), "click");
+  expect(foldedRanges(view.state).size).toBe(0);
+  expect(toggle().classList.contains("is-open")).toBe(true);
 });
 
 // ---------------------------------------------------------------- front matter
@@ -385,7 +485,7 @@ test("the shortcut bar is a panel at the bottom of the editor", () => {
   expect(Array.from(bar.children).map((b) => b.getAttribute("data-button"))).toEqual(BUTTONS.filter((b) => b.enabled).map((b) => b.id));
 });
 
-test("bar taps keep focus where it was; editing buttons give it back, swipes do nothing", () => {
+test("bar taps keep focus where it was; editing buttons give it back, new heading takes it, swipes do nothing", () => {
   // happy-dom fires selectionchange synchronously inside CodeMirror's own
   // update; a real browser fires it later, so keep it from CodeMirror here
   const swallow = (e: Event) => e.stopImmediatePropagation();
@@ -404,6 +504,15 @@ test("bar taps keep focus where it was; editing buttons give it back, swipes do 
     view.contentDOM.blur();
     tap(button("demote"));
     expect(view.hasFocus).toBe(false);
+    // new heading is pressed to start typing: it focuses even from unfocused
+    tap(button("new-heading"));
+    expect(view.hasFocus).toBe(true);
+    // so are the block buttons
+    for (const id of ["src-block", "quote-block"]) {
+      view.contentDOM.blur();
+      tap(button(id));
+      expect(view.hasFocus).toBe(true);
+    }
   } finally {
     document.removeEventListener("selectionchange", swallow, true);
   }
@@ -427,4 +536,74 @@ test("the visibility button's icon and label follow the level", () => {
   expect(state()).toEqual(["fold-vertical", "Visibility: fold all"]);
   applyVisibility(view, "outline");
   expect(state()).toEqual(["list-tree", "Visibility: outline"]);
+});
+
+test("zoom shows only the heading's subtree, keeps the cursor inside, and grows with edits", () => {
+  const doc = "intro\n* A\na\n** B\nb\n** C\nc";
+  const { view } = mount(doc, [], doc.indexOf("b"));
+  const visible = () => Array.from(view.contentDOM.querySelectorAll(".cm-line")).map((l) => l.textContent);
+  applyVisibility(view, "foldall");
+  expect(toggleZoom(view)).toBe(true);
+  // the heading's own fold is opened
+  expect(visible()).toEqual(["** B", "b"]);
+  expect(view.dom.querySelector(".org-zoom-hidden")).not.toBeNull();
+  // Ctrl+Home / select all stay inside
+  view.dispatch({ selection: EditorSelection.cursor(0) });
+  expect(view.state.selection.main.head).toBe(doc.indexOf("** B"));
+  view.dispatch({ selection: EditorSelection.range(0, view.state.doc.length) });
+  expect([view.state.selection.main.from, view.state.selection.main.to]).toEqual([doc.indexOf("** B"), doc.indexOf("b") + 1]);
+  // typing at the end of the zoom stays visible
+  view.dispatch({ changes: { from: doc.indexOf("b") + 1, insert: "\nmore" }, selection: EditorSelection.cursor(doc.indexOf("b") + 6) });
+  expect(visible()).toEqual(["** B", "b", "more"]);
+  expect(view.state.doc.toString()).toBe("intro\n* A\na\n** B\nb\nmore\n** C\nc");
+  expect(toggleZoom(view)).toBe(true);
+  expect(view.state.field(zoomField)).toBeNull();
+  expect(view.dom.querySelector(".org-zoom-hidden")).toBeNull();
+  // before the first heading there is nothing to zoom into
+  view.dispatch({ selection: EditorSelection.cursor(0) });
+  expect(toggleZoom(view)).toBe(false);
+});
+
+test("the breadcrumbs name the file and each heading; tapping one zooms out to it", () => {
+  const doc = "* Top\n** Mid\n*** Deep\nx\n* Other";
+  const { view } = mount(doc, [], doc.indexOf("x"));
+  toggleZoom(view);
+  const crumbs = () => Array.from(view.dom.querySelectorAll(".org-zoom-crumb")).map((c) => c.textContent);
+  expect(crumbs()).toEqual(["Whole file", "Top", "Mid", "Deep"]);
+  expect(view.dom.querySelector(".org-zoom-crumb.is-current")?.textContent).toBe("Deep");
+  tap(view.dom.querySelectorAll(".org-zoom-crumb")[2]);
+  expect(crumbs()).toEqual(["Whole file", "Top", "Mid"]);
+  expect(view.state.field(zoomField)).toEqual({ from: doc.indexOf("** Mid"), to: doc.indexOf("x") + 1 });
+  tap(view.dom.querySelectorAll(".org-zoom-crumb")[0]);
+  expect(view.state.field(zoomField)).toBeNull();
+  expect(view.dom.querySelector(".org-zoom-bar")).toBeNull();
+});
+
+test("jumping to hidden text zooms out; the zoom button shows when zoomed", () => {
+  const doc = "* A\na\n* B\nb";
+  const { view } = mount(doc, shortcutBar({ buttons: BUTTONS, icon: (d) => d.icon, setIcon() {}, run: (_id, v) => void toggleZoom(v) }), 1);
+  const zoom = view.dom.querySelector('[data-button="zoom"]')!;
+  tap(zoom);
+  expect(zoom.classList.contains("is-active")).toBe(true);
+  expect(revealZoomEffects(view.state, 2)).toEqual([]);
+  view.dispatch({ effects: revealZoomEffects(view.state, doc.indexOf("b")), selection: EditorSelection.cursor(doc.indexOf("b")) });
+  expect(view.state.field(zoomField)).toBeNull();
+  expect(view.state.selection.main.head).toBe(doc.indexOf("b"));
+  expect(zoom.classList.contains("is-active")).toBe(false);
+});
+
+test("an ID link to a heading opens it zoomed in, even from another zoom; a file ID doesn't zoom", () => {
+  const doc = ":PROPERTIES:\n:ID: f\n:END:\n* A\na\n** A1\nx\n* B\n:PROPERTIES:\n:ID: b\n:END:\nb";
+  const { view } = mount(doc, [], 1);
+  applyVisibility(view, "foldall");
+  expect(zoomToHeadingAt(view, doc.indexOf("** A1"))).toBe(true);
+  expect(view.state.field(zoomField)).toEqual({ from: doc.indexOf("** A1"), to: doc.indexOf("* B") - 1 });
+  expect(zoomToHeadingAt(view, doc.indexOf("* B"))).toBe(true);
+  expect(view.state.field(zoomField)).toEqual({ from: doc.indexOf("* B"), to: doc.length });
+  expect(view.state.selection.main.head).toBe(doc.indexOf("* B"));
+  const b = view.state.doc.lineAt(doc.indexOf("* B"));
+  let covered = false;
+  foldedRanges(view.state).between(b.from, b.to, (from, to) => { if (from <= b.to && to >= b.from) covered = true; });
+  expect(covered).toBe(false);
+  expect(zoomToHeadingAt(view, 0)).toBe(false);
 });

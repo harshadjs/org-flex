@@ -12,6 +12,7 @@ import { srcHighlight } from "./src-highlight";
 import { orgFolding } from "./folding";
 import { checklists } from "./checklists";
 import { orgCompletion } from "./completion";
+import { orgZoom } from "./zoom";
 
 /** PLAT-3: the view type, which is also the plugin id. */
 export const VIEW_TYPE = "org-flex";
@@ -36,6 +37,7 @@ export function coreExtensions(options: { spellcheck: boolean }): Extension {
     orgFolding(),
     checklists(),
     orgCompletion(),
+    orgZoom(),
   ];
 }
 
@@ -75,5 +77,54 @@ export function lockOuterScroll(
     doc.removeEventListener("scroll", reset);
     focusRoot.removeEventListener("focusin", later);
     vv?.removeEventListener("resize", reset);
+  };
+}
+
+/**
+ * BAR-1: keep `cls` on `el` while the on-screen keyboard is open. The Obsidian
+ * app says so with `keyboardWillShow` / `keyboardWillHide` window events (the
+ * ones it hides its own navigation bar on). Before the first of those, and
+ * where there are none, the keyboard counts as open when the visible height
+ * is under 3/4 of the tallest seen at this width (Android shrinks the window,
+ * iOS the visual viewport; the screen's height is the first guess, so a view
+ * opened with the keyboard up knows it too). Returns a function that removes
+ * the listeners.
+ */
+export function trackKeyboard(el: Element, win: Window, cls = "org-keyboard-open"): () => void {
+  let width = -1;
+  let tallest = 0;
+  let told = false;
+  const show = () => {
+    told = true;
+    el.classList.add(cls);
+  };
+  const hide = (e: Event) => {
+    // a hardware keyboard being attached isn't the on-screen one going away
+    if ((e as Event & { hasPhysicalKeyboard?: boolean }).hasPhysicalKeyboard) return;
+    told = true;
+    el.classList.remove(cls);
+  };
+  const update = () => {
+    if (told) return;
+    const height = Math.min(win.innerHeight, win.visualViewport?.height ?? win.innerHeight);
+    if (win.innerWidth !== width) {
+      // turned: start again from the screen's height
+      width = win.innerWidth;
+      tallest = win.screen?.availHeight ?? 0;
+    }
+    tallest = Math.max(tallest, height);
+    el.classList.toggle(cls, height < tallest * 0.75);
+  };
+  update();
+  win.addEventListener("keyboardWillShow", show);
+  win.addEventListener("keyboardWillHide", hide);
+  win.addEventListener("resize", update);
+  win.visualViewport?.addEventListener("resize", update);
+  return () => {
+    win.removeEventListener("keyboardWillShow", show);
+    win.removeEventListener("keyboardWillHide", hide);
+    win.removeEventListener("resize", update);
+    win.visualViewport?.removeEventListener("resize", update);
+    el.classList.remove(cls);
   };
 }

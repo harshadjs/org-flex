@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { EditorSelection, EditorState, TransactionSpec } from "@codemirror/state";
 import { history, undo } from "@codemirror/commands";
+import { codeFolding, foldEffect } from "@codemirror/language";
 import {
-  continueList, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
+  assignId, continueList, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
 import { parseItem } from "../src/org/lists";
@@ -105,6 +106,94 @@ describe("planning dates", () => {
 
   test("setPlanningDate needs a heading and ignores *bold* text", () => {
     expect(setPlanningDate(at("*bold*\ntext|"), "SCHEDULED", jan2)).toBeNull();
+  });
+});
+
+describe("new heading", () => {
+  const cursor = (s: EditorState) => s.selection.main.head;
+
+  test("insertHeading puts a heading at the current level right below the line", () => {
+    let s = at("* A\n** B\nsome |text\nmore");
+    s = apply(s, insertHeading(s));
+    expect(text(s)).toBe("* A\n** B\nsome text\n** \nmore");
+    expect(cursor(s)).toBe("* A\n** B\nsome text\n** ".length);
+    // on a heading line: a sibling of that heading
+    s = at("* A\n** B|\nbody");
+    s = apply(s, insertHeading(s));
+    expect(text(s)).toBe("* A\n** B\n** \nbody");
+  });
+
+  test("insertHeading turns a blank line into the heading, and uses level 1 before any heading", () => {
+    let s = at("* A\ntext\n  |\nmore");
+    s = apply(s, insertHeading(s));
+    expect(text(s)).toBe("* A\ntext\n* \nmore");
+    expect(cursor(s)).toBe("* A\ntext\n* ".length);
+    s = at("intro|");
+    expect(text(apply(s, insertHeading(s)))).toBe("intro\n* ");
+    s = at("|");
+    expect(text(apply(s, insertHeading(s)))).toBe("* ");
+    // *bold* text is not a heading
+    s = at("*bold* |text");
+    expect(text(apply(s, insertHeading(s)))).toBe("*bold* text\n* ");
+  });
+
+  test("insertHeading on a folded heading goes below the hidden text", () => {
+    let s = EditorState.create({
+      doc: "* A\nhidden\n* B",
+      selection: EditorSelection.cursor(1),
+      extensions: [codeFolding()],
+    });
+    s = s.update({ effects: foldEffect.of({ from: 3, to: 10 }) }).state;
+    s = apply(s, insertHeading(s));
+    expect(text(s)).toBe("* A\nhidden\n* \n* B");
+    expect(cursor(s)).toBe("* A\nhidden\n* ".length);
+  });
+});
+
+describe("IDs", () => {
+  const ID = "0b6e1c3a-1f2d-4c5e-9a8b-7c6d5e4f3a2b";
+
+  test("assignId adds a property drawer with the ID under the heading, after its planning line", () => {
+    let s = at("* H|\ntext\n* Next");
+    s = apply(s, assignId(s, ID));
+    expect(text(s)).toBe(`* H\n:PROPERTIES:\n:ID:       ${ID}\n:END:\ntext\n* Next`);
+    // the cursor stays where it was
+    expect(s.selection.main.head).toBe(3);
+    s = at("* H\n  SCHEDULED: <2024-01-02 Tue>\nsome |text");
+    s = apply(s, assignId(s, ID));
+    expect(text(s)).toBe(`* H\n  SCHEDULED: <2024-01-02 Tue>\n:PROPERTIES:\n:ID:       ${ID}\n:END:\nsome text`);
+    // a heading at the end of a file without a final newline
+    s = at("* a\n** b|");
+    expect(text(apply(s, assignId(s, ID)))).toBe(`* a\n** b\n:PROPERTIES:\n:ID:       ${ID}\n:END:`);
+  });
+
+  test("assignId adds to an existing drawer, fills an empty ID, and keeps an existing one", () => {
+    let s = at("* H\n  :PROPERTIES:\n  :CUSTOM: x\n  :END:\nbody|");
+    s = apply(s, assignId(s, ID));
+    expect(text(s)).toBe(`* H\n  :PROPERTIES:\n  :ID:       ${ID}\n  :CUSTOM: x\n  :END:\nbody`);
+    s = at("* H|\n:PROPERTIES:\n:ID:\n:END:");
+    expect(text(apply(s, assignId(s, ID)))).toBe(`* H\n:PROPERTIES:\n:ID:       ${ID}\n:END:`);
+    expect(assignId(at("* H|\n:PROPERTIES:\n:ID: old\n:END:"), ID)).toBeNull();
+    // an unclosed drawer isn't one: a new drawer goes in
+    s = at("* H|\n:PROPERTIES:\n* Next");
+    expect(text(apply(s, assignId(s, ID)))).toBe(`* H\n:PROPERTIES:\n:ID:       ${ID}\n:END:\n:PROPERTIES:\n* Next`);
+  });
+
+  test("assignId before the first heading gives the file an ID, and ignores *bold* text", () => {
+    let s = at("#+title: Note\n|intro\n* H");
+    s = apply(s, assignId(s, ID));
+    expect(text(s)).toBe(`:PROPERTIES:\n:ID:       ${ID}\n:END:\n#+title: Note\nintro\n* H`);
+    s = at(":PROPERTIES:\n:CREATED: x\n:END:\n*bold* |text");
+    s = apply(s, assignId(s, ID));
+    expect(text(s)).toBe(`:PROPERTIES:\n:ID:       ${ID}\n:CREATED: x\n:END:\n*bold* text`);
+    expect(assignId(at(`:PROPERTIES:\n:ID: ${ID}\n:END:\nbody|`), ID)).toBeNull();
+  });
+
+  test("assignId is one undoable change", () => {
+    let s = at("* H|\ntext");
+    s = apply(s, assignId(s, ID));
+    undo({ state: s, dispatch: (tr) => (s = tr.state) });
+    expect(text(s)).toBe("* H\ntext");
   });
 });
 
@@ -226,5 +315,53 @@ describe("links", () => {
     const s = apply(s0, insertWikiLink(s0));
     expect(text(s)).toBe("see [[pkm]] now");
     expect(s.selection.main.head).toBe(11);
+  });
+});
+
+describe("blocks", () => {
+  const cursor = (s: EditorState) => s.selection.main.head;
+
+  test("insertBlock puts a source block below the line with the cursor where the language goes", () => {
+    let s = at("* A\nsome |text\nmore");
+    s = apply(s, insertBlock(s, "src"));
+    expect(text(s)).toBe("* A\nsome text\n#+begin_src \n\n#+end_src\nmore");
+    expect(cursor(s)).toBe("* A\nsome text\n#+begin_src ".length);
+    s = at("a\n  |\nb");
+    s = apply(s, insertBlock(s, "src"));
+    expect(text(s)).toBe("a\n#+begin_src \n\n#+end_src\nb");
+  });
+
+  test("insertBlock puts a quote block below the line, or on a blank line, with the cursor inside", () => {
+    let s = at("text|");
+    s = apply(s, insertBlock(s, "quote"));
+    expect(text(s)).toBe("text\n#+begin_quote\n\n#+end_quote");
+    expect(cursor(s)).toBe("text\n#+begin_quote\n".length);
+    s = at("|");
+    s = apply(s, insertBlock(s, "quote"));
+    expect(text(s)).toBe("#+begin_quote\n\n#+end_quote");
+    expect(cursor(s)).toBe("#+begin_quote\n".length);
+  });
+
+  test("insertBlock wraps the selected lines", () => {
+    let s = EditorState.create({ doc: "x\none two\nthree\ny", selection: EditorSelection.range(4, 13) });
+    s = apply(s, insertBlock(s, "quote"));
+    expect(text(s)).toBe("x\n#+begin_quote\none two\nthree\n#+end_quote\ny");
+    expect(cursor(s)).toBe("x\n#+begin_quote\none two\nthree".length);
+    // a selection ending at a line start leaves that line out
+    s = EditorState.create({ doc: "one\ntwo", selection: EditorSelection.range(0, 4) });
+    s = apply(s, insertBlock(s, "src"));
+    expect(text(s)).toBe("#+begin_src \none\n#+end_src\ntwo");
+    expect(cursor(s)).toBe("#+begin_src ".length);
+  });
+
+  test("insertBlock on a folded heading goes below the hidden text", () => {
+    let s = EditorState.create({
+      doc: "* A\nhidden\n* B",
+      selection: EditorSelection.cursor(1),
+      extensions: [codeFolding()],
+    });
+    s = s.update({ effects: foldEffect.of({ from: 3, to: 10 }) }).state;
+    s = apply(s, insertBlock(s, "quote"));
+    expect(text(s)).toBe("* A\nhidden\n#+begin_quote\n\n#+end_quote\n* B");
   });
 });

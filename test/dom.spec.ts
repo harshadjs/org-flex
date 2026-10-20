@@ -12,11 +12,12 @@ import { applyVisibility, orgFolding } from "../src/editor/folding";
 import { checklists } from "../src/editor/checklists";
 import { frontMatterPanel } from "../src/editor/front-matter-panel";
 import { backlinksSection, setBacklinks } from "../src/editor/backlinks";
-import { headingDrag } from "../src/editor/heading-drag";
 import { shortcutBar } from "../src/editor/shortcut-bar";
-import { CompletionContext } from "@codemirror/autocomplete";
-import { linkCompletions, orgCompletion } from "../src/editor/completion";
+import { CompletionContext, completionStatus, currentCompletions } from "@codemirror/autocomplete";
+import { insertLinkWithCompletion, linkCompletions, orgCompletion } from "../src/editor/completion";
+import { insertIdLink, insertWikiLink } from "../src/org/edit";
 import { BUTTONS } from "../src/settings";
+import { orgZoom, toggleZoom } from "../src/editor/zoom";
 
 const doc = `:PROPERTIES:
 :ID:       note
@@ -54,8 +55,8 @@ test("the editor renders every feature without errors", () => {
       extensions: [
         orgConfig.of({ ...DEFAULT_CONFIG, frontMatterPanel: true, hideStars: true, keywords: { todo: ["TODO"], done: ["DONE"] } }),
         orgHost.of({ setIcon() {}, openLink() {}, imageSrc: () => null, linkCompletions: () => [], idCompletions: () => [] }),
-        docInfo, history(), livePreview(), srcHighlight, orgFolding(), checklists(), orgCompletion(),
-        frontMatterPanel(), backlinksSection(actions), headingDrag(),
+        docInfo, history(), livePreview(), srcHighlight, orgFolding(), checklists(), orgCompletion(), orgZoom(),
+        frontMatterPanel(), backlinksSection(actions),
         shortcutBar({ buttons: BUTTONS, icon: (d) => d.icon, setIcon() {}, run() {} }),
       ],
     }),
@@ -79,6 +80,15 @@ test("the editor renders every feature without errors", () => {
   // the cursor is at the end, so the front matter shows as the panel
   expect(view.dom.querySelector(".org-front-matter-title")?.textContent).toBe("A *note*");
   expect(view.dom.querySelector(".org-properties-count")?.textContent).toBe("2");
+  // zoomed into "** Sub", the front matter, the task and its lists are hidden
+  view.dispatch({ selection: EditorSelection.cursor(view.state.doc.toString().indexOf("# comment")) });
+  applyVisibility(view, "foldall");
+  expect(toggleZoom(view)).toBe(true);
+  expect(view.dom.querySelector(".org-front-matter-title")).toBeNull();
+  expect(Array.from(view.contentDOM.querySelectorAll(".cm-line")).map((l) => l.textContent?.trim())).toEqual(["Sub", "# comment", "Deep", "-  new"]);
+  expect(Array.from(view.dom.querySelectorAll(".org-zoom-crumb")).map((c) => c.textContent)).toEqual(["Whole file", "Heading", "Sub"]);
+  toggleZoom(view);
+  expect(view.dom.querySelector(".org-front-matter-title")?.textContent).toBe("A *note*");
   view.destroy();
 });
 
@@ -109,4 +119,82 @@ test("picking a title after [[ inserts an ID link with the title as description"
   // a closing ]] already there (the link button) is reused, and the cursor ends after it
   expect(pick("See [[|]] next", "Org roam")).toEqual({ text: "See [[id:5f0c-uuid][Org roam]] next", cursor: 30 });
   expect(pick("[[im|", "img.png")).toEqual({ text: "[[img.png]]", cursor: 11 });
+});
+
+test("a title nobody has yet can be picked to create the note, linked by its new ID", () => {
+  const created: string[] = [];
+  const host = {
+    setIcon() {}, openLink() {}, imageSrc: () => null,
+    idCompletions: () => [{ label: "5f0c-uuid", target: "5f0c-uuid" }],
+    linkCompletions: () => [{ label: "Org roam", target: "id:5f0c-uuid", description: "Org roam", type: "note" }],
+    createNote: (title: string) => { created.push(title); return "new-uuid"; },
+  };
+  const query = (doc: string) => {
+    const view = new EditorView({ parent: document.body, state: EditorState.create({ doc, extensions: [orgHost.of(host)] }) });
+    const pos = doc.length;
+    const result = linkCompletions(new CompletionContext(view.state, pos, true));
+    return { view, pos, result };
+  };
+  const creates = (doc: string) => query(doc).result?.options.filter((o) => o.detail === "Create note").map((o) => o.label) ?? [];
+  expect(creates("[[Fresh idea ")).toEqual(["Fresh idea "]);
+  // an exact title (ignoring case and spaces around it) is offered as it is, not created again
+  expect(creates("[[org ROAM ")).toEqual([]);
+  expect(creates("[[")).toEqual([]);
+  expect(creates("[[id:abc")).toEqual([]);
+  const { view, pos, result } = query("See [[ Fresh idea");
+  // the entry follows what's typed, so the list is never reused
+  expect(result!.validFor).toBeUndefined();
+  const option = result!.options.find((o) => o.detail === "Create note")!;
+  (option.apply as (v: EditorView, c: typeof option, from: number, to: number) => void)(view, option, result!.from, pos);
+  expect(created).toEqual(["Fresh idea"]);
+  expect(view.state.doc.toString()).toBe("See [[id:new-uuid][Fresh idea]]");
+  expect(view.state.selection.main.head).toBe(view.state.doc.length);
+  view.destroy();
+});
+
+test("the create entry comes after every match and follows the typing", async () => {
+  const host = {
+    setIcon() {}, openLink() {}, imageSrc: () => null, idCompletions: () => [],
+    linkCompletions: () => [{ label: "Org roam", target: "id:5f0c-uuid", description: "Org roam", type: "note" }],
+    createNote: () => "new-uuid",
+  };
+  const view = new EditorView({
+    parent: document.body,
+    state: EditorState.create({ doc: "[[", selection: { anchor: 2 }, extensions: [orgHost.of(host), orgCompletion()] }),
+  });
+  const type = async (text: string) => {
+    for (const ch of text) {
+      const p = view.state.selection.main.head;
+      view.dispatch({ changes: { from: p, insert: ch }, selection: { anchor: p + 1 }, userEvent: "input.type" });
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return currentCompletions(view.state).map((c) => c.label);
+  };
+  expect(await type("Or")).toEqual(["Org roam", "Or"]);
+  expect(await type(" new")).toEqual(["Or new"]);
+  view.destroy();
+});
+
+test("the link button and ID link command open the list straight away, without typing", async () => {
+  const host = {
+    setIcon() {}, openLink() {}, imageSrc: () => null,
+    idCompletions: () => [{ label: "5f0c-uuid", target: "5f0c-uuid" }],
+    linkCompletions: () => [{ label: "Org roam", target: "id:5f0c-uuid", description: "Org roam", type: "note" }],
+  };
+  const view = new EditorView({
+    parent: document.body,
+    state: EditorState.create({ doc: "See ", selection: { anchor: 4 }, extensions: [orgHost.of(host), orgCompletion()] }),
+  });
+  const settle = () => new Promise((r) => setTimeout(r, 100));
+  insertLinkWithCompletion(view, insertWikiLink(view.state));
+  expect(view.state.doc.toString()).toBe("See [[]]");
+  await settle();
+  expect(completionStatus(view.state)).toBe("active");
+  expect(currentCompletions(view.state).map((c) => c.label)).toEqual(["Org roam"]);
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "See " }, selection: { anchor: 4 } });
+  await settle();
+  insertLinkWithCompletion(view, insertIdLink(view.state));
+  await settle();
+  expect(currentCompletions(view.state).map((c) => c.label)).toEqual(["5f0c-uuid"]);
+  view.destroy();
 });

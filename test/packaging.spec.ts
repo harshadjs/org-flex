@@ -81,16 +81,23 @@ test("heading sizes are set on the line only, from the theme's heading variables
   }
 });
 
-test("the gutters have no background or border", () => {
-  expect(style(".org-flex-view .cm-gutters", "background")).toBe("transparent");
-  expect(style(".org-flex-view .cm-gutters", "border")).toBe("none");
+test("fold arrows hang in the line's left padding, hidden unless shown, with a tall tap target", () => {
+  const arrow = ".org-flex-view .org-fold-toggle";
+  expect(style(arrow, "position")).toBe("absolute");
+  expect(style(arrow, "margin-left")).toBe("-22px");
+  expect(style(".org-flex-view .cm-line", "padding")).toBe("0 var(--size-4-2) 0 24px");
+  expect(style(arrow, "opacity")).toBe("0");
+  expect(style(`${arrow}.is-shown`, "opacity")).toBe("1");
+  expect(style(`${arrow}::before`, "top")).toBe("-8px");
+  expect(style(`${arrow}::before`, "bottom")).toBe("-8px");
+  expect(style(arrow, "user-select")).toBe("none");
 });
 
-test("the drag grip is faint until used and doesn't pan or select", () => {
-  expect(Number(style(".org-flex-view .org-drag-grip", "opacity"))).toBeLessThan(1);
-  expect(style(".org-flex-view .org-drag-grip", "touch-action")).toBe("none");
-  expect(style(".org-flex-view .org-drag-grip", "user-select")).toBe("none");
-  expect(style(".org-flex-view .org-drag-grip:hover", "opacity")).toBe("1");
+test("bar buttons are full-size touch targets with no gaps between them", () => {
+  expect(style(".org-flex-view .org-shortcut-bar", "gap")).toBe("0");
+  expect(parseInt(style(".is-mobile .org-flex-view .org-shortcut-button", "min-width")!)).toBeGreaterThanOrEqual(48);
+  expect(parseInt(style(".is-mobile .org-flex-view .org-shortcut-button", "height")!)).toBeGreaterThanOrEqual(44);
+  expect(style(".org-flex-view .org-shortcut-button:active", "background-color")).toBeTruthy();
 });
 
 test("the shortcut bar is one row that scrolls sideways", () => {
@@ -98,6 +105,10 @@ test("the shortcut bar is one row that scrolls sideways", () => {
   expect(style(".org-flex-view .org-shortcut-bar", "overflow-x")).toBe("auto");
   expect(style(".org-flex-view .org-shortcut-button", "flex")).toBe("0 0 auto");
   expect(style(".is-phone.is-floating-nav .org-flex-view .cm-panels-bottom", "margin-bottom")).toContain("--view-bottom-spacing");
+  // no gap above the keyboard
+  for (const nav of ["", ".auto-full-screen", ".is-floating-nav"]) {
+    expect(style(`.is-phone${nav} .org-flex-view.org-keyboard-open .cm-panels-bottom`, "margin-bottom")).toBe("0");
+  }
 });
 
 test("flex children with siblings never use height: 100%", () => {

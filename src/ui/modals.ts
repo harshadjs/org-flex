@@ -1,7 +1,9 @@
 // Dialogs: the date picker for SCHEDULED/DEADLINE, the journal list, the
 // journal calendar and the new note dialog.
 
-import { App, FuzzySuggestModal, Modal, Platform, setIcon } from "obsidian";
+import { App, FuzzySuggestModal, Modal, Platform, prepareFuzzySearch, setIcon, SuggestModal } from "obsidian";
+import { findNodes, NodeChoice } from "../org/node-find";
+import { TitleCompletion } from "../org/vault-index";
 import { calendarMonth, journalDateString, JournalEntry, journalEntryLabel, localeWeekStart } from "../org/journal";
 
 function pad2(n: number): string {
@@ -205,5 +207,33 @@ export class NewNoteModal extends Modal {
 
   onClose() {
     this.contentEl.empty();
+  }
+}
+
+/** FIND-1..3: every note and heading with an ID, by title; the last entry can create the note. */
+export class NodeFinderModal extends SuggestModal<NodeChoice> {
+  constructor(app: App, private nodes: TitleCompletion[], private onChoose: (choice: NodeChoice) => void) {
+    super(app);
+    this.setPlaceholder("Find or create a node");
+    this.setInstructions([{ command: "↵", purpose: "to open" }]);
+  }
+  getSuggestions(query: string): NodeChoice[] {
+    const match = prepareFuzzySearch(query.trim());
+    return findNodes(this.nodes, query, (label) => match(label)?.score ?? null);
+  }
+  renderSuggestion(choice: NodeChoice, el: HTMLElement) {
+    el.addClass("org-node-choice");
+    if (choice.kind === "create") {
+      el.addClass("org-node-create");
+      setIcon(el.createSpan({ cls: "org-node-icon" }), "file-plus");
+      el.createSpan({ cls: "org-node-title", text: choice.title });
+      el.createSpan({ cls: "org-node-detail", text: "Create note" });
+      return;
+    }
+    el.createSpan({ cls: "org-node-title", text: choice.node.label });
+    if (choice.node.detail) el.createSpan({ cls: "org-node-detail", text: choice.node.detail });
+  }
+  onChooseSuggestion(choice: NodeChoice) {
+    this.onChoose(choice);
   }
 }

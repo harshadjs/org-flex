@@ -8,12 +8,6 @@ export type VisibilityLevel = "foldall" | "outline" | "expandall";
 
 export const VISIBILITY_ORDER: VisibilityLevel[] = ["foldall", "outline", "expandall"];
 
-export const VISIBILITY_NAMES: Record<VisibilityLevel, string> = {
-  foldall: "Fold all",
-  outline: "Outline",
-  expandall: "Expand all",
-};
-
 export function nextVisibility(level: VisibilityLevel): VisibilityLevel {
   return VISIBILITY_ORDER[(VISIBILITY_ORDER.indexOf(level) + 1) % VISIBILITY_ORDER.length];
 }
@@ -42,7 +36,7 @@ function foldUntil(doc: Text, n: number, stop: number): FoldRange | null {
 }
 
 /** Next heading after line `n` with level <= `level`, or the line count. */
-function subtreeEnd(structure: OrgStructure, n: number, level: number): number {
+export function subtreeEnd(structure: OrgStructure, n: number, level: number): number {
   for (const h of structure.headings) {
     if (h > n && structure.lines[h].level <= level) return h;
   }

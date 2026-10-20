@@ -5,9 +5,9 @@ import { ButtonDef, buttonIconName, mergeSettings, migrateShortcutButtons, OrgFl
 import { Keywords, classifyLink } from "./org/syntax";
 import { readNote, VaultIndex } from "./org/vault-index";
 import { journalEntries, journalFileContent, journalPathForDate } from "./org/journal";
-import { noteFileContent, notePath, titleProblem } from "./org/new-note";
+import { freeNotePath, noteFileContent, noteFileName, notePath, titleProblem } from "./org/new-note";
 import { OrgFlexView, VIEW_TYPE } from "./view";
-import { JournalCalendarModal, JournalPickerModal, NewNoteModal } from "./ui/modals";
+import { JournalCalendarModal, JournalPickerModal, NewNoteModal, NodeFinderModal } from "./ui/modals";
 import { registerTaskBlocks } from "./ui/tasks-block";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
 
@@ -111,14 +111,20 @@ export default class OrgFlexPlugin extends Plugin {
     };
     inView("cycle-orgmode-visibility", "Cycle visibility (fold all / outline / expand all)", (v) => v.cycleVisibility());
     inView("org-toggle-stars", "Toggle leading stars (*)", (v) => v.command("stars"));
+    inView("org-insert-heading", "Insert heading (M-RET)", (v) => v.command("new-heading"));
     inView("org-increase-heading-level", "Increase heading level (+*)", (v) => v.command("demote"));
     inView("org-decrease-heading-level", "Decrease heading level (-*)", (v) => v.command("promote"));
     inView("org-cycle-task-state", "Cycle task state (none -> TODO -> DONE)", (v) => v.command("todo"));
     inView("org-schedule-task", "Schedule task (SCHEDULED:)", (v) => v.pickDate("SCHEDULED"));
     inView("org-deadline-task", "Task deadline (DEADLINE:)", (v) => v.pickDate("DEADLINE"));
     inView("org-toggle-checkbox", "Toggle checkbox (- [ ])", (v) => v.command("checkbox"));
+    inView("org-insert-src-block", "Insert source block (#+begin_src)", (v) => v.command("src-block"));
+    inView("org-insert-quote-block", "Insert quote block (#+begin_quote)", (v) => v.command("quote-block"));
     inView("org-insert-id-link", "Insert ID link ([[id:]])", (v) => v.command("id-link"));
     inView("org-insert-wiki-link", "Insert wiki link ([[]])", (v) => v.command("wiki-link"));
+    inView("org-zoom", "Zoom into heading / zoom out", (v) => v.toggleZoom());
+    this.addCommand({ id: "org-roam-node-find", name: "Go to node (find or create)", callback: () => this.findNode() });
+    inView("org-assign-id", "Assign ID to heading (:ID:)", (v) => v.command("heading-id"));
     this.addCommand({ id: "open-todays-journal", name: "Open today's journal", callback: () => void this.openJournal(new Date()) });
     this.addCommand({ id: "browse-journal-entries", name: "Browse journal entries", callback: () => this.browseJournal() });
     this.addCommand({ id: "open-journal-calendar", name: "Open journal calendar", callback: () => this.openCalendar() });
@@ -129,7 +135,7 @@ export default class OrgFlexPlugin extends Plugin {
   // Opening files and links
 
   /** Open `path` in `leaf` and put the cursor on a line or at an offset, without focus. */
-  async openAt(leaf: WorkspaceLeaf, path: string, where: { line?: number; offset?: number; top?: boolean }) {
+  async openAt(leaf: WorkspaceLeaf, path: string, where: { line?: number; offset?: number; top?: boolean; zoom?: boolean }) {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {
       new Notice(`File not found: ${path}`);
@@ -138,7 +144,8 @@ export default class OrgFlexPlugin extends Plugin {
     await leaf.openFile(file);
     const view = leaf.view;
     if (!(view instanceof OrgFlexView)) return;
-    if (where.offset !== undefined) view.revealPosition(where.offset, { top: where.top });
+    if (where.offset !== undefined && where.zoom) view.revealHeading(where.offset);
+    else if (where.offset !== undefined) view.revealPosition(where.offset, { top: where.top });
     else if (where.line !== undefined) view.revealLine(where.line, { top: where.top });
   }
 
@@ -155,7 +162,7 @@ export default class OrgFlexPlugin extends Plugin {
         new Notice(`No org entry has the ID "${link.id}".`);
         return;
       }
-      await this.openAt(leaf, found.path, { offset: found.offset, top: true });
+      await this.openAt(leaf, found.path, { offset: found.offset, top: true, zoom: true });
       return;
     }
     const path = link.path.split("::")[0];
@@ -243,6 +250,54 @@ export default class OrgFlexPlugin extends Plugin {
     new NewNoteModal(this.app, dir, (title) => this.createNote(dir, title)).open();
   }
 
+  /** paths being created by createNoteFromLink, not yet in the vault */
+  private pendingNotes = new Set<string>();
+
+  /**
+   * LP-10: create a note at the vault root for a title picked in the `[[`
+   * list, without opening it. The ID is returned straight away, for the link.
+   */
+  createNoteFromLink(raw: string): string {
+    return this.createRootNote(raw).id;
+  }
+
+  /** LP-10, FIND-3: a note at the vault root; the ID now, the file once written (null if it failed). */
+  private createRootNote(raw: string): { id: string; file: Promise<TFile | null> } {
+    const title = raw.trim();
+    const id = crypto.randomUUID();
+    const path = freeNotePath("", noteFileName(title),
+      (p) => this.pendingNotes.has(p) || this.app.vault.getAbstractFileByPath(p) !== null);
+    this.pendingNotes.add(path);
+    const file = this.app.vault.create(path, noteFileContent(title, id))
+      .catch((e: Error) => {
+        new Notice(`Org Flex: couldn't create ${path}: ${e.message}`);
+        return null;
+      })
+      .finally(() => this.pendingNotes.delete(path));
+    return { id, file };
+  }
+
+  /** FIND-1..3: org-roam-node-find. */
+  findNode() {
+    new NodeFinderModal(this.app, this.index.titles(), (choice) => {
+      const leaf = this.app.workspace.getLeaf(false);
+      if (choice.kind === "node") {
+        void this.openLink(`id:${choice.node.id}`, "", leaf);
+        return;
+      }
+      void this.createRootNote(choice.title).file.then((file) => file && this.openNewNote(leaf, file));
+    }).open();
+  }
+
+  /** NOTE-5: open a new note with the cursor below its header, ready to type. */
+  private async openNewNote(leaf: WorkspaceLeaf, file: TFile) {
+    await leaf.openFile(file);
+    if (leaf.view instanceof OrgFlexView) {
+      const view = leaf.view;
+      view.revealPosition(view.editor?.state.doc.length ?? 0, { focus: true });
+    }
+  }
+
   /** NOTE-3..5: create and open the note, or say why not. */
   async createNote(folder: string, raw: string): Promise<string | null> {
     const problem = titleProblem(raw);
@@ -252,12 +307,7 @@ export default class OrgFlexPlugin extends Plugin {
     if (this.app.vault.getAbstractFileByPath(path)) return `${path} already exists.`;
     try {
       const file = await this.app.vault.create(path, noteFileContent(title, crypto.randomUUID()));
-      const leaf = this.app.workspace.getLeaf(false);
-      await leaf.openFile(file);
-      if (leaf.view instanceof OrgFlexView) {
-        const view = leaf.view;
-        view.revealPosition(view.editor?.state.doc.length ?? 0, { focus: true });
-      }
+      await this.openNewNote(this.app.workspace.getLeaf(false), file);
       return null;
     } catch (e) {
       return (e as Error).message;

@@ -78,13 +78,6 @@ export class OrgFlexSettingTab extends PluginSettingTab {
         settings.backlinks = v;
         await save();
       }));
-    new Setting(containerEl)
-      .setName("Heading drag handles")
-      .setDesc("Show a grip next to every heading to move it, with its subtree, by dragging.")
-      .addToggle((t) => t.setValue(settings.headingDragHandles).onChange(async (v) => {
-        settings.headingDragHandles = v;
-        await save();
-      }));
 
     new Setting(containerEl).setName("Journal").setHeading();
     new Setting(containerEl)

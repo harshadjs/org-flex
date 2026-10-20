@@ -25,3 +25,32 @@ export function noteFileContent(raw: string, id: string): string {
   const title = raw.trim();
   return `:PROPERTIES:\n:ID:       ${id}\n:END:\n#+title: ${title}\n\n`;
 }
+
+/**
+ * LP-10: a file name for a title typed in the `[[` list: characters NOTE-3
+ * refuses become "-", and leading and trailing dots are dropped.
+ */
+export function noteFileName(raw: string): string {
+  const name = raw.trim().replace(new RegExp(FORBIDDEN.source, "g"), "-").replace(/^\.+|\.+$/g, "").trim();
+  return name || "Untitled";
+}
+
+/** LP-10: `<name>.org`, or `<name> 2.org`, `<name> 3.org`, … when taken. */
+export function freeNotePath(folder: string, name: string, taken: (path: string) => boolean): string {
+  for (let n = 1; ; n++) {
+    const path = notePath(folder, n === 1 ? name : `${name} ${n}`);
+    if (!taken(path)) return path;
+  }
+}
+
+/**
+ * LP-10, FIND-2: whether to offer creating a note titled `typed`: when
+ * something is typed and no entry has exactly that label (ignoring case and
+ * spaces around it).
+ */
+export function offerCreate(labels: Iterable<string>, typed: string): boolean {
+  const title = typed.trim().toLowerCase();
+  if (!title) return false;
+  for (const label of labels) if (label.trim().toLowerCase() === title) return false;
+  return true;
+}

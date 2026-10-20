@@ -47,6 +47,13 @@ export interface OrgHost {
   linkCompletions(): Completion[];
   /** after `[[id:`: every raw ID */
   idCompletions(): Completion[];
+  /**
+   * LP-10: start creating a note titled `title` and return its new ID
+   * straight away; the file is written in the background.
+   */
+  createNote?(title: string): string;
+  /** ZOOM-2: the file's title, for the first breadcrumb */
+  title?(): string;
 }
 
 export const orgHost = Facet.define<OrgHost, OrgHost | null>({

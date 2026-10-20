@@ -3,6 +3,7 @@
 // view, so they can be tested with a bare EditorState.
 
 import { ChangeSpec, EditorSelection, EditorState, Text, TransactionSpec } from "@codemirror/state";
+import { foldedRanges } from "@codemirror/language";
 import { analyze, headingLevel, isPlanningLine, Keywords, parseHeading } from "./syntax";
 import { BoxState, itemLines, nextBullet, parseItem, recountSection, sectionAround, setItemState, toggledState } from "./lists";
 
@@ -327,6 +328,142 @@ export function insertWikiLink(state: EditorState): TransactionSpec {
     changes: { from, to, insert: `[[${text}]]` },
     selection: EditorSelection.cursor(from + text.length + 4),
     userEvent: "input",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// IDs
+
+const PROPERTIES_RE = /^([ \t]*):PROPERTIES:[ \t]*$/i;
+const END_RE = /^[ \t]*:END:[ \t]*$/i;
+const ID_RE = /^[ \t]*:ID:(?:[ \t]+(.*?))?[ \t]*$/i;
+
+/** org-id's layout: the value starts in column 11 */
+function idLine(indent: string, id: string): string {
+  return `${indent}:ID:       ${id}`;
+}
+
+/**
+ * ACT-10: give the heading enclosing `pos` an `:ID:`, as org-roam's
+ * `org-id-get-create` does. Before the first heading, the file gets one.
+ * The ID goes into the heading's property drawer (straight after the heading
+ * and its planning line) or the file's (on the first line), which is made
+ * when missing. Null when there already is an ID.
+ */
+export function assignId(state: EditorState, id: string, pos = state.selection.main.head): TransactionSpec | null {
+  const doc = state.doc;
+  const heading = enclosingHeading(doc, pos);
+  // the drawer goes after line `after` (1-based; 0 is the top of the file)
+  const after = heading === null ? 0
+    : heading < doc.lines && isPlanningLine(doc.line(heading + 1).text) ? heading + 1 : heading;
+  const first = after + 1 <= doc.lines ? doc.line(after + 1) : null;
+  const open = first ? PROPERTIES_RE.exec(first.text) : null;
+  if (first && open) {
+    for (let n = first.number + 1; n <= doc.lines; n++) {
+      const line = doc.line(n);
+      if (headingLevel(line.text)) break;
+      if (END_RE.test(line.text)) {
+        // a closed drawer: fill an empty :ID:, or add one at the top
+        for (let m = first.number + 1; m < n; m++) {
+          const prop = ID_RE.exec(doc.line(m).text);
+          if (!prop) continue;
+          if (prop[1]) return null;
+          const l = doc.line(m);
+          return { changes: { from: l.from, to: l.to, insert: idLine(/^[ \t]*/.exec(l.text)![0], id) }, userEvent: "input" };
+        }
+        return { changes: { from: first.to, insert: "\n" + idLine(open[1], id) }, userEvent: "input" };
+      }
+    }
+  }
+  const drawer = `:PROPERTIES:\n${idLine("", id)}\n:END:`;
+  if (after === 0) return { changes: { from: 0, insert: drawer + "\n" }, userEvent: "input" };
+  return { changes: { from: doc.line(after).to, insert: "\n" + drawer }, userEvent: "input" };
+}
+
+// ---------------------------------------------------------------------------
+// New heading
+
+/** The end of the line `from`–`to`, or of the text a fold starting on it hides. */
+function endPastFold(state: EditorState, from: number, to: number): number {
+  let end = to;
+  foldedRanges(state).between(from, to, (f, t) => {
+    if (f >= from && f <= to) end = Math.max(end, state.doc.lineAt(t).to);
+  });
+  return end;
+}
+
+/**
+ * ACT-11: a new heading at the level of the heading the cursor is under
+ * (level 1 above the first heading), with the cursor after its stars. A blank
+ * line becomes the heading; otherwise it goes on a new line right below,
+ * or below the hidden text when the line is a folded heading.
+ */
+export function insertHeading(state: EditorState): TransactionSpec {
+  const doc = state.doc;
+  const line = doc.lineAt(state.selection.main.head);
+  const heading = enclosingHeading(doc, line.from);
+  const stars = "*".repeat(heading === null ? 1 : headingLevel(doc.line(heading).text)) + " ";
+  if (!line.text.trim()) {
+    return {
+      changes: { from: line.from, to: line.to, insert: stars },
+      selection: EditorSelection.cursor(line.from + stars.length),
+      userEvent: "input",
+      scrollIntoView: true,
+    };
+  }
+  const end = endPastFold(state, line.from, line.to);
+  return {
+    changes: { from: end, insert: "\n" + stars },
+    selection: EditorSelection.cursor(end + 1 + stars.length),
+    userEvent: "input",
+    scrollIntoView: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Blocks
+
+/**
+ * ACT-12: a `#+begin_src` or `#+begin_quote` block. A selection is wrapped,
+ * whole lines; otherwise a blank line becomes the block, or it goes on new
+ * lines right below (below the hidden text of a folded heading). The cursor
+ * goes where the language is typed (src) or on the empty body line (quote).
+ */
+export function insertBlock(state: EditorState, kind: "src" | "quote"): TransactionSpec {
+  const doc = state.doc;
+  const begin = `#+begin_${kind}`;
+  const end = `#+end_${kind}`;
+  const sel = state.selection.main;
+  if (!sel.empty) {
+    const first = doc.lineAt(sel.from);
+    // a selection ending at the start of a line doesn't take that line
+    const last = doc.lineAt(sel.to > sel.from && doc.lineAt(sel.to).from === sel.to ? sel.to - 1 : sel.to);
+    const beginLine = (kind === "src" ? begin + " " : begin) + "\n";
+    return {
+      changes: [{ from: first.from, insert: beginLine }, { from: last.to, insert: "\n" + end }],
+      selection: EditorSelection.cursor(kind === "src" ? first.from + begin.length + 1 : last.to + beginLine.length),
+      userEvent: "input",
+      scrollIntoView: true,
+    };
+  }
+  const line = doc.lineAt(sel.head);
+  const text = `${begin}${kind === "src" ? " " : ""}\n\n${end}`;
+  // after "#+begin_src " for src, on the empty line for quote: the same offset
+  const cursorIn = begin.length + 1;
+  if (!line.text.trim()) {
+    return {
+      changes: { from: line.from, to: line.to, insert: text },
+      selection: EditorSelection.cursor(line.from + cursorIn),
+      userEvent: "input",
+      scrollIntoView: true,
+    };
+  }
+  const at = endPastFold(state, line.from, line.to);
+  return {
+    changes: { from: at, insert: "\n" + text },
+    selection: EditorSelection.cursor(at + 1 + cursorIn),
+    userEvent: "input",
+    scrollIntoView: true,
   };
 }
 

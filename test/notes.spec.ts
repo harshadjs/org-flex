@@ -6,7 +6,7 @@ import { displayValue, parseFrontMatter, propertyIcon, simplifyValue } from "../
 import {
   calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, journalPathForDate,
 } from "../src/org/journal";
-import { notePath, noteFileContent, titleProblem } from "../src/org/new-note";
+import { freeNotePath, noteFileName, notePath, noteFileContent, titleProblem } from "../src/org/new-note";
 import {
   barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, parseKeywordList, DEFAULT_SETTINGS,
 } from "../src/settings";
@@ -151,6 +151,16 @@ describe("new notes", () => {
     expect(notePath("", "x")).toBe("x.org");
   });
 
+  test("a note created from the link list gets a clean file name that isn't taken yet", () => {
+    expect(noteFileName(" A/B: c ")).toBe("A-B- c");
+    expect(noteFileName("...dots.")).toBe("dots");
+    expect(noteFileName("[[]]")).toBe("----");
+    expect(noteFileName("..")).toBe("Untitled");
+    const taken = new Set(["Idea.org", "Idea 2.org"]);
+    expect(freeNotePath("", "Idea", (p) => taken.has(p))).toBe("Idea 3.org");
+    expect(freeNotePath("", "Other", (p) => taken.has(p))).toBe("Other.org");
+  });
+
   test("noteFileContent uses the UUID as ID and the title as #+title", () => {
     expect(noteFileContent(" My Note ", "0b6e1c3a-1f2d-4c5e-9a8b-7c6d5e4f3a2b"))
       .toBe(":PROPERTIES:\n:ID:       0b6e1c3a-1f2d-4c5e-9a8b-7c6d5e4f3a2b\n:END:\n#+title: My Note\n\n");
@@ -163,31 +173,56 @@ describe("settings", () => {
     expect(s.hideStars).toBe(true);
     s.todoKeywords.push("X");
     expect(DEFAULT_SETTINGS.todoKeywords).not.toContain("X");
-    expect(mergeSettings(null).shortcutBarVersion).toBe(4);
+    expect(mergeSettings(null).shortcutBarVersion).toBe(8);
+    // a setting that no longer exists is dropped
+    expect("headingDragHandles" in mergeSettings({ headingDragHandles: true } as never)).toBe(false);
     expect(mergeSettings({ hideStars: true }).shortcutBarVersion).toBe(1);
   });
 
   test("migrateShortcutButtons enables undo/redo/visibility once and drops stars", () => {
-    expect(migrateShortcutButtons(["stars", "todo"], 1).buttons).toEqual(["undo", "redo", "visibility", "todo", "wiki-link"]);
-    expect(migrateShortcutButtons(["todo"], 4)).toEqual({ buttons: ["todo"], changed: false });
+    expect(migrateShortcutButtons(["stars", "todo"], 1).buttons).toEqual(["undo", "redo", "visibility", "todo", "wiki-link", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
+    expect(migrateShortcutButtons(["todo"], 8)).toEqual({ buttons: ["todo"], changed: false });
   });
 
   test("migrateShortcutButtons replaces id-link with wiki-link in place", () => {
-    expect(migrateShortcutButtons(["undo", "id-link", "todo"], 3).buttons).toEqual(["undo", "wiki-link", "todo"]);
-    expect(migrateShortcutButtons(["undo", "todo"], 3).buttons).toEqual(["undo", "todo"]);
+    expect(migrateShortcutButtons(["undo", "id-link", "todo"], 3).buttons).toEqual(["undo", "wiki-link", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
+    expect(migrateShortcutButtons(["undo", "todo"], 3).buttons).toEqual(["undo", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
+  });
+
+  test("migrateShortcutButtons adds heading-id once", () => {
+    expect(migrateShortcutButtons(["undo", "todo"], 4)).toEqual({ buttons: ["undo", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"], changed: true });
+    expect(migrateShortcutButtons(["heading-id", "undo"], 4).buttons).toEqual(["heading-id", "undo", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
+  });
+
+  test("migrateShortcutButtons adds new-heading once", () => {
+    expect(migrateShortcutButtons(["undo", "todo"], 5)).toEqual({ buttons: ["undo", "todo", "new-heading", "src-block", "quote-block", "zoom", "node-find"], changed: true });
+    expect(migrateShortcutButtons(["new-heading", "undo"], 5).buttons).toEqual(["new-heading", "undo", "src-block", "quote-block", "zoom", "node-find"]);
+    // turned off after the upgrade, it stays off
+    expect(migrateShortcutButtons(["undo"], 8)).toEqual({ buttons: ["undo"], changed: false });
+  });
+
+  test("migrateShortcutButtons adds the source and quote block buttons once", () => {
+    expect(migrateShortcutButtons(["undo"], 6)).toEqual({ buttons: ["undo", "src-block", "quote-block", "zoom", "node-find"], changed: true });
+    expect(migrateShortcutButtons(["quote-block", "undo"], 6).buttons).toEqual(["quote-block", "undo", "src-block", "zoom", "node-find"]);
+  });
+
+  test("migrateShortcutButtons adds zoom and go to node once", () => {
+    expect(migrateShortcutButtons(["undo"], 7)).toEqual({ buttons: ["undo", "zoom", "node-find"], changed: true });
+    expect(migrateShortcutButtons(["node-find"], 7).buttons).toEqual(["node-find", "zoom"]);
   });
 
   test("bar buttons keep BUTTONS order and ignore unknown ids", () => {
     expect(BUTTONS.map((b) => b.id)).toEqual([
-      "undo", "redo", "visibility", "demote", "promote", "todo", "schedule", "deadline",
-      "checkbox", "wiki-link", "journal", "journal-picker", "journal-calendar", "new-note",
+      "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
+      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note",
     ]);
     expect(barButtons(["todo", "stars", "undo"]).map((b) => b.id)).toEqual(["undo", "todo"]);
   });
 
   test("a fresh bar has the editing buttons on and the journal and note buttons off", () => {
     expect(DEFAULT_SETTINGS.shortcutBarButtons).toEqual([
-      "undo", "redo", "visibility", "demote", "promote", "todo", "schedule", "deadline", "checkbox", "wiki-link",
+      "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline", "checkbox",
+      "src-block", "quote-block", "wiki-link", "node-find", "heading-id",
     ]);
   });
 

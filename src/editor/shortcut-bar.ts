@@ -7,6 +7,7 @@ import { redoDepth, undoDepth } from "@codemirror/commands";
 import { ButtonDef } from "../settings";
 import { VisibilityLevel } from "../org/folding";
 import { visibilityField } from "./folding";
+import { zoomField } from "./zoom";
 import { onTap } from "./state";
 
 export const VISIBILITY_ICONS: Record<VisibilityLevel, string> = {
@@ -48,7 +49,7 @@ class Bar implements Panel {
       onTap(button, () => {
         const hadFocus = view.hasFocus;
         options.run(def.id, view);
-        if (def.refocus && hadFocus) view.focus();
+        if (def.refocus === "always" || (def.refocus && hadFocus)) view.focus();
       });
       this.elements.set(def.id, button);
     }
@@ -63,6 +64,7 @@ class Bar implements Panel {
     const state = this.view.state;
     this.elements.get("undo")?.classList.toggle("is-disabled", undoDepth(state) === 0);
     this.elements.get("redo")?.classList.toggle("is-disabled", redoDepth(state) === 0);
+    this.elements.get("zoom")?.classList.toggle("is-active", Boolean(state.field(zoomField, false)));
     const visibility = this.elements.get("visibility");
     const level = state.field(visibilityField, false) ?? "expandall";
     if (visibility && level !== this.level) {
