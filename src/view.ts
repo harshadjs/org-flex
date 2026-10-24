@@ -9,6 +9,7 @@ import { foldedRanges, unfoldEffect } from "@codemirror/language";
 import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
 import { barButtons, ButtonId } from "./settings";
+import { FLAVOUR } from "./flavour";
 import { nextVisibility } from "./org/folding";
 import { appendEntry } from "./org/capture";
 import {
@@ -124,7 +125,7 @@ export class OrgFlexView extends TextFileView {
     }
     if (clear) {
       this.editor.setState(this.createState(data));
-      applyVisibility(this.editor, this.plugin.settings.defaultFoldLevel);
+      applyVisibility(this.editor, FLAVOUR.defaultFoldLevel);
       this.refreshBacklinks();
       return;
     }
@@ -172,7 +173,7 @@ export class OrgFlexView extends TextFileView {
   }
 
   private configExtension(): Extension {
-    const s = this.plugin.settings;
+    const s = FLAVOUR;
     return orgConfig.of({
       keywords: this.plugin.keywords(),
       hideStars: s.hideStars,
@@ -182,7 +183,7 @@ export class OrgFlexView extends TextFileView {
   }
 
   private featureExtension(): Extension {
-    const s = this.plugin.settings;
+    const s = FLAVOUR;
     return [
       s.frontMatterPanel ? frontMatterPanel() : [],
       s.backlinks ? this.backlinksField : [],
@@ -254,7 +255,7 @@ export class OrgFlexView extends TextFileView {
   /** BL-5: recompute the backlinks section from the index. */
   refreshBacklinks() {
     const editor = this.editor;
-    if (!editor || !this.plugin.settings.backlinks) return;
+    if (!editor || !FLAVOUR.backlinks) return;
     const path = this.file?.path;
     let data: BacklinksData | null = null;
     if (path) {

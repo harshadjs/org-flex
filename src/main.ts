@@ -8,6 +8,7 @@ import { journalEntries, journalFileContent, journalPathForDate } from "./org/jo
 import { appendEntry, captureEntry, capturePath, captureStates, noteCaptureText, sharedCaptureText } from "./org/capture";
 import { freeNotePath, noteFileContent, noteFileName, notePath, titleProblem } from "./org/new-note";
 import { OrgFlexView, VIEW_TYPE } from "./view";
+import { FLAVOUR } from "./flavour";
 import { orgConflictMessage } from "./conflicts";
 import { CaptureChoice, CaptureModal, JournalCalendarModal, JournalPickerModal, NewNoteModal, NodeFinderModal } from "./ui/modals";
 import { registerTaskBlocks } from "./ui/tasks-block";
@@ -95,7 +96,7 @@ export default class OrgFlexPlugin extends Plugin {
   }
 
   keywords(): Keywords {
-    return { todo: this.settings.todoKeywords, done: this.settings.doneKeywords };
+    return { todo: FLAVOUR.todoKeywords, done: FLAVOUR.doneKeywords };
   }
 
   /** BAR-7: the custom icon when Lucide knows it, else the default. */
@@ -239,7 +240,7 @@ export default class OrgFlexPlugin extends Plugin {
       let file = this.app.vault.getAbstractFileByPath(path);
       if (!file) {
         await this.ensureFolder(path.slice(0, path.lastIndexOf("/")));
-        file = await this.app.vault.create(path, journalFileContent(date, this.settings.journalTemplate, crypto.randomUUID()));
+        file = await this.app.vault.create(path, journalFileContent(date, FLAVOUR.journalTemplate, crypto.randomUUID()));
       }
       if (!(file instanceof TFile)) throw new Error(`${path} is not a file`);
       await this.app.workspace.getLeaf(false).openFile(file);
@@ -354,7 +355,7 @@ export default class OrgFlexPlugin extends Plugin {
    */
   capture(initial?: string) {
     const path = capturePath(this.settings.captureFile);
-    const states = captureStates(this.settings.todoKeywords, this.settings.doneKeywords);
+    const states = captureStates(FLAVOUR.todoKeywords, FLAVOUR.doneKeywords);
     let text = initial ?? "";
     let cursor = text.length;
     const view = initial === undefined ? this.activeView() : null;

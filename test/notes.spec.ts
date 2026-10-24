@@ -1,17 +1,18 @@
 import { describe, expect, test } from "vitest";
 import { orgConflictMessage } from "../src/conflicts";
+import { FLAVOUR } from "../src/flavour";
 import { Text } from "@codemirror/state";
 import { analyze } from "../src/org/syntax";
 import { foldAt, nextVisibility, visibilityFolds } from "../src/org/folding";
 import { displayValue, parseFrontMatter, propertyIcon, simplifyValue } from "../src/org/front-matter";
 import {
-  calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, DEFAULT_JOURNAL_TEMPLATE, DATE_ID_JOURNAL_TEMPLATE, journalPathForDate,
+  calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, DEFAULT_JOURNAL_TEMPLATE, journalPathForDate,
 } from "../src/org/journal";
 import { readNote } from "../src/org/vault-index";
 import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, sharedCaptureText } from "../src/org/capture";
 import { freeNotePath, noteFileName, notePath, noteFileContent, titleProblem } from "../src/org/new-note";
 import {
-  barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, parseKeywordList, DEFAULT_SETTINGS,
+  barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, DEFAULT_SETTINGS,
 } from "../src/settings";
 
 function folds(lines: string[]) {
@@ -113,16 +114,13 @@ describe("journal", () => {
 
   test("journalFileContent fills the template's date and ID", () => {
     expect(journalFileContent(d, DEFAULT_JOURNAL_TEMPLATE, "u-1")).toBe(":PROPERTIES:\n:ID:       u-1\n:END:\n#+title: 2024-03-05\n\n");
-    expect(journalFileContent(d, DATE_ID_JOURNAL_TEMPLATE, "u-1")).toBe(":PROPERTIES:\n:ID:       2024-03-05\n:END:\n#+title: 2024-03-05\n#+filetags: :journal:\n\n");
+    expect(journalFileContent(d, ":ID: {{date}}\n#+filetags: :journal:\n", "u-1")).toBe(":ID: 2024-03-05\n#+filetags: :journal:\n");
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("a fresh install uses TODO | DONE and the UUID journal header; older installs keep the date header", () => {
-    const fresh = mergeSettings(null);
-    expect([fresh.todoKeywords, fresh.doneKeywords]).toEqual([["TODO"], ["DONE"]]);
-    expect(fresh.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
-    expect(mergeSettings({ hideStars: true }).journalTemplate).toBe(DATE_ID_JOURNAL_TEMPLATE);
-    expect(mergeSettings({ journalTemplate: "x" }).journalTemplate).toBe("x");
+  test("the base flavour has only TODO and DONE, and the UUID journal header", () => {
+    expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO"], ["DONE"]]);
+    expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
   });
 
   test("journalEntries keeps dated files under the folder, newest first", () => {
@@ -240,14 +238,21 @@ describe("capture", () => {
 
 describe("settings", () => {
   test("saved settings merge over copied defaults", () => {
-    const s = mergeSettings({ hideStars: true });
-    expect(s.hideStars).toBe(true);
-    s.todoKeywords.push("X");
-    expect(DEFAULT_SETTINGS.todoKeywords).not.toContain("X");
+    const s = mergeSettings({ journalFolder: "days" });
+    expect(s.journalFolder).toBe("days");
+    s.shortcutBarButtons.push("X");
+    expect(DEFAULT_SETTINGS.shortcutBarButtons).not.toContain("X");
     expect(mergeSettings(null).shortcutBarVersion).toBe(8);
-    // a setting that no longer exists is dropped
-    expect("headingDragHandles" in mergeSettings({ headingDragHandles: true } as never)).toBe(false);
-    expect(mergeSettings({ hideStars: true }).shortcutBarVersion).toBe(1);
+    expect(mergeSettings({ journalFolder: "days" }).shortcutBarVersion).toBe(1);
+  });
+
+  test("saved workflow choices are dropped: the flavour has them now", () => {
+    const old = { headingDragHandles: true, todoKeywords: ["NEXT"], hideStars: true, backlinks: false, journalTemplate: "x", captureFile: "in.org" };
+    const s = mergeSettings(old as never) as unknown as Record<string, unknown>;
+    for (const key of ["headingDragHandles", "todoKeywords", "hideStars", "backlinks", "journalTemplate"]) expect(key in s, key).toBe(false);
+    expect(s.captureFile).toBe("in.org");
+    expect(Object.keys(DEFAULT_SETTINGS).sort()).toEqual(
+      ["captureFile", "journalFolder", "shortcutBarButtons", "shortcutBarVersion", "shortcutCustomIcons", "showShortcutBar"]);
   });
 
   test("migrateShortcutButtons enables undo/redo/visibility once and drops stars", () => {
@@ -303,10 +308,6 @@ describe("settings", () => {
     expect(buttonIconName(todo, " star ", known)).toBe("star");
     expect(buttonIconName(todo, "no-such-icon", known)).toBe("circle-check");
     expect(buttonIconName(todo, undefined, known)).toBe("circle-check");
-  });
-
-  test("keyword lists accept commas or newlines", () => {
-    expect(parseKeywordList("TODO, NEXT\nWAIT,,\n")).toEqual(["TODO", "NEXT", "WAIT"]);
   });
 });
 

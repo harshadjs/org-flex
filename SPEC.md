@@ -58,7 +58,7 @@ Org Flex is a base to be tailored: each user's fork, usually through their own c
 | VIEW-4 | Undo/redo history is CodeMirror's `history()`. Keymap: CodeMirror defaults, history and search keys, and Tab indents. List continuation (CHK-8) has priority over the default Enter. **Test:** "the keymap: Tab indents, Enter continues lists, undo takes edits back". **Manual:** Vim's priority needs Obsidian's Vim setting. |
 | VIEW-5 | Vim mode follows Obsidian's *Vim key bindings* setting. It's checked when the editor gains or loses focus, so changing the setting takes effect on the next focus change. Vim has the highest key priority, so in normal mode Enter is Vim's; in insert mode it reaches CHK-8. **Manual:** needs Obsidian's Vim setting. |
 | VIEW-6 | Lines wrap. `scrollPastEnd()` is on, so short or fully folded documents can still scroll (mobile requirement, see §13). The caret and selection are the browser's own (no drawn selection), which keeps native selection handles on phones. **Test:** "lines wrap and the selection is the browser's own". **Manual:** scrolling a fully folded file needs a real layout. |
-| VIEW-7 | Saving settings applies them to every open org view without reopening it: TODO keywords, hidden stars, the shortcut bar, the front matter panel and backlinks. **Manual:** needs open Obsidian views and the settings tab. |
+| VIEW-7 | Saving settings applies them to every open org view without reopening it: the shortcut bar and its buttons. (Flavour choices, §12a, are code and apply on reload.) **Manual:** needs open Obsidian views and the settings tab. |
 | VIEW-8 | Spellcheck follows Obsidian's *Editor → Spellcheck* setting (on unless it is turned off). The editor sets `spellcheck="true"` (plus `autocorrect` and `autocapitalize` for mobile keyboards) on its content. The setting is read when the file is opened, so a change applies to files opened afterwards. **Test:** "lines wrap and the selection is the browser's own". **Manual:** the underline needs Obsidian's setting. |
 | VIEW-9 | **Changes on disk** (Syncthing, Emacs) are applied to the open editor as one edit covering only the part that differs, so the cursor, folds and undo history survive. Undo can take the external change back, like any edit. Opening a different file in the view builds a fresh state. **Test:** "externalChange replaces only the part that differs". **Manual:** needs Syncthing or Emacs writing the file. |
 
@@ -81,7 +81,7 @@ Org Flex is a base to be tailored: each user's fork, usually through their own c
 |---|---|
 | PARSE-1 | Supported: headings (any depth) with TODO keyword, priority, title and tags; planning lines (only directly after a heading); drawers, with `:KEY: value` lines in property drawers; blocks (`#+begin_X` … `#+end_X`, any name, with the source language); keyword lines (`#+KEY:`), comment lines (`# `); text markup (bold, italic, underline, verbatim, code, strike-through) including nesting; regular `[[…]]`, angle `<scheme:…>` and plain URL links; markup and links combined. A block or drawer only counts if it is closed before the next heading (headings always win, as in Org); otherwise its first line is plain text. **Test:** "planning only directly after a heading, drawers and blocks need their end line", "headings are stars at column 0 followed by whitespace or the end", "heading keyword, priority, title and tags", "text markup, nested", "links: regular, with description, angle and plain", "markup and links combined; markup never ends inside a link". |
 | PARSE-2 | Overlapping markup is resolved into a tree: an opening marker pairs with the nearest valid closing one, so in `*one _two three* four_`, `*one _two three*` is bold and ` four_` is plain. This deliberately differs from Emacs. Markers need Org's borders (whitespace or `-({'"` before, whitespace or punctuation after); the edges of the enclosing markup also count, so `*bold /italic/*` nests. Verbatim and code contents are not parsed. Markup is matched within one line. **Test:** "markup criss-cross becomes a tree, unlike Emacs", "markers need a valid border", "verbatim and code contents are not parsed". |
-| PARSE-3 | TODO and DONE keywords come from the settings (`todoKeywords`, `doneKeywords`). A keyword is only recognised as the first word of a heading title, exactly as configured. **Test:** "a keyword is only recognised at the start of the title, as configured". |
+| PARSE-3 | TODO and DONE keywords come from the flavour (`todoKeywords`, `doneKeywords`, §12a). A keyword is only recognised as the first word of a heading title, exactly as configured. **Test:** "a keyword is only recognised at the start of the title, as configured". |
 | PARSE-4 | Source blocks get syntax highlighting for c, c++/cpp, css, html, java, javascript/js, typescript/ts, json, php, python/py, rust, sass, scss and xml (`src/editor/src-highlight.ts`). Each visible block is parsed with that language's Lezer parser; token classes `org-tok-*` map onto Obsidian's `--code-*` colours. **Test:** "the editor renders every feature without errors". |
 | PARSE-5 | The parser must never hang on any input. **Test:** "the parser never hangs". |
 
@@ -119,7 +119,7 @@ Not parsed: lists as tree nodes (handled line by line instead, §8), horizontal 
 
 ## 5a. Index and backlinks
 
-`src/org/vault-index.ts` (index and pure functions), `src/editor/backlinks.ts` (the section), `src/main.ts` (vault events), `src/view.ts` (`refreshBacklinks`, `linkMention`). Tests in `test/index.spec.ts`. Setting `backlinks` (default on).
+`src/org/vault-index.ts` (index and pure functions), `src/editor/backlinks.ts` (the section), `src/main.ts` (vault events), `src/view.ts` (`refreshBacklinks`, `linkMention`). Tests in `test/index.spec.ts`. Flavour `backlinks` (§12a, on in the base).
 
 | ID | Rule |
 |---|---|
@@ -160,7 +160,7 @@ Not parsed: lists as tree nodes (handled line by line instead, §8), horizontal 
 
 ## 7. Front matter panel
 
-`src/org/front-matter.ts` (pure), `src/editor/front-matter-panel.ts`. Tests in `test/notes.spec.ts` and `test/editor.spec.ts`. Setting `frontMatterPanel` (default on).
+`src/org/front-matter.ts` (pure), `src/editor/front-matter-panel.ts`. Tests in `test/notes.spec.ts` and `test/editor.spec.ts`. Flavour `frontMatterPanel` (§12a, on in the base).
 
 | ID | Rule |
 |---|---|
@@ -169,7 +169,7 @@ Not parsed: lists as tree nodes (handled line by line instead, §8), horizontal 
 | FM-3 | **Values:** tags (`filetags`/`tags`, `:a:b:`) show as pills. Keys ending in `aliases` show as pills, with `"quoted phrases"` kept together. `ID`/`CUSTOM_ID` get a fingerprint icon, tags a tags icon, dates a calendar icon, links a link icon. Links show their description (or target) and dates lose their brackets. Empty values show "Empty". **Test:** "values: tags and aliases become pills, links and dates are simplified". |
 | FM-4 | The Properties header collapses and expands without moving the cursor or focusing the editor. A collapsed header shows how many properties there are. The starting state follows `foldPropertyDrawers`. The title always shows. Changing other settings keeps the current collapsed state. **Test:** "the editor renders every feature without errors" (the count). |
 | FM-5 | **Editing:** clicking the title or a row shows the raw text, with the cursor at the end of that line and the editor focused. So does moving the cursor into the front matter with the keyboard, or typing, deleting, undoing or redoing there. The panel comes back when the cursor leaves. Opening a file does *not* show the raw text, even though the cursor starts at position 0, and neither does any transaction that isn't the user's (folds, backlinks). **Test:** "the source shows only when the user moves into the front matter". |
-| FM-6 | The panel is never stored in the document. Turning the setting off shows the raw text again, and the drawer becomes foldable again. **Test:** "the panel is never part of the document, and turning it off shows the raw text". |
+| FM-6 | The panel is never stored in the document. Turning `frontMatterPanel` off (§12a) shows the raw text again, and the drawer becomes foldable again. **Test:** "the panel is never part of the document, and turning it off shows the raw text". |
 
 ## 8. Checklists
 
@@ -266,12 +266,12 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 10. Journal
 
-`src/org/journal.ts` (pure), `src/main.ts` (`openJournal`, `browseJournal`, `openCalendar`), `src/ui/modals.ts` (`JournalPickerModal`, `JournalCalendarModal`). Tests in `test/notes.spec.ts`. Settings `journalFolder` (default `journal`) and `journalTemplate`.
+`src/org/journal.ts` (pure), `src/main.ts` (`openJournal`, `browseJournal`, `openCalendar`), `src/ui/modals.ts` (`JournalPickerModal`, `JournalCalendarModal`). Tests in `test/notes.spec.ts`. Setting `journalFolder` (default `journal`); flavour `journalTemplate` (§12a).
 
 | ID | Rule |
 |---|---|
 | JRN-1 | Today's file is `<journalFolder>/YYYY/MM/YYYY-MM-DD.org`, using the **local** date. Leading and trailing slashes on the folder are ignored, and an empty folder means the vault root. **Test:** "journalDateString zero-pads month and day in local time", "journalPathForDate nests by year and month, tolerating slashes and an empty folder". |
-| JRN-2 | **Open today's journal** opens that file in the current tab. If it doesn't exist, the missing folders are created one at a time and the file is created from the `journalTemplate` setting ("New journal file"), where every `{{date}}` becomes the day (`YYYY-MM-DD`) and every `{{id}}` a new UUID (ignoring case and spaces inside the braces). A fresh install's template is the first block below. Installs whose saved settings predate the setting keep the second, with the date as `:ID:`, which journals migrated from Emacs and org-roam setups that link days by date rely on. Errors show as a notice. **Test:** "journalFileContent fills the template's date and ID", "a fresh install uses TODO | DONE and the UUID journal header; older installs keep the date header". |
+| JRN-2 | **Open today's journal** opens that file in the current tab. If it doesn't exist, the missing folders are created one at a time and the file is created from the flavour's `journalTemplate` (§12a), where every `{{date}}` becomes the day (`YYYY-MM-DD`) and every `{{id}}` a new UUID (ignoring case and spaces inside the braces). The base flavour's template is the block below; a fork whose org-roam setup links days by date uses `:ID:       {{date}}` instead. Errors show as a notice. **Test:** "journalFileContent fills the template's date and ID", "the base flavour has only TODO and DONE, and the UUID journal header". |
 | JRN-3 | **Browse journal entries** lists every `.org` file at any depth under the journal folder whose name is `YYYY-MM-DD.org`, newest first. Each is shown as `YYYY-MM-DD · Weekday, Month D`, so a date, weekday or month name can be searched. Choosing one opens it in the current tab. With no entries, a notice appears. **Test:** "journalEntries keeps dated files under the folder, newest first", "journal entries are labelled with weekday and month". |
 | JRN-4 | **Journal calendar** (command `open-journal-calendar`, optional `journal-calendar` bar button) shows a month grid, starting on the locale's first weekday (Monday when the engine can't tell), with full weeks padded from the months around it. Days with a journal file (JRN-3 naming) have a dot, and today is highlighted. Arrows change the month, and **Today** returns to the current month. Tapping a day closes the calendar and opens that day's journal, creating it as in JRN-2 if needed. **Test:** "calendarMonth lays a month out in full weeks from the first weekday". |
 
@@ -283,14 +283,6 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ```
 
-```
-:PROPERTIES:
-:ID:       {{date}}
-:END:
-#+title: {{date}}
-#+filetags: :journal:
-
-```
 
 ## 10a. New org note
 
@@ -356,34 +348,39 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 | ID | Rule |
 |---|---|
 | TASK-1 | A Markdown ` ```orgmode-tasks ` block with YAML `filepath:` (required; a vault path, or a link resolved from the note) and `query:` (default `it.todo or it.done`) lists the tasks of that org file. Errors are shown in place of the block. **Test:** "a task block needs filepath: and defaults its query". **Manual:** rendering in a Markdown note needs Obsidian. |
-| TASK-2 | **Tasks** are headings, at any depth, together with their keyword, title, priority and `SCHEDULED`/`DEADLINE`/`CLOSED` dates (with time, if given). Whether a task is TODO or DONE comes from the keyword settings. **Test:** "headings at any depth with keyword, priority and planning dates". |
+| TASK-2 | **Tasks** are headings, at any depth, together with their keyword, title, priority and `SCHEDULED`/`DEADLINE`/`CLOSED` dates (with time, if given). Whether a task is TODO or DONE comes from the flavour's keywords (§12a). **Test:** "headings at any depth with keyword, priority and planning dates". |
 | TASK-3 | Ticking a task's checkbox rewrites the keyword in the org file: DONE-type → `TODO`, anything else (including no keyword) → `DONE`. The file is updated with `vault.process` so concurrent edits aren't lost; if the heading is no longer on its line with the same title, nothing changes. The list re-renders whenever the org file changes. **Test:** "ticking flips done tasks to TODO and anything else to DONE". |
 | TASK-4 | **Queries** use a subset of Orgzly's search language. Supported: <br>• `it.todo`, `it.done`, `it.none` (no keyword), and `i.<keyword>` for a keyword. <br>• `s.`, `d.`, `c.` for scheduled, deadline and closed, with an optional operator `eq ne lt le gt ge` (default `le` for s/d, `eq` for c) and a time `today`/`tod`, `tomorrow`/`tmrw`/`tom`, `yesterday`, `now`, `Nd`/`Nw`/`Nm`/`Ny` (N may be negative), or `none`/`no`. Dates compare by day, `now` by time. <br>• A leading `.` negates any condition. <br>• Sorting with `o.s`, `o.d`, `o.c`, `o.p`, `o.st` (`.o.…` sorts descending); missing values sort last, ties keep file order. Priority sorting uses `defaultPriority` for tasks without one; state sorting follows the keyword settings' order. <br>• `ad.N`: an agenda view of N days. <br>• Combine with `and`, `or`, a space (also and), and parentheses. The symbols `&` and `|` are rejected. **Test:** "state conditions and negation", "date conditions with operators and times", "and, or and parentheses", "sorting", "bad queries say why". |
 | TASK-5 | **Agenda view:** tasks scheduled or due on each of the N days from today are listed under that day. Open tasks scheduled or due before today go under a first, translated "Overdue" heading (English when the language isn't known), and dates are formatted in Obsidian's language. **Test:** "agenda groups tasks by day, overdue first". |
 
 ## 12. Settings
 
-`src/settings.ts` (defaults, upgrade), `src/ui/settings-tab.ts`, `src/main.ts` (`loadSettings`). Saved settings are merged over the defaults on load, and array and object defaults are copied so editing them never changes `DEFAULT_SETTINGS`. **Test:** "saved settings merge over copied defaults".
+`src/settings.ts` (defaults, upgrade), `src/ui/settings-tab.ts`, `src/main.ts` (`loadSettings`). Settings hold only what differs between one person's vaults and devices (folders, the inbox, the bar on this phone). How the person works with Org is the flavour (§12a), which is code. Saved settings are merged over the defaults on load, and array and object defaults are copied so editing them never changes `DEFAULT_SETTINGS`. Saved keys that are no longer settings (`RETIRED_SETTINGS`: the old keyword, display, panel, backlinks and journal-template settings, and `headingDragHandles`) are dropped on load; their values are not carried into the flavour. **Test:** "saved settings merge over copied defaults", "saved workflow choices are dropped: the flavour has them now".
 
 | Key | Default | Effect |
 |---|---|---|
-| `todoKeywords` | `TODO` | Open-task keywords (PARSE-3, ACT-3, TASK-2) |
-| `doneKeywords` | `DONE` | Closed-task keywords. A fresh install has Org's own `TODO \| DONE`; saved lists are kept. **Test:** "a fresh install uses TODO \| DONE and the UUID journal header; older installs keep the date header". |
-| `defaultPriority` | `B` | Priority used when sorting tasks that have none |
-| `hideStars` | `false` | LP-7 |
-| `foldPropertyDrawers` | `true` | Drawers stay folded (FOLD-4); front matter starts collapsed (FM-4) |
-| `defaultFoldLevel` | `foldall` | FOLD-5 (`foldall` / `outline` / `expandall`) |
 | `showShortcutBar` | `true` | BAR-1 |
 | `shortcutBarButtons` | BAR-3 list | BAR-2 |
 | `shortcutCustomIcons` | `{}` | BAR-7 |
 | `shortcutBarVersion` | `8` | BAR-8 (internal, not shown in settings) |
 | `journalFolder` | `journal` | JRN-1 |
-| `journalTemplate` | first JRN-2 block (the second for older installs) | JRN-2 |
 | `captureFile` | `inbox.org` | CAP-2 |
+
+## 12a. Flavour
+
+`src/flavour.ts` (`FLAVOUR`). The choices that fit one way of using Org, as code a fork edits (`TAILOR.md`) rather than settings. The base flavour is plain Org. **Test:** "the base flavour has only TODO and DONE, and the UUID journal header".
+
+| Key | Base | Effect |
+|---|---|---|
+| `todoKeywords` | `TODO` | Open-task keywords, in cycling order (PARSE-3, ACT-3, TASK-2, CAP-7) |
+| `doneKeywords` | `DONE` | Closed-task keywords |
+| `defaultPriority` | `B` | Priority used when sorting tasks that have none |
+| `hideStars` | `false` | LP-7 |
+| `foldPropertyDrawers` | `true` | Drawers stay folded (FOLD-4); front matter starts collapsed (FM-4) |
+| `defaultFoldLevel` | `foldall` | FOLD-5 (`foldall` / `outline` / `expandall`) |
 | `frontMatterPanel` | `true` | §7 |
 | `backlinks` | `true` | §5a |
-
-Keyword text areas accept commas or newlines; blank entries are dropped. **Test:** "keyword lists accept commas or newlines".
+| `journalTemplate` | first JRN-2 block | JRN-2 |
 
 ## 13. Layout and mobile requirements
 
@@ -422,7 +419,6 @@ These need Obsidian, ideally on a phone as well as the desktop. Go through them 
 - [ ] With `orgmode-cm6` disabled, Org Flex enables without an error and `.org` files open in it. [PLAT-3]
 - [ ] With `orgmode-cm6` enabled first, enabling Org Flex shows a notice naming "Orgmode (cm6)" and nothing breaks; after turning that off and Org Flex off and on, `.org` files open in Org Flex. [PLAT-6]
 - [ ] Pushing a version tag makes a draft release with main.js, manifest.json and styles.css; BRAT installs it on the phone. [PLAT-7]
-- [ ] On a fresh vault, the keywords are TODO and DONE, and today's journal starts with a UUID `:ID:` and the date as title; editing "New journal file" in settings changes the next new day. [JRN-2]
 - [ ] An org file opens with its text, and the tab shows its name. Edits are saved, also when the tab is closed right after typing. [VIEW-1..3]
 - [ ] A fully folded file still scrolls. [VIEW-6]
 - [ ] Turning *Vim key bindings* on applies on the next focus, and Enter in normal mode is Vim's. [VIEW-4, VIEW-5]
@@ -462,7 +458,7 @@ These need Obsidian, ideally on a phone as well as the desktop. Go through them 
 - [ ] `[[id:…]]` links open instantly on the phone, also right after the app starts (once the index is built). [IDX-1, LINK-3]
 - [ ] The ID button on a heading adds a property drawer with a UUID `:ID:`; after the index refreshes, `[[` offers the heading by title and the link opens it; Emacs org-roam finds the node after `org-roam-db-sync`. Tapping it again changes nothing. [ACT-10, LP-9, LINK-3]
 - [ ] The journal calendar marks days with entries; tapping a past day without one creates it with the journal header. [JRN-4]
-- [ ] Turning a setting on or off applies to open views without reopening them. [VIEW-7]
+- [ ] Turning the shortcut bar or one of its buttons on or off applies to open views without reopening them. [VIEW-7]
 - [ ] Go to node (bar button, and the command from a Markdown note) lists notes and headings by title; choosing a heading opens its file zoomed into the heading, also when that file is open and zoomed elsewhere. Typing a new title and choosing "Create note" makes the note at the vault root and opens it ready to type. [FIND-1..3, ZOOM-5]
 - [ ] On the phone, "New org note" from the ribbon, and from long-pressing a folder, creates the note, opens it and leaves the cursor below the header. A title already used shows the reason in the dialog. [NOTE-1..5]
 - [ ] On the phone, "Capture to inbox" from the ribbon menu (and the bar button, once turned on) opens the dialog with the keyboard up. Two lines typed, then Capture, add `* TODO <first line>`, `SCHEDULED: <today>` and the second line at the end of `inbox.org` (created the first time, with a header), with a notice and without leaving the current file. With `inbox.org` open in another tab, the entry appears there straight away and Undo removes it. On the desktop, Enter files and Shift+Enter adds a line. [CAP-1..5]

@@ -1,8 +1,6 @@
 // Settings (§12) and the shortcut bar's button list (§9.1). No Obsidian
 // imports, so the defaults and the upgrade step can be tested.
 
-import type { VisibilityLevel } from "./org/folding";
-import { DATE_ID_JOURNAL_TEMPLATE, DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
 
 export type ButtonId =
   | "undo" | "redo" | "visibility" | "zoom" | "new-heading" | "demote" | "promote" | "todo" | "schedule" | "deadline"
@@ -59,57 +57,41 @@ export function buttonIconName(def: ButtonDef, custom: string | undefined, known
   return name && known(name) ? name : def.icon;
 }
 
+/** §12: what differs between one person's vaults and devices; workflow choices are in the flavour (§12a). */
 export interface OrgFlexSettings {
-  todoKeywords: string[];
-  doneKeywords: string[];
-  defaultPriority: string;
-  hideStars: boolean;
-  foldPropertyDrawers: boolean;
-  defaultFoldLevel: VisibilityLevel;
   showShortcutBar: boolean;
   shortcutBarButtons: string[];
   shortcutCustomIcons: Record<string, string>;
   shortcutBarVersion: number;
   journalFolder: string;
-  journalTemplate: string;
   captureFile: string;
-  frontMatterPanel: boolean;
-  backlinks: boolean;
 }
 
 export const BAR_VERSION = 8;
 
 export const DEFAULT_SETTINGS: OrgFlexSettings = {
-  todoKeywords: ["TODO"],
-  doneKeywords: ["DONE"],
-  defaultPriority: "B",
-  hideStars: false,
-  foldPropertyDrawers: true,
-  defaultFoldLevel: "foldall",
   showShortcutBar: true,
   shortcutBarButtons: BUTTONS.filter((b) => b.enabled).map((b) => b.id),
   shortcutCustomIcons: {},
   shortcutBarVersion: BAR_VERSION,
   journalFolder: "journal",
-  journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
   captureFile: "inbox.org",
-  frontMatterPanel: true,
-  backlinks: true,
 };
+
+/** §12: saved keys that are no longer settings (gone, or moved to the flavour, §12a); dropped on load. */
+export const RETIRED_SETTINGS = [
+  "headingDragHandles", "todoKeywords", "doneKeywords", "defaultPriority", "hideStars", "foldPropertyDrawers",
+  "defaultFoldLevel", "frontMatterPanel", "backlinks", "journalTemplate",
+];
 
 /** Saved settings over the defaults, with arrays and objects copied (§12). */
 export function mergeSettings(saved: Partial<OrgFlexSettings> | null | undefined): OrgFlexSettings {
   const merged: OrgFlexSettings = { ...DEFAULT_SETTINGS, ...(saved ?? {}) };
-  // settings that no longer exist
-  delete (merged as unknown as Record<string, unknown>).headingDragHandles;
-  merged.todoKeywords = [...merged.todoKeywords];
-  merged.doneKeywords = [...merged.doneKeywords];
+  for (const key of RETIRED_SETTINGS) delete (merged as unknown as Record<string, unknown>)[key];
   merged.shortcutBarButtons = [...merged.shortcutBarButtons];
   merged.shortcutCustomIcons = { ...merged.shortcutCustomIcons };
   // a fresh install starts at the current version; saved settings without one are version 1
   if (saved && saved.shortcutBarVersion === undefined) merged.shortcutBarVersion = 1;
-  // JRN-2: installs from before the template setting keep the header they had
-  if (saved && saved.journalTemplate === undefined) merged.journalTemplate = DATE_ID_JOURNAL_TEMPLATE;
   return merged;
 }
 
@@ -130,9 +112,4 @@ export function migrateShortcutButtons(buttons: string[], version: number): { bu
   if (version < 7) for (const id of ["src-block", "quote-block"]) if (!list.includes(id)) list.push(id);
   if (version < 8) for (const id of ["zoom", "node-find"]) if (!list.includes(id)) list.push(id);
   return { buttons: list, changed: true };
-}
-
-/** Keyword text areas: commas or newlines, blank entries dropped. */
-export function parseKeywordList(text: string): string[] {
-  return text.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
 }

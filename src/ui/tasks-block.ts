@@ -4,6 +4,7 @@ import { MarkdownPostProcessorContext, MarkdownRenderChild, moment, parseYaml, T
 import type OrgFlexPlugin from "../main";
 import { parseTasks, OrgTask, taskBlockConfig, toggleTaskInText } from "../org/tasks";
 import { agenda, overdueLabel, parseQuery, runQuery } from "../org/query";
+import { FLAVOUR } from "../flavour";
 
 class TaskList extends MarkdownRenderChild {
   constructor(el: HTMLElement, private plugin: OrgFlexPlugin, private source: string, private sourcePath: string) {
@@ -44,8 +45,7 @@ class TaskList extends MarkdownRenderChild {
       const keywords = this.plugin.keywords();
       const tasks = parseTasks(await this.plugin.app.vault.read(file), keywords);
       const query = parseQuery(source);
-      const settings = this.plugin.settings;
-      const ctx = { todoKeywords: settings.todoKeywords, doneKeywords: settings.doneKeywords, defaultPriority: settings.defaultPriority };
+      const ctx = { todoKeywords: FLAVOUR.todoKeywords, doneKeywords: FLAVOUR.doneKeywords, defaultPriority: FLAVOUR.defaultPriority };
       const now = new Date();
       if (query.agendaDays !== null) {
         const locale = moment.locale();

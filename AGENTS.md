@@ -6,6 +6,9 @@ This repository contains the Org Flex Obsidian plugin (ID: `org-flex`): Org mode
 ## Behaviour Spec
 `SPEC.md` is the contract for how the plugin behaves. Read the sections your change touches before changing anything. Any change that alters behaviour must update the matching rule in the same commit. Finish with the checks in its §15 (tests, type-check, build). Every rule must be testable: it names its tests (**Test:**) or says why only a person in Obsidian can check it (**Manual:**, with a line in the §16 checklist); `test/spec.spec.ts` enforces this. The four invariants in its §0 (plain Org, phone-first taps, testable rules, permanent command ids) hold in every fork and are guarded by `test/invariants.spec.ts` and `test/spec.spec.ts`; every other rule is a default you may rewrite when the user asks. Keep logic out of the Obsidian-importing files (`src/view.ts`, `src/main.ts`, `src/ui/`) so it can be tested.
 
+## Settings and flavour
+Settings (`src/settings.ts`, the settings tab) hold only what differs between one person's vaults and devices. How the user works with Org (keywords, templates, what is shown or folded, which features are on) is the flavour, `src/flavour.ts` (SPEC §12a): change it there, in code, when the user asks, rather than adding a setting.
+
 ## Layout
 - `src/org/` — pure Org logic (parsing, lists, editing commands, folding rules, front matter, journal, notes, index, task queries). No Obsidian imports; tested directly.
 - `src/editor/` — CodeMirror extensions (live preview, folding, checklists, front matter panel, backlinks, heading drag, shortcut bar, completion).

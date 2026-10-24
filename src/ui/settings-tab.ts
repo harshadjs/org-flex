@@ -1,9 +1,9 @@
-// The settings tab (§12).
+// The settings tab (§12): only what differs between vaults and devices.
+// Workflow choices are in the flavour (src/flavour.ts, §12a).
 
 import { App, getIcon, PluginSettingTab, setIcon, Setting } from "obsidian";
 import type OrgFlexPlugin from "../main";
-import { BUTTONS, parseKeywordList } from "../settings";
-import type { VisibilityLevel } from "../org/folding";
+import { BUTTONS } from "../settings";
 
 export class OrgFlexSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: OrgFlexPlugin) {
@@ -16,69 +16,6 @@ export class OrgFlexSettingTab extends PluginSettingTab {
     const save = () => this.plugin.saveSettings();
     containerEl.empty();
 
-    new Setting(containerEl).setName("Tasks").setHeading();
-    new Setting(containerEl)
-      .setName("TODO keywords")
-      .setDesc("Keywords of open tasks, separated by commas or new lines. The first one is used when cycling.")
-      .addTextArea((t) => t.setValue(settings.todoKeywords.join(", ")).onChange(async (v) => {
-        settings.todoKeywords = parseKeywordList(v);
-        await save();
-      }));
-    new Setting(containerEl)
-      .setName("DONE keywords")
-      .setDesc("Keywords of closed tasks. The first one is used when cycling.")
-      .addTextArea((t) => t.setValue(settings.doneKeywords.join(", ")).onChange(async (v) => {
-        settings.doneKeywords = parseKeywordList(v);
-        await save();
-      }));
-    new Setting(containerEl)
-      .setName("Default priority")
-      .setDesc("Used when sorting tasks that have no priority.")
-      .addText((t) => t.setValue(settings.defaultPriority).onChange(async (v) => {
-        settings.defaultPriority = v.trim().toUpperCase().slice(0, 1) || "B";
-        await save();
-      }));
-
-    new Setting(containerEl).setName("Editor").setHeading();
-    new Setting(containerEl)
-      .setName("Hide leading stars")
-      .setDesc("Hide the stars of headings unless the cursor is on them.")
-      .addToggle((t) => t.setValue(settings.hideStars).onChange(async (v) => {
-        settings.hideStars = v;
-        await save();
-      }));
-    new Setting(containerEl)
-      .setName("Default fold level")
-      .setDesc("The visibility a file opens with.")
-      .addDropdown((d) => d
-        .addOptions({ foldall: "Fold all", outline: "Outline", expandall: "Expand all" })
-        .setValue(settings.defaultFoldLevel)
-        .onChange(async (v) => {
-          settings.defaultFoldLevel = v as VisibilityLevel;
-          await save();
-        }));
-    new Setting(containerEl)
-      .setName("Fold properties drawer by default")
-      .setDesc("Property drawers stay folded at every visibility level, and the front matter's Properties start collapsed.")
-      .addToggle((t) => t.setValue(settings.foldPropertyDrawers).onChange(async (v) => {
-        settings.foldPropertyDrawers = v;
-        await save();
-      }));
-    new Setting(containerEl)
-      .setName("Front matter panel")
-      .setDesc("Show the drawer and #+ lines at the top of a file as a title and a list of properties.")
-      .addToggle((t) => t.setValue(settings.frontMatterPanel).onChange(async (v) => {
-        settings.frontMatterPanel = v;
-        await save();
-      }));
-    new Setting(containerEl)
-      .setName("Backlinks")
-      .setDesc("Show linked and unlinked mentions at the end of every org note.")
-      .addToggle((t) => t.setValue(settings.backlinks).onChange(async (v) => {
-        settings.backlinks = v;
-        await save();
-      }));
-
     new Setting(containerEl).setName("Journal").setHeading();
     new Setting(containerEl)
       .setName("Journal folder")
@@ -87,17 +24,6 @@ export class OrgFlexSettingTab extends PluginSettingTab {
         settings.journalFolder = v;
         await save();
       }));
-    new Setting(containerEl)
-      .setName("New journal file")
-      .setDesc("What a new day's file starts with. {{date}} is the day (YYYY-MM-DD), {{id}} a new UUID.")
-      .addTextArea((t) => {
-        t.inputEl.rows = 6;
-        t.inputEl.addClass("org-template-input");
-        t.setValue(settings.journalTemplate).onChange(async (v) => {
-          settings.journalTemplate = v;
-          await save();
-        });
-      });
 
     new Setting(containerEl).setName("Capture").setHeading();
     new Setting(containerEl)
