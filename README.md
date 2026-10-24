@@ -36,7 +36,7 @@ Edit [Org mode](https://orgmode.org) files in Obsidian, on the phone as comforta
 
 Org is used in very different ways, so Org Flex doesn't try to offer every option as a setting. It is a base you fork and shape to your own workflow with a coding agent. Every behaviour is a numbered rule in [`SPEC.md`](SPEC.md) with tests, so an agent can change it safely, and four invariants keep every fork sound: files stay plain Org, the phone comes first, every rule is tested, and command ids never change.
 
-1. Fork this repository.
+1. Fork this repository, or make a branch for yourself in your own copy (see [`TAILOR.md`](TAILOR.md)).
 2. Ask your coding agent to tailor it. In Claude Code, run `/tailor`; other agents, point them at [`TAILOR.md`](TAILOR.md). It interviews you about how you use Org: tasks, notes, journal, capture, and Emacs or not. Then it keeps, changes or drops features, sets your keywords and templates in `src/flavour.ts`, and records your choices in `FLAVOUR.md`.
 3. Install your fork's own releases with BRAT, or `npm run deploy` to your vault.
 
