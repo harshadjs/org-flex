@@ -38,7 +38,7 @@ npm version patch    # release: bumps manifest.json and versions.json; push the 
 
 When `specCopy` is set, the vault keeps a live copy of the spec there. Whenever `SPEC.md` changes, refresh it with `npm run deploy`. Never edit the vault copy; it is overwritten.
 
-A vault synced without `.obsidian` (e.g. a Syncthing ignore) doesn't get plugin builds: copy the three files by hand or install through BRAT.
+A vault synced without `.obsidian` (e.g. a Syncthing ignore) doesn't get plugin builds: copy the three files by hand.
 
 ## Obsidian Mobile & CodeMirror 6 Layout Guidelines
 

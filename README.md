@@ -38,21 +38,18 @@ Org is used in very different ways, so Org Flex doesn't try to offer every optio
 
 1. Fork this repository, or make a branch for yourself in your own copy (see [`TAILOR.md`](TAILOR.md)).
 2. Ask your coding agent to tailor it. In Claude Code, run `/tailor`; other agents, point them at [`TAILOR.md`](TAILOR.md). It interviews you about how you use Org: tasks, notes, journal, capture, and Emacs or not. Then it keeps, changes or drops features, sets your keywords and templates in `src/flavour.ts`, and records your choices in `FLAVOUR.md`.
-3. Install your fork's own releases with BRAT, or `npm run deploy` to your vault.
+3. `npm run deploy` builds it into your vault (set the vault in `.deploy.json`); copy `main.js`, `manifest.json` and `styles.css` to other devices.
 
 [`recipes/`](recipes/) has worked examples: GTD keywords, org-roam dailies with date IDs, logging `CLOSED:`, capture into a date tree, and dropping a feature.
 
 ## Install
 
-Org Flex is in beta. Until it is in the community plugin directory, install it with [BRAT](https://github.com/TfTHacker/obsidian42-brat):
+Org Flex is in beta and not yet in the community plugin directory. To install it:
 
-1. Install and enable **BRAT** from *Settings → Community plugins*.
-2. In BRAT, choose *Add beta plugin* and enter `harshadjs/org-flex`.
-3. Turn on *Settings → Files and links → Detect all file extensions*, so `.org` files show in the file explorer.
-4. Turn off any other plugin that opens `.org` files, such as *Orgmode (cm6)*: only one plugin can own the extension. Org Flex tells you if another one has it.
-5. Enable **Org Flex** under *Community plugins*.
-
-Or download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/harshadjs/org-flex/releases) into `<vault>/.obsidian/plugins/org-flex/`.
+1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/harshadjs/org-flex/releases) into `<vault>/.obsidian/plugins/org-flex/`, or build them yourself (`npm install && npm run build`).
+2. Turn on *Settings → Files and links → Detect all file extensions*, so `.org` files show in the file explorer.
+3. Turn off any other plugin that opens `.org` files, such as *Orgmode (cm6)*: only one plugin can own the extension. Org Flex tells you if another one has it.
+4. Enable **Org Flex** under *Community plugins*.
 
 ## Capturing from other apps
 
