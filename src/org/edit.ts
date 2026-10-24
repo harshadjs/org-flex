@@ -106,6 +106,19 @@ export function cycleTaskState(state: EditorState, keywords: Keywords): Transact
   return { changes: { from: line.from + kw.from, to: line.from + to }, userEvent: "delete" };
 }
 
+/**
+ * RD-3: in reading mode, tapping a heading's keyword: an open keyword (any
+ * TODO-type) → the first DONE keyword, a done one → the first TODO keyword.
+ * Null when the line at `pos` is not a heading with a keyword.
+ */
+export function toggleKeyword(state: EditorState, pos: number, keywords: Keywords): TransactionSpec | null {
+  const line = state.doc.lineAt(pos);
+  const kw = parseHeading(line.text, keywords)?.keyword;
+  if (!kw) return null;
+  const next = kw.done ? (keywords.todo[0] ?? "TODO") : (keywords.done[0] ?? "DONE");
+  return { changes: { from: line.from + kw.from, to: line.from + kw.to, insert: next }, userEvent: "input" };
+}
+
 // ---------------------------------------------------------------------------
 // Planning dates
 
@@ -234,7 +247,7 @@ export function toggleBoxOnLine(state: EditorState, n: number): TransactionSpec 
   return replaceLines(state, setItemState(lines, n, toggledState(item.box.state)));
 }
 
-/** ACT-6: plain → `- [ ]`, item → adds a box, `[ ]`/`[-]` → `[x]`, `[x]` → box removed. */
+/** ACT-6: plain → `- [ ]`, item → adds a box, `[ ]`/`[-]` → `[X]`, `[X]` → box removed. */
 export function toggleCheckbox(state: EditorState): TransactionSpec | null {
   const lines = docLines(state.doc);
   const n = state.doc.lineAt(state.selection.main.head).number - 1;

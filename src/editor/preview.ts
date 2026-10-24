@@ -128,6 +128,12 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
         case "planning":
           if (text) out.push(mark("org-planning").range(line.from, line.to));
+          // RD-4: each SCHEDULED/DEADLINE date can be tapped in reading mode
+          for (const m of text.matchAll(/(SCHEDULED|DEADLINE):[ \t]*<[^>\n]*>/g)) {
+            const from = line.from + m.index! + m[0].indexOf("<");
+            out.push(Decoration.mark({ class: "org-planning-date", attributes: { "data-org-date": m[1] } })
+              .range(from, line.from + m.index! + m[0].length));
+          }
           break;
         case "drawer-begin":
         case "drawer-end":

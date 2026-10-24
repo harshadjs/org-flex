@@ -14,7 +14,7 @@ import { frontMatterPanel } from "../src/editor/front-matter-panel";
 import { backlinksSection, setBacklinks } from "../src/editor/backlinks";
 import { shortcutBar } from "../src/editor/shortcut-bar";
 import { CompletionContext, completionStatus, currentCompletions } from "@codemirror/autocomplete";
-import { insertLinkWithCompletion, linkCompletions, orgCompletion } from "../src/editor/completion";
+import { exactIdMatches, insertLinkWithCompletion, linkButton, linkCompletions, orgCompletion } from "../src/editor/completion";
 import { insertIdLink, insertWikiLink } from "../src/org/edit";
 import { BUTTONS } from "../src/settings";
 import { orgZoom, toggleZoom } from "../src/editor/zoom";
@@ -196,5 +196,83 @@ test("the link button and ID link command open the list straight away, without t
   insertLinkWithCompletion(view, insertIdLink(view.state));
   await settle();
   expect(currentCompletions(view.state).map((c) => c.label)).toEqual(["5f0c-uuid"]);
+  view.destroy();
+});
+
+test("the link button links selected words to the one note or heading with that title", async () => {
+  const host = {
+    setIcon() {}, openLink() {}, imageSrc: () => null, idCompletions: () => [],
+    linkCompletions: () => [
+      { label: "Trip Plans", target: "id:trip", description: "Trip Plans", type: "note" },
+      { label: "Notes", target: "id:n1", description: "Notes", type: "note" },
+      { label: "notes", target: "id:n2", description: "notes", type: "note" },
+      { label: "Packing", target: "Packing", type: "file" },
+    ],
+    createNote: () => "new-uuid",
+  };
+  expect(exactIdMatches(host.linkCompletions(), " trip plans ").map((m) => m.target)).toEqual(["id:trip"]);
+  expect(exactIdMatches(host.linkCompletions(), "Packing")).toEqual([]);
+  const settle = () => new Promise((r) => setTimeout(r, 100));
+  const press = (doc: string, from: number, to: number) => {
+    const view = new EditorView({
+      parent: document.body,
+      state: EditorState.create({ doc, selection: EditorSelection.single(from, to), extensions: [orgHost.of(host), orgCompletion()] }),
+    });
+    linkButton(view);
+    return view;
+  };
+
+  // one exact match: linked straight away with the words as written; spaces stay outside
+  let view = press("See the trip plans now", 7, 19);
+  expect(view.state.doc.toString()).toBe("See the [[id:trip][trip plans]] now");
+  expect(view.state.selection.main.head).toBe(31);
+  await settle();
+  expect(completionStatus(view.state)).toBeNull();
+  view.destroy();
+
+  // two with that title: the list opens on the words; picking one keeps the words
+  view = press("Read notes", 5, 10);
+  expect(view.state.doc.toString()).toBe("Read [[notes]]");
+  await settle();
+  expect(completionStatus(view.state)).toBe("active");
+  const labels = currentCompletions(view.state).map((c) => c.label);
+  expect(labels).toContain("Notes");
+  expect(labels).toContain("notes");
+  const result = linkCompletions(new CompletionContext(view.state, view.state.selection.main.head, true))!;
+  const option = result.options.find((o) => o.label === "Notes")!;
+  (option.apply as (v: EditorView, c: typeof option, from: number, to: number) => void)(view, option, result.from, view.state.selection.main.head);
+  expect(view.state.doc.toString()).toBe("Read [[id:n1][notes]]");
+  view.destroy();
+
+  // no ID match (a file has that name): the list opens on the words, files and create included
+  view = press("Do Packing", 3, 10);
+  expect(view.state.doc.toString()).toBe("Do [[Packing]]");
+  await settle();
+  expect(currentCompletions(view.state).map((c) => c.label)).toContain("Packing");
+  view.destroy();
+
+  // over two lines: wrapped as before, no list
+  view = press("a\nb", 0, 3);
+  expect(view.state.doc.toString()).toBe("[[a\nb]]");
+  await settle();
+  expect(completionStatus(view.state)).toBeNull();
+  view.destroy();
+});
+
+test("after the link button's words are edited, picking an entry uses its title", () => {
+  const host = {
+    setIcon() {}, openLink() {}, imageSrc: () => null, idCompletions: () => [],
+    linkCompletions: () => [{ label: "Notes", target: "id:n1", description: "Notes", type: "note" }, { label: "notes", target: "id:n2", description: "notes", type: "note" }],
+  };
+  const view = new EditorView({
+    parent: document.body,
+    state: EditorState.create({ doc: "Read notes", selection: EditorSelection.single(5, 10), extensions: [orgHost.of(host), orgCompletion()] }),
+  });
+  linkButton(view);
+  view.dispatch({ changes: { from: 12, insert: "s" }, selection: { anchor: 13 } });
+  const result = linkCompletions(new CompletionContext(view.state, 13, true))!;
+  const option = result.options.find((o) => o.label === "Notes")!;
+  (option.apply as (v: EditorView, c: typeof option, from: number, to: number) => void)(view, option, result.from, 13);
+  expect(view.state.doc.toString()).toBe("Read [[id:n1][Notes]]");
   view.destroy();
 });

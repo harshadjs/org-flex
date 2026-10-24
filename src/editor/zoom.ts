@@ -90,6 +90,14 @@ export function zoomToHeadingAt(view: EditorView, pos: number): boolean {
   return true;
 }
 
+/** ZOOM-6: zoom into the heading on the line at `pos`, or out when it is the one zoomed into. Nothing for other lines. */
+export function zoomAt(view: EditorView, pos: number) {
+  const line = view.state.doc.lineAt(pos);
+  if (structureOf(view.state).lines[line.number - 1]?.kind !== "heading") return;
+  if (view.state.field(zoomField, false)?.from === line.from) zoomOut(view);
+  else zoomTo(view, line.number - 1);
+}
+
 /** ZOOM-4: the effect that zooms out when `pos` is hidden by the zoom, for jumps (links, backlinks, search). */
 export function revealZoomEffects(state: EditorState, pos: number): StateEffect<unknown>[] {
   const zoom = state.field(zoomField, false);

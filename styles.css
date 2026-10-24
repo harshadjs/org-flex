@@ -281,6 +281,114 @@
   color: var(--checklist-done-color, var(--text-muted));
 }
 
+/* list item grips (CHK-9..11): on hover on desktop, always on the phone */
+.org-flex-view .org-list-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  margin-right: 0.15em;
+  vertical-align: middle;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.org-flex-view .org-list-grip svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+/* nested list lines stand further in than their spaces alone would put them (CHK-13) */
+.org-flex-view {
+  --org-list-step: 1.1em;
+}
+.is-mobile .org-flex-view {
+  --org-list-step: 1.5em;
+}
+.org-flex-view .cm-line.org-list-nested {
+  margin-left: calc(var(--org-list-depth, 0) * var(--org-list-step));
+}
+/* wrapped item lines start under the item's text, not under its bullet (CHK-14) */
+.org-flex-view .cm-line.org-list-hang {
+  border-left: var(--org-list-hang) solid transparent;
+  text-indent: calc(-1 * var(--org-list-hang));
+}
+.org-flex-view .cm-line.org-list-hang > * {
+  text-indent: 0;
+}
+.org-flex-view .org-list-step-probe {
+  position: absolute;
+  visibility: hidden;
+  margin-left: var(--org-list-step);
+}
+/* on the phone: a finger-sized grip, a bigger box and room between items */
+.is-mobile .org-flex-view .org-list-grip {
+  width: 1.9em;
+  height: 1.7em;
+  margin-left: -0.3em;
+  margin-right: 0.05em;
+  color: var(--text-muted);
+}
+.is-mobile .org-flex-view .org-list-grip svg {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
+.is-mobile .org-flex-view .cm-line.org-list-item {
+  padding-top: 0.3em;
+  padding-bottom: 0.3em;
+}
+.is-mobile .org-flex-view .org-checkbox {
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: 0.45em;
+}
+body:not(.is-mobile) .org-flex-view .org-list-grip {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+body:not(.is-mobile) .org-flex-view .cm-line:hover .org-list-grip,
+.org-flex-view .org-list-dragging .org-list-grip {
+  opacity: 1;
+}
+.org-flex-view .org-list-dragging,
+.org-flex-view .org-list-dragging * {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.org-flex-view .org-list-dragged {
+  opacity: 0.4;
+}
+.org-flex-view .org-list-drop {
+  position: absolute;
+  height: 2px;
+  background: var(--interactive-accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 10;
+}
+.org-flex-view .org-list-ghost {
+  position: absolute;
+  max-width: 70%;
+  padding: 2px 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  box-shadow: var(--shadow-s);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 11;
+}
+.org-flex-view .org-list-drop.is-hidden,
+.org-flex-view .org-list-ghost.is-hidden {
+  display: none;
+}
+
 /* ---------------------------------------------------------------- front matter */
 
 .org-flex-view .org-front-matter {
@@ -524,7 +632,48 @@
 .org-new-note-title {
   width: 100%;
 }
-.org-new-note-error {
+.org-capture-target {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: var(--size-4-2);
+}
+.org-capture-text {
+  width: 100%;
+  min-height: 6em;
+  resize: vertical;
+  font-size: var(--font-ui-medium);
+}
+.org-capture-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-3);
+}
+.org-capture-label {
+  min-width: 5.5em;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.org-capture-state,
+.org-capture-date {
+  min-height: 2.25em;
+}
+.org-capture-quick {
+  display: flex;
+  gap: var(--size-4-1);
+}
+.org-capture-chip.is-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.is-mobile .org-capture-state,
+.is-mobile .org-capture-date,
+.is-mobile .org-capture-chip {
+  min-height: 44px;
+}
+.org-new-note-error,
+.org-capture-error {
   color: var(--text-error);
   font-size: var(--font-ui-small);
   min-height: 1.5em;
@@ -685,4 +834,26 @@ input.org-icon-invalid {
   align-self: center;
   display: flex;
   color: var(--text-accent);
+}
+
+/* ---------------------------------------------------------------- reading mode (RD-1..4) */
+
+.org-flex-view .org-reading .cm-content {
+  caret-color: transparent;
+}
+.org-flex-view .org-reading .org-list-grip {
+  display: none;
+}
+.org-flex-view .org-reading .org-keyword[data-keyword],
+.org-flex-view .org-reading .org-planning-date {
+  cursor: pointer;
+  border-radius: var(--radius-s);
+}
+.org-flex-view .org-reading .org-planning-date {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.org-flex-view .org-reading .org-keyword[data-keyword]:active,
+.org-flex-view .org-reading .org-planning-date:active {
+  background: var(--background-modifier-active-hover);
 }

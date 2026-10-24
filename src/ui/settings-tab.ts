@@ -88,6 +88,15 @@ export class OrgFlexSettingTab extends PluginSettingTab {
         await save();
       }));
 
+    new Setting(containerEl).setName("Capture").setHeading();
+    new Setting(containerEl)
+      .setName("Inbox file")
+      .setDesc("Captured TODOs go at the end of this file, which is created when missing. \".org\" is added when left out.")
+      .addText((t) => t.setValue(settings.captureFile).onChange(async (v) => {
+        settings.captureFile = v;
+        await save();
+      }));
+
     new Setting(containerEl).setName("Shortcut bar").setHeading();
     new Setting(containerEl)
       .setName("Show the shortcut bar")

@@ -6,6 +6,7 @@ import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetTy
 import { codeFolding, foldable, foldedRanges, foldEffect, foldService, unfoldEffect } from "@codemirror/language";
 import { foldAt, FoldOptions, visibilityFolds, VisibilityLevel } from "../org/folding";
 import { docInfo, onTap, orgConfig, selectionTouches, structureOf } from "./state";
+import { zoomAt } from "./zoom";
 
 export function foldOptions(state: EditorState): FoldOptions {
   const fm = state.field(docInfo).frontMatter;
@@ -102,7 +103,8 @@ class FoldToggle extends WidgetType {
     el.classList.add("org-fold-toggle");
     if (this.shown) el.classList.add("is-shown");
     el.setAttribute("aria-label", el.title);
-    onTap(el, () => toggleFoldAt(view, view.posAtDOM(el)));
+    // ZOOM-6: a long press on a heading's arrow zooms into it (or out again)
+    onTap(el, () => toggleFoldAt(view, view.posAtDOM(el)), () => zoomAt(view, view.posAtDOM(el)));
     return el;
   }
   ignoreEvent() {

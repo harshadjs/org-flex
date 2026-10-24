@@ -10,18 +10,20 @@ import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
 import { barButtons, ButtonId } from "./settings";
 import { nextVisibility } from "./org/folding";
+import { appendEntry } from "./org/capture";
 import {
-  assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
+  assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { linkDescription, mentionLink, Mention } from "./org/vault-index";
-import { OrgHost, orgConfig, orgHost } from "./editor/state";
+import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
+import { readingMode } from "./editor/reading";
 import { revealZoomEffects, toggleZoom, zoomToHeadingAt } from "./editor/zoom";
 import { applyVisibility, visibilityField } from "./editor/folding";
 import { frontMatterPanel } from "./editor/front-matter-panel";
 import { BacklinksData, backlinksSection, setBacklinks } from "./editor/backlinks";
 import { shortcutBar } from "./editor/shortcut-bar";
-import { insertLinkWithCompletion } from "./editor/completion";
+import { insertLinkWithCompletion, linkButton } from "./editor/completion";
 import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard, VIEW_TYPE } from "./editor/setup";
 import { DatePickerModal } from "./ui/modals";
 
@@ -33,7 +35,11 @@ export class OrgFlexView extends TextFileView {
   private featureCompartment = new Compartment();
   private barCompartment = new Compartment();
   private vimCompartment = new Compartment();
+  private readingCompartment = new Compartment();
   private vimOn = false;
+  /** RD-1: this tab shows its file in reading mode */
+  reading = false;
+  private readingButton: HTMLElement | null = null;
   private sections = { linked: true, mentions: false };
   private backlinksField: StateField<unknown>;
 
@@ -66,6 +72,37 @@ export class OrgFlexView extends TextFileView {
     this.lockOuterScroll();
     // BAR-1: the bar sits flush on the keyboard
     this.register(trackKeyboard(this.contentEl, window));
+    this.readingButton = this.addAction("book-open", "Reading mode", () => this.toggleReading());
+    this.showReadingButton();
+  }
+
+  /** RD-1: switch this tab between reading and editing. */
+  toggleReading() {
+    this.reading = !this.reading;
+    this.showReadingButton();
+    const editor = this.editor;
+    if (!editor) return;
+    // the keyboard goes down at once
+    if (this.reading) editor.contentDOM.blur();
+    editor.dispatch({
+      effects: [this.readingCompartment.reconfigure(this.readingExtension()), this.barCompartment.reconfigure(this.barExtension())],
+    });
+  }
+
+  private showReadingButton() {
+    const button = this.readingButton;
+    if (!button) return;
+    setIcon(button, this.reading ? "pencil" : "book-open");
+    button.setAttribute("aria-label", this.reading ? "Edit" : "Reading mode");
+    button.toggleClass("is-active", this.reading);
+  }
+
+  private readingExtension(): Extension {
+    if (!this.reading) return [];
+    return readingMode({
+      keywords: () => this.plugin.keywords(),
+      pickDate: (kind, pos) => this.pickDate(kind, pos),
+    });
   }
 
   async onClose() {
@@ -153,7 +190,8 @@ export class OrgFlexView extends TextFileView {
 
   private barExtension(): Extension {
     const s = this.plugin.settings;
-    if (!s.showShortcutBar) return [];
+    // RD-1: the bar edits, so reading mode has none
+    if (!s.showShortcutBar || this.reading) return [];
     return shortcutBar({
       buttons: barButtons(s.shortcutBarButtons),
       icon: (def) => this.plugin.buttonIcon(def),
@@ -182,6 +220,7 @@ export class OrgFlexView extends TextFileView {
         coreExtensions({ spellcheck: spell }),
         this.featureCompartment.of(this.featureExtension()),
         this.barCompartment.of(this.barExtension()),
+        this.readingCompartment.of(this.readingExtension()),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) this.requestSave();
           if (update.focusChanged) this.syncVim();
@@ -272,6 +311,14 @@ export class OrgFlexView extends TextFileView {
     if (this.editor && !zoomToHeadingAt(this.editor, pos)) this.revealPosition(pos, { top: true });
   }
 
+  /** CAP-3: add a captured entry at the end, as one undoable edit, even in reading mode. False with no editor. */
+  appendEntry(entry: string): boolean {
+    const editor = this.editor;
+    if (!editor) return false;
+    editor.dispatch({ changes: appendEntry(editor.state.doc.toString(), entry), userEvent: "input.capture", annotations: allowInReading.of(true) });
+    return true;
+  }
+
   revealLine(line: number, options: { top?: boolean; focus?: boolean } = {}) {
     if (!this.editor) return;
     const n = Math.max(1, Math.min(line + 1, this.editor.state.doc.lines));
@@ -298,13 +345,14 @@ export class OrgFlexView extends TextFileView {
       case "checkbox": this.run(toggleCheckbox(state)); break;
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;
-      case "wiki-link": insertLinkWithCompletion(view, insertWikiLink(state)); break;
+      case "wiki-link": linkButton(view); break;
       case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
       case "node-find": this.plugin.findNode(); break;
       case "journal": void this.plugin.openJournal(new Date()); break;
       case "journal-picker": this.plugin.browseJournal(); break;
       case "journal-calendar": this.plugin.openCalendar(); break;
       case "new-note": this.plugin.newNote(); break;
+      case "capture": this.plugin.capture(); break;
     }
   }
 
@@ -327,7 +375,7 @@ export class OrgFlexView extends TextFileView {
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;
       case "id-link": insertLinkWithCompletion(editor, insertIdLink(state)); break;
-      case "wiki-link": insertLinkWithCompletion(editor, insertWikiLink(state)); break;
+      case "wiki-link": linkButton(editor); break;
       case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
     }
   }
@@ -346,11 +394,11 @@ export class OrgFlexView extends TextFileView {
   }
 
   /** ACT-4 */
-  pickDate(kind: PlanningKind) {
+  pickDate(kind: PlanningKind, pos?: number) {
     const editor = this.editor;
     if (!editor) return;
     const hadFocus = editor.hasFocus;
-    const pos = editor.state.selection.main.head;
+    pos ??= editor.state.selection.main.head;
     if (setPlanningDate(editor.state, kind, new Date(), pos) === null) {
       new Notice("Put the cursor under a heading first.");
       return;
@@ -360,7 +408,11 @@ export class OrgFlexView extends TextFileView {
       this.app,
       title,
       currentPlanningDate(editor.state, kind, pos),
-      (date) => this.run(setPlanningDate(editor.state, kind, date, pos)),
+      // RD-4: let through in reading mode too
+      (date) => {
+        const spec = setPlanningDate(editor.state, kind, date, pos);
+        if (spec) editor.dispatch(spec, { annotations: allowInReading.of(true) });
+      },
       () => {
         if (hadFocus) editor.focus();
       },

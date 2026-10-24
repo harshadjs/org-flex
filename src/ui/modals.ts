@@ -1,9 +1,10 @@
 // Dialogs: the date picker for SCHEDULED/DEADLINE, the journal list, the
-// journal calendar and the new note dialog.
+// journal calendar, the new note dialog and the capture dialog.
 
 import { App, FuzzySuggestModal, Modal, Platform, prepareFuzzySearch, setIcon, SuggestModal } from "obsidian";
 import { findNodes, NodeChoice } from "../org/node-find";
 import { TitleCompletion } from "../org/vault-index";
+import { addDays, dateFieldValue, parseDateField } from "../org/capture";
 import { calendarMonth, journalDateString, JournalEntry, journalEntryLabel, localeWeekStart } from "../org/journal";
 
 function pad2(n: number): string {
@@ -203,6 +204,98 @@ export class NewNoteModal extends Modal {
     input.addEventListener("input", () => error.setText(""));
     window.setTimeout(() => input.focus(), 0);
     input.focus();
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+export interface CaptureChoice {
+  text: string;
+  /** "" for no keyword */
+  state: string;
+  scheduled: Date | null;
+}
+
+/**
+ * CAP-1, CAP-4, CAP-7, CAP-8: one box for a quick capture, with its state
+ * and schedule. On the desktop Enter files it and Shift+Enter adds a line; on
+ * the phone Enter adds a line and the button files it.
+ */
+export class CaptureModal extends Modal {
+  constructor(
+    app: App,
+    private target: string,
+    private initial: string,
+    private cursor: number,
+    private states: string[],
+    private file: (choice: CaptureChoice) => Promise<string | null>,
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    this.titleEl.setText("Capture");
+    contentEl.addClass("org-capture");
+    contentEl.createDiv({ cls: "org-capture-target", text: `At the end of ${this.target}` });
+    const input = contentEl.createEl("textarea", { cls: "org-capture-text", attr: { placeholder: "What's on your mind? Lines after the first are notes.", rows: "4" } });
+    input.value = this.initial;
+
+    const stateRow = contentEl.createDiv({ cls: "org-capture-row" });
+    stateRow.createSpan({ cls: "org-capture-label", text: "State" });
+    const state = stateRow.createEl("select", { cls: "dropdown org-capture-state" });
+    for (const s of this.states) state.createEl("option", { value: s, text: s || "None" });
+    state.value = this.states[0] ?? "";
+
+    const dateRow = contentEl.createDiv({ cls: "org-capture-row" });
+    dateRow.createSpan({ cls: "org-capture-label", text: "Scheduled" });
+    const date = dateRow.createEl("input", { type: "date", cls: "org-capture-date" });
+    const quick = dateRow.createDiv({ cls: "org-capture-quick" });
+    const today = new Date();
+    const chips: [string, Date | null][] = [["Today", today], ["Tomorrow", addDays(today, 1)], ["None", null]];
+    const buttons = chips.map(([label, value]) => {
+      const chip = quick.createEl("button", { text: label, cls: "org-capture-chip" });
+      chip.addEventListener("click", () => {
+        date.value = value ? dateFieldValue(value) : "";
+        mark();
+      });
+      return { chip, value: value ? dateFieldValue(value) : "" };
+    });
+    const mark = () => buttons.forEach(({ chip, value }) => chip.toggleClass("is-active", value === date.value));
+    date.value = dateFieldValue(today);
+    date.addEventListener("input", mark);
+    date.addEventListener("change", mark);
+    mark();
+
+    const error = contentEl.createDiv({ cls: "org-capture-error" });
+    const actions = contentEl.createDiv({ cls: "modal-button-container" });
+    const submit = async () => {
+      // a half-typed date counts as none only when the field is empty
+      const scheduled = parseDateField(date.value);
+      if (date.value && !scheduled) {
+        error.setText("Finish the date, or choose None.");
+        return;
+      }
+      const problem = await this.file({ text: input.value, state: state.value, scheduled });
+      if (problem) error.setText(problem);
+      else this.close();
+    };
+    actions.createEl("button", { text: "Capture", cls: "mod-cta" }).addEventListener("click", () => void submit());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !Platform.isMobile) {
+        e.preventDefault();
+        void submit();
+      }
+    });
+    input.addEventListener("input", () => error.setText(""));
+    const focus = () => {
+      input.focus();
+      input.setSelectionRange(this.cursor, this.cursor);
+    };
+    window.setTimeout(focus, 0);
+    focus();
   }
 
   onClose() {

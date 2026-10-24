@@ -3,10 +3,10 @@ import { EditorSelection, EditorState, TransactionSpec } from "@codemirror/state
 import { history, undo } from "@codemirror/commands";
 import { codeFolding, foldEffect } from "@codemirror/language";
 import {
-  assignId, continueList, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
+  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
-import { parseItem } from "../src/org/lists";
+import { dropSlots, itemExtent, listDepths, moveItem, parseItem } from "../src/org/lists";
 
 const kw = { todo: ["TODO", "DOING", "WAITING"], done: ["DONE", "CANCELLED"] };
 
@@ -219,28 +219,28 @@ describe("checklists", () => {
 
   test("toggling an item updates the heading cookie", () => {
     const s = at("* Tasks [0/2]\n- [ ] a\n- [ ] b");
-    expect(text(apply(s, toggleBoxOnLine(s, 1)))).toBe("* Tasks [1/2]\n- [x] a\n- [ ] b");
+    expect(text(apply(s, toggleBoxOnLine(s, 1)))).toBe("* Tasks [1/2]\n- [X] a\n- [ ] b");
   });
 
   test("percent cookies and parent boxes follow their children", () => {
     const s = at("* T [%]\n- [ ] parent [/]\n  - [ ] a\n  - [ ] b\n  - [ ] c\n- [ ] other");
     const s2 = apply(s, toggleBoxOnLine(s, 2));
-    expect(text(s2)).toBe("* T [0%]\n- [-] parent [1/3]\n  - [x] a\n  - [ ] b\n  - [ ] c\n- [ ] other");
+    expect(text(s2)).toBe("* T [0%]\n- [-] parent [1/3]\n  - [X] a\n  - [ ] b\n  - [ ] c\n- [ ] other");
   });
 
   test("checking a parent checks all its children", () => {
     const s = at("- [ ] p [0/2]\n  - [ ] a\n    - [ ] deep\n  - [ ] b");
-    expect(text(apply(s, toggleBoxOnLine(s, 0)))).toBe("- [x] p [2/2]\n  - [x] a\n    - [x] deep\n  - [x] b");
+    expect(text(apply(s, toggleBoxOnLine(s, 0)))).toBe("- [X] p [2/2]\n  - [X] a\n    - [X] deep\n  - [X] b");
   });
 
   test("each heading's cookie counts only its own section", () => {
     const s = at("* A [/]\n- [ ] a\n** B [/]\n- [x] b1\n- [ ] b2");
-    expect(text(apply(s, toggleBoxOnLine(s, 1)))).toBe("* A [1/1]\n- [x] a\n** B [/]\n- [x] b1\n- [ ] b2");
+    expect(text(apply(s, toggleBoxOnLine(s, 1)))).toBe("* A [1/1]\n- [X] a\n** B [/]\n- [x] b1\n- [ ] b2");
   });
 
   test("text at or left of an item's indentation ends it", () => {
     const s = at("- [ ] p [/]\nnot in the list\n  - [ ] a");
-    expect(text(apply(s, toggleBoxOnLine(s, 2)))).toBe("- [ ] p [0/0]\nnot in the list\n  - [x] a");
+    expect(text(apply(s, toggleBoxOnLine(s, 2)))).toBe("- [ ] p [0/0]\nnot in the list\n  - [X] a");
   });
 
   test("toggling is a single undoable change", () => {
@@ -251,12 +251,12 @@ describe("checklists", () => {
     expect(text(undone)).toBe("* T [0/1]\n- [ ] a");
   });
 
-  test("toggleCheckbox cycles plain text -> [ ] -> [x] -> none and recounts", () => {
+  test("toggleCheckbox cycles plain text -> [ ] -> [X] -> none and recounts", () => {
     let s = at("* T [/]\n|buy milk");
     s = apply(s, toggleCheckbox(s));
     expect(text(s)).toBe("* T [0/1]\n- [ ] buy milk");
     s = apply(s, toggleCheckbox(s));
-    expect(text(s)).toBe("* T [1/1]\n- [x] buy milk");
+    expect(text(s)).toBe("* T [1/1]\n- [X] buy milk");
     s = apply(s, toggleCheckbox(s));
     expect(text(s)).toBe("* T [0/0]\n- buy milk");
   });
@@ -265,7 +265,7 @@ describe("checklists", () => {
     const x = at("- [X] a|");
     expect(text(apply(x, toggleCheckbox(x)))).toBe("- a");
     const partial = at("- [-] a|");
-    expect(text(apply(partial, toggleCheckbox(partial)))).toBe("- [x] a");
+    expect(text(apply(partial, toggleCheckbox(partial)))).toBe("- [X] a");
     const ordered = at("1. a|");
     expect(text(apply(ordered, toggleCheckbox(ordered)))).toBe("1. [ ] a");
     expect(toggleCheckbox(at("* heading|"))).toBeNull();
@@ -364,4 +364,79 @@ describe("blocks", () => {
     s = apply(s, insertBlock(s, "quote"));
     expect(text(s)).toBe("* A\nhidden\n#+begin_quote\n\n#+end_quote\n* B");
   });
+});
+
+describe("moving list items", () => {
+  const list = ["* H", "- a", "  - a1", "    more a1", "", "- b", "- c", "Text", "- other list"];
+  const move = (lines: string[], n: number, slotLine: number, indent: number) => {
+    const slot = dropSlots(lines, n).find((s) => s.line === slotLine)!;
+    expect(slot.indents).toContain(indent);
+    return moveItem(lines, n, slot, indent);
+  };
+
+  test("an item covers its nested lines, not the blank lines after them", () => {
+    expect(itemExtent(list, 1)).toBe(4);
+    expect(itemExtent(list, 2)).toBe(4);
+    expect(itemExtent(list, 6)).toBe(7);
+  });
+
+  test("drop slots stay in the item's own list, nest at most one level deeper, and don't adopt the item below", () => {
+    // dragging "- c": before a, before a1 (only as a's child), before b, and the list's end
+    expect(dropSlots(list, 6)).toEqual([
+      { line: 1, indents: [0], minDepth: 0, original: false },
+      { line: 2, indents: [2], minDepth: 1, original: false },
+      { line: 5, indents: [0, 2, 4], minDepth: 0, original: false },
+      { line: 7, indents: [0, 2], minDepth: 0, original: true },
+    ]);
+    // a list of one item has nowhere else to go
+    expect(dropSlots(["- only", "  - child"], 0)).toEqual([]);
+    expect(dropSlots(list, 7)).toEqual([]);
+    expect(dropSlots(["#+begin_src", "- a", "- b", "#+end_src"], 1)).toEqual([]);
+  });
+
+  test("an item moves up and down with its children", () => {
+    expect(move(list, 1, 7, 0)).toEqual(["* H", "", "- b", "- c", "- a", "  - a1", "    more a1", "Text", "- other list"]);
+    expect(move(list, 6, 1, 0)).toEqual(["* H", "- c", "- a", "  - a1", "    more a1", "", "- b", "Text", "- other list"]);
+  });
+
+  test("dropping further right or left nests or un-nests it, children following, bullets matched", () => {
+    // in place, one level in: c becomes b's child
+    expect(move(list, 6, 7, 2)).toEqual([...list.slice(0, 6), "  - c", ...list.slice(7)]);
+    // a1 out to the top level keeps its own nested text with it
+    const out = move(list, 2, 5, 0)!;
+    expect(out.slice(1, 4)).toEqual(["- a", "- a1", "  more a1"]);
+    // under "10." children go 4 columns in
+    expect(dropSlots(["10. x", "11. y"], 1)[1].indents).toEqual([0, 4]);
+  });
+
+  test("ordered lists are renumbered and checkbox counts follow the move", () => {
+    expect(move(["1. a", "2. b", "3. c"], 2, 0, 0)).toEqual(["1. c", "2. a", "3. b"]);
+    const boxes = ["- [ ] parent [0/1]", "  - [x] done", "- [ ] other"];
+    expect(move(boxes, 2, 3, 2)).toEqual(["- [-] parent [1/2]", "  - [x] done", "  - [ ] other"]);
+  });
+
+  test("dropping back where it was changes nothing", () => {
+    const slot = dropSlots(list, 6).find((s) => s.original)!;
+    expect(moveItem(list, 6, slot, 0)).toBeNull();
+  });
+});
+
+test("each list line knows how deeply it is nested, for the extra indent", () => {
+  const lines = ["- a", "  - b", "    more b", "    - c", "", "  - d", "Text", "  indented text", "* H", "  - e", "#+begin_src", "  - x", "#+end_src"];
+  expect(listDepths(lines)).toEqual([0, 1, 1, 2, -1, 1, -1, -1, -1, 0, -1, -1, -1]);
+});
+
+test("tapping a keyword in reading mode toggles open and done, never to none", () => {
+  const kw2 = { todo: ["TODO", "DOING"], done: ["DONE", "CANCELLED"] };
+  const tap = (doc: string) => {
+    const s = EditorState.create({ doc });
+    const spec = toggleKeyword(s, 2, kw2);
+    return spec ? s.update(spec).state.doc.toString() : null;
+  };
+  expect(tap("* TODO a")).toBe("* DONE a");
+  expect(tap("* DOING a")).toBe("* DONE a");
+  expect(tap("** DONE a :t:")).toBe("** TODO a :t:");
+  expect(tap("* CANCELLED a")).toBe("* TODO a");
+  expect(tap("* a")).toBeNull();
+  expect(tap("text")).toBeNull();
 });

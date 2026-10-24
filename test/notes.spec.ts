@@ -6,6 +6,8 @@ import { displayValue, parseFrontMatter, propertyIcon, simplifyValue } from "../
 import {
   calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, journalPathForDate,
 } from "../src/org/journal";
+import { readNote } from "../src/org/vault-index";
+import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, sharedCaptureText } from "../src/org/capture";
 import { freeNotePath, noteFileName, notePath, noteFileContent, titleProblem } from "../src/org/new-note";
 import {
   barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, parseKeywordList, DEFAULT_SETTINGS,
@@ -167,6 +169,64 @@ describe("new notes", () => {
   });
 });
 
+describe("capture", () => {
+  const day = new Date(2026, 9, 23, 10, 12);
+
+  test("capturePath trims slashes, adds .org and falls back to inbox.org", () => {
+    expect(capturePath("inbox.org")).toBe("inbox.org");
+    expect(capturePath(" /notes/inbox/ ")).toBe("notes/inbox.org");
+    expect(capturePath("")).toBe("inbox.org");
+  });
+
+  test("captureEntry makes a TODO scheduled today, later lines as its body", () => {
+    expect(captureEntry("  Buy milk ", "TODO", day)).toBe("* TODO Buy milk\nSCHEDULED: <2026-10-23 Fri>\n");
+    expect(captureEntry("\nCall Sam\r\n- about the trip\n  ask dates\n\n", "NEXT", day))
+      .toBe("* NEXT Call Sam\nSCHEDULED: <2026-10-23 Fri>\n- about the trip\n  ask dates\n");
+    expect(captureEntry(" \n\t\n", "TODO", day)).toBeNull();
+  });
+
+  test("captureEntry leaves out the keyword or the schedule when none is chosen", () => {
+    expect(captureEntry("Read book", "", day)).toBe("* Read book\nSCHEDULED: <2026-10-23 Fri>\n");
+    expect(captureEntry("Read book\nch. 3", "DONE", null)).toBe("* DONE Read book\nch. 3\n");
+  });
+
+  test("noteCaptureText links back to the note by its file ID, else by file name", () => {
+    const withId = readNote("notes/Trip.org", ":PROPERTIES:\n:ID:       abc-123\n:END:\n#+title: Trip [plans]\n\n* H\n:PROPERTIES:\n:ID: h1\n:END:\n");
+    expect(noteCaptureText(withId)).toBe("\n[[id:abc-123][Trip plans]]");
+    expect(noteCaptureText(readNote("notes/Trip.org", "* H\n:PROPERTIES:\n:ID: h1\n:END:\n"))).toBe("\n[[Trip]]");
+    expect(noteCaptureText(readNote("Trip.org", "#+title: Big trip\n"))).toBe("\n[[Trip][Big trip]]");
+  });
+
+  test("captureStates lists open then done keywords once each, then none", () => {
+    expect(captureStates(["TODO", "NEXT"], ["DONE", "TODO"])).toEqual(["TODO", "NEXT", "DONE", ""]);
+    expect(captureStates([], [])).toEqual([""]);
+  });
+
+  test("schedule dates go to and from a date field in local time", () => {
+    expect(dateFieldValue(day)).toBe("2026-10-23");
+    expect(dateFieldValue(addDays(day, 1))).toBe("2026-10-24");
+    expect(dateFieldValue(addDays(new Date(2026, 11, 31, 23, 0), 1))).toBe("2027-01-01");
+    expect(parseDateField("2026-02-03")?.getTime()).toBe(new Date(2026, 1, 3).getTime());
+    expect(parseDateField("")).toBeNull();
+    expect(parseDateField("2026-02")).toBeNull();
+  });
+
+  test("appendEntry starts the entry on its own line at the end", () => {
+    expect(appendEntry("", "* TODO a\n")).toEqual({ from: 0, insert: "* TODO a\n" });
+    expect(appendEntry("#+title: Inbox\n", "* TODO a\n")).toEqual({ from: 15, insert: "* TODO a\n" });
+    expect(appendEntry("* TODO x", "* TODO a\n")).toEqual({ from: 8, insert: "\n* TODO a\n" });
+  });
+
+  test("sharedCaptureText puts the title or first line first and the URL as a link", () => {
+    expect(sharedCaptureText({ title: "An article", url: "https://a.example/x" })).toBe("An article\n[[https://a.example/x]]");
+    expect(sharedCaptureText({ text: "Look at this\nhttps://a.example/x" })).toBe("Look at this\n[[https://a.example/x]]");
+    expect(sharedCaptureText({ text: "https://a.example/x" })).toBe("https://a.example/x");
+    expect(sharedCaptureText({ title: "T", text: "some words\nhttps://a.example/x", url: "https://a.example/x" }))
+      .toBe("T\nsome words\n[[https://a.example/x]]");
+    expect(sharedCaptureText({})).toBe("");
+  });
+});
+
 describe("settings", () => {
   test("saved settings merge over copied defaults", () => {
     const s = mergeSettings({ hideStars: true });
@@ -214,7 +274,7 @@ describe("settings", () => {
   test("bar buttons keep BUTTONS order and ignore unknown ids", () => {
     expect(BUTTONS.map((b) => b.id)).toEqual([
       "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
-      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note",
+      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture",
     ]);
     expect(barButtons(["todo", "stars", "undo"]).map((b) => b.id)).toEqual(["undo", "todo"]);
   });

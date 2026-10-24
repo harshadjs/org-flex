@@ -11,6 +11,8 @@ import { livePreview } from "./preview";
 import { srcHighlight } from "./src-highlight";
 import { orgFolding } from "./folding";
 import { checklists } from "./checklists";
+import { listDrag } from "./list-drag";
+import { hangingIndent } from "./hanging-indent";
 import { orgCompletion } from "./completion";
 import { orgZoom } from "./zoom";
 
@@ -36,6 +38,8 @@ export function coreExtensions(options: { spellcheck: boolean }): Extension {
     srcHighlight,
     orgFolding(),
     checklists(),
+    listDrag(),
+    hangingIndent(),
     orgCompletion(),
     orgZoom(),
   ];

@@ -5,7 +5,7 @@ import type { VisibilityLevel } from "./org/folding";
 
 export type ButtonId =
   | "undo" | "redo" | "visibility" | "zoom" | "new-heading" | "demote" | "promote" | "todo" | "schedule" | "deadline"
-  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note";
+  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture";
 
 export interface ButtonDef {
   id: ButtonId;
@@ -42,6 +42,7 @@ export const BUTTONS: ButtonDef[] = [
   { id: "journal-picker", name: "Browse journal entries", icon: "book-open", enabled: false, refocus: false },
   { id: "journal-calendar", name: "Journal calendar", icon: "calendar", enabled: false, refocus: false },
   { id: "new-note", name: "New org note", icon: "file-plus", enabled: false, refocus: false },
+  { id: "capture", name: "Capture to inbox", icon: "inbox", enabled: false, refocus: false },
 ];
 
 /** BAR-2: the buttons to show, always in `BUTTONS` order; unknown ids are ignored. */
@@ -67,6 +68,7 @@ export interface OrgFlexSettings {
   shortcutCustomIcons: Record<string, string>;
   shortcutBarVersion: number;
   journalFolder: string;
+  captureFile: string;
   frontMatterPanel: boolean;
   backlinks: boolean;
 }
@@ -85,6 +87,7 @@ export const DEFAULT_SETTINGS: OrgFlexSettings = {
   shortcutCustomIcons: {},
   shortcutBarVersion: BAR_VERSION,
   journalFolder: "journal",
+  captureFile: "inbox.org",
   frontMatterPanel: true,
   backlinks: true,
 };

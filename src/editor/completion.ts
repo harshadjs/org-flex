@@ -1,13 +1,14 @@
 // LP-9: typing `[[` offers notes and headings by title (picking one inserts
 // an ID link with the title as description) and files without an ID;
 // `[[id:` offers every raw org ID. LP-10: a title nobody has yet can be
-// picked to create the note.
+// picked to create the note. ACT-9: the link button links selected words.
 
 import { autocompletion, Completion as CmCompletion, CompletionContext, CompletionResult, startCompletion } from "@codemirror/autocomplete";
-import { TransactionSpec } from "@codemirror/state";
+import { EditorSelection, StateEffect, StateField, TransactionSpec } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { linkDescription } from "../org/vault-index";
 import { offerCreate } from "../org/new-note";
+import { insertWikiLink } from "../org/edit";
 import { Completion, orgHost } from "./state";
 
 /** LP-9: the text that goes between `[[` and `]]` for a picked entry. */
@@ -37,6 +38,16 @@ const CREATE_SECTION = {
   },
 };
 
+/** ACT-9: selected words turned into a `[[words` query: where the `[[` is, and the words. */
+const setLinkWords = StateEffect.define<{ from: number; words: string } | null>();
+const linkWordsField = StateField.define<{ from: number; words: string } | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setLinkWords)) return e.value;
+    return value && tr.docChanged ? { from: tr.changes.mapPos(value.from, 1), words: value.words } : value;
+  },
+});
+
 export function linkCompletions(context: CompletionContext): CompletionResult | null {
   const host = context.state.facet(orgHost);
   if (!host) return null;
@@ -46,11 +57,14 @@ export function linkCompletions(context: CompletionContext): CompletionResult | 
   const isId = /^id:/i.test(typed);
   const from = before.from + 2 + (isId ? 3 : 0);
   const items = isId ? host.idCompletions() : host.linkCompletions();
+  // ACT-9: still the selected words, untouched: an ID link keeps them as its text
+  const pending = context.state.field(linkWordsField, false);
+  const words = pending && pending.from === before.from && pending.words === typed ? linkDescription(typed) : null;
   const options: CmCompletion[] = items.map((item) => ({
     label: item.label,
     detail: item.detail,
     type: item.type,
-    apply: insertLink(linkBody(item)),
+    apply: insertLink(linkBody(words && item.description !== undefined ? { ...item, description: words } : item)),
   }));
   const title = typed.trim();
   const create = !isId && host.createNote && offerCreate(items.map((i) => i.label), typed);
@@ -82,6 +96,48 @@ export function insertLinkWithCompletion(view: EditorView, spec: TransactionSpec
   startCompletion(view);
 }
 
+/** ACT-9: the ID entries (notes and headings) whose title is exactly `words`, ignoring case and spaces around them. */
+export function exactIdMatches(items: Completion[], words: string): Completion[] {
+  const want = words.trim().toLowerCase();
+  return want ? items.filter((i) => i.target.startsWith("id:") && i.label.trim().toLowerCase() === want) : [];
+}
+
+/**
+ * ACT-9: the link button. No selection: `[[]]` and the list. A selection on
+ * one line: an ID link straight away when exactly one note or heading has
+ * that title, else `[[words]]` with the list open on the words. A selection
+ * over several lines, or with brackets, is wrapped as `[[selection]]`.
+ */
+export function linkButton(view: EditorView) {
+  const state = view.state;
+  const { from, to } = state.selection.main;
+  const text = state.sliceDoc(from, to);
+  const host = state.facet(orgHost);
+  if (from === to || !host || /[\n\[\]]/.test(text) || !text.trim()) {
+    if (from === to) insertLinkWithCompletion(view, insertWikiLink(state));
+    else view.dispatch(insertWikiLink(state));
+    return;
+  }
+  // spaces around the words stay outside the link
+  const lead = text.length - text.trimStart().length;
+  const words = text.trim();
+  const start = from + lead;
+  const end = start + words.length;
+  const matches = exactIdMatches(host.linkCompletions(), words);
+  if (matches.length === 1) {
+    const insert = `[[${linkBody({ target: matches[0].target, description: linkDescription(words) })}]]`;
+    view.dispatch({ changes: { from: start, to: end, insert }, selection: EditorSelection.cursor(start + insert.length), userEvent: "input" });
+    return;
+  }
+  view.dispatch({
+    changes: { from: start, to: end, insert: `[[${words}]]` },
+    selection: EditorSelection.cursor(start + 2 + words.length),
+    effects: setLinkWords.of({ from: start, words }),
+    userEvent: "input",
+  });
+  startCompletion(view);
+}
+
 export function orgCompletion() {
-  return autocompletion({ override: [linkCompletions], icons: false });
+  return [linkWordsField, autocompletion({ override: [linkCompletions], icons: false })];
 }

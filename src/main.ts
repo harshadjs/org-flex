@@ -5,9 +5,10 @@ import { ButtonDef, buttonIconName, mergeSettings, migrateShortcutButtons, OrgFl
 import { Keywords, classifyLink } from "./org/syntax";
 import { readNote, VaultIndex } from "./org/vault-index";
 import { journalEntries, journalFileContent, journalPathForDate } from "./org/journal";
+import { appendEntry, captureEntry, capturePath, captureStates, noteCaptureText, sharedCaptureText } from "./org/capture";
 import { freeNotePath, noteFileContent, noteFileName, notePath, titleProblem } from "./org/new-note";
 import { OrgFlexView, VIEW_TYPE } from "./view";
-import { JournalCalendarModal, JournalPickerModal, NewNoteModal, NodeFinderModal } from "./ui/modals";
+import { CaptureChoice, CaptureModal, JournalCalendarModal, JournalPickerModal, NewNoteModal, NodeFinderModal } from "./ui/modals";
 import { registerTaskBlocks } from "./ui/tasks-block";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
 
@@ -47,6 +48,9 @@ export default class OrgFlexPlugin extends Plugin {
     this.addCommands();
     this.addRibbonIcon("file-plus", "New org note", () => this.newNote());
     this.addRibbonIcon("calendar-days", "Open today's journal", () => void this.openJournal(new Date()));
+    this.addRibbonIcon("inbox", "Capture to inbox", () => this.capture());
+    // CAP-6: obsidian://org-capture?title=…&text=…&url=…
+    this.registerObsidianProtocolHandler("org-capture", (params) => this.capture(sharedCaptureText({ title: params.title, text: params.text, url: params.url })));
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
       if (!(file instanceof TFolder)) return;
       menu.addItem((item) => item.setTitle("New org note").setIcon("file-plus").onClick(() => this.newNote(file)));
@@ -123,12 +127,14 @@ export default class OrgFlexPlugin extends Plugin {
     inView("org-insert-id-link", "Insert ID link ([[id:]])", (v) => v.command("id-link"));
     inView("org-insert-wiki-link", "Insert wiki link ([[]])", (v) => v.command("wiki-link"));
     inView("org-zoom", "Zoom into heading / zoom out", (v) => v.toggleZoom());
+    inView("org-toggle-reading", "Toggle reading mode", (v) => v.toggleReading());
     this.addCommand({ id: "org-roam-node-find", name: "Go to node (find or create)", callback: () => this.findNode() });
     inView("org-assign-id", "Assign ID to heading (:ID:)", (v) => v.command("heading-id"));
     this.addCommand({ id: "open-todays-journal", name: "Open today's journal", callback: () => void this.openJournal(new Date()) });
     this.addCommand({ id: "browse-journal-entries", name: "Browse journal entries", callback: () => this.browseJournal() });
     this.addCommand({ id: "open-journal-calendar", name: "Open journal calendar", callback: () => this.openCalendar() });
     this.addCommand({ id: "new-org-note", name: "New org note", callback: () => this.newNote() });
+    this.addCommand({ id: "org-capture", name: "Capture to inbox", callback: () => this.capture() });
   }
 
   // -------------------------------------------------------------------------
@@ -308,6 +314,53 @@ export default class OrgFlexPlugin extends Plugin {
     try {
       const file = await this.app.vault.create(path, noteFileContent(title, crypto.randomUUID()));
       await this.openNewNote(this.app.workspace.getLeaf(false), file);
+      return null;
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Capture (§10c)
+
+  /**
+   * CAP-1: the capture dialog, with `initial` already typed (CAP-6), or, with
+   * none, a link to the org note being viewed (CAP-9).
+   */
+  capture(initial?: string) {
+    const path = capturePath(this.settings.captureFile);
+    const states = captureStates(this.settings.todoKeywords, this.settings.doneKeywords);
+    let text = initial ?? "";
+    let cursor = text.length;
+    const view = initial === undefined ? this.activeView() : null;
+    if (view?.file && view.file.path !== path) {
+      text = noteCaptureText(readNote(view.file.path, view.getViewData(), this.keywords()));
+      cursor = 0;
+    }
+    new CaptureModal(this.app, path, text, cursor, states, (choice) => this.fileCapture(path, choice)).open();
+  }
+
+  /** CAP-2, CAP-3, CAP-5: add the entry (CAP-7, CAP-8: with the chosen state and date) to the inbox, creating it when missing; why not, or null when done. */
+  private async fileCapture(path: string, choice: CaptureChoice): Promise<string | null> {
+    const entry = captureEntry(choice.text, choice.state, choice.scheduled);
+    if (!entry) return "Type something to capture.";
+    try {
+      let file = this.app.vault.getAbstractFileByPath(path);
+      if (!file) {
+        const slash = path.lastIndexOf("/");
+        if (slash > 0) await this.ensureFolder(path.slice(0, slash));
+        const name = path.slice(slash + 1).replace(/\.org$/, "");
+        file = await this.app.vault.create(path, noteFileContent(name, crypto.randomUUID()));
+      }
+      if (!(file instanceof TFile)) return `${path} is not a file.`;
+      // an open inbox takes it as an edit, so nothing typed there is lost
+      let done = false;
+      this.forEachView((v) => { if (!done && v.file?.path === path) done = v.appendEntry(entry); });
+      if (!done) await this.app.vault.process(file, (data) => {
+        const { from, insert } = appendEntry(data, entry);
+        return data.slice(0, from) + insert;
+      });
+      new Notice(`Captured to ${path}`);
       return null;
     } catch (e) {
       return (e as Error).message;

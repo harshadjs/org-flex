@@ -5,7 +5,7 @@ import { Prec, Range } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, keymap, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { BoxState, parseItem } from "../org/lists";
 import { continueList, toggleBoxOnLine } from "../org/edit";
-import { onTap, structureOf } from "./state";
+import { allowInReading, onTap, structureOf } from "./state";
 
 class CheckboxWidget extends WidgetType {
   constructor(readonly state: BoxState) {
@@ -25,7 +25,7 @@ class CheckboxWidget extends WidgetType {
     onTap(box, () => {
       const pos = view.posAtDOM(box);
       const spec = toggleBoxOnLine(view.state, view.state.doc.lineAt(pos).number - 1);
-      if (spec) view.dispatch(spec);
+      if (spec) view.dispatch(spec, { annotations: allowInReading.of(true) });
     });
     return box;
   }

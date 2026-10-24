@@ -11,6 +11,9 @@ import { frontMatterPanel } from "../src/editor/front-matter-panel";
 import { BacklinksActions, backlinksSection, setBacklinks } from "../src/editor/backlinks";
 import { shortcutBar } from "../src/editor/shortcut-bar";
 import { revealZoomEffects, toggleZoom, zoomField, zoomToHeadingAt } from "../src/editor/zoom";
+import { undo } from "@codemirror/commands";
+import { chooseDrop } from "../src/editor/list-drag";
+import { readingMode } from "../src/editor/reading";
 import { BUTTONS, ButtonId } from "../src/settings";
 
 const views: EditorView[] = [];
@@ -425,7 +428,7 @@ test("tapping a checkbox toggles it without moving the cursor or focusing", () =
   const { view } = mount(doc);
   const box = () => view.contentDOM.querySelector("input.task-list-item-checkbox") as HTMLInputElement;
   tap(box());
-  expect(view.state.doc.toString()).toBe("- [x] open\nend");
+  expect(view.state.doc.toString()).toBe("- [X] open\nend");
   mouse(box(), "click");
   expect(view.state.doc.toString()).toBe("- [ ] open\nend");
   expect(view.state.selection.main.head).toBe(doc.length);
@@ -606,4 +609,138 @@ test("an ID link to a heading opens it zoomed in, even from another zoom; a file
   foldedRanges(view.state).between(b.from, b.to, (from, to) => { if (from <= b.to && to >= b.from) covered = true; });
   expect(covered).toBe(false);
   expect(zoomToHeadingAt(view, 0)).toBe(false);
+});
+
+test("list items get a grip that drags them, with children, without focusing the editor", () => {
+  const doc = "- a\n- b\n  - b1\n#+begin_src\n- x\n#+end_src";
+  const { view, opened } = mount(doc, [], 1);
+  // nested lines carry their depth, for the extra indent
+  const lineOf = (n: number) => view.contentDOM.querySelectorAll(".cm-line")[n] as HTMLElement;
+  expect(lineOf(2).classList.contains("org-list-nested")).toBe(true);
+  expect(lineOf(2).style.getPropertyValue("--org-list-depth").trim()).toBe("1");
+  expect(lineOf(1).classList.contains("org-list-nested")).toBe(false);
+  expect(lineOf(4).classList.contains("org-list-item")).toBe(false);
+  const grips = Array.from(view.contentDOM.querySelectorAll<HTMLElement>(".org-list-grip"));
+  // a, b and b1; not the line inside the block
+  expect(grips.length).toBe(3);
+  expect(opened.icons.get(grips[0])).toBe("grip-vertical");
+  const pointer = (type: string, x: number, y: number) => {
+    const e = new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, clientX: x, clientY: y, button: 0 });
+    (type === "pointerdown" ? grips[1] : window).dispatchEvent(e);
+    return e;
+  };
+  expect(pointer("pointerdown", 0, 0).defaultPrevented).toBe(true);
+  expect(view.dom.classList.contains("org-list-dragging")).toBe(true);
+  expect(view.contentDOM.querySelectorAll(".org-list-dragged").length).toBe(2);
+  // Obsidian's swipes, listening on the document, don't see the finger while it drags
+  const swipes: string[] = [];
+  const listen = (ev: Event) => void swipes.push(ev.type);
+  document.addEventListener("touchmove", listen);
+  document.addEventListener("pointermove", listen);
+  window.dispatchEvent(new Event("touchmove", { cancelable: true }));
+  pointer("pointermove", 0, -100);
+  document.removeEventListener("touchmove", listen);
+  document.removeEventListener("pointermove", listen);
+  expect(swipes).toEqual([]);
+  pointer("pointerup", 0, -100);
+  expect(view.state.doc.toString()).toBe("- b\n  - b1\n- a\n#+begin_src\n- x\n#+end_src");
+  expect(view.hasFocus).toBe(false);
+  expect(view.dom.querySelector(".org-list-drop, .org-list-ghost")).toBeNull();
+  expect(view.contentDOM.querySelectorAll(".org-list-dragged").length).toBe(0);
+  undo(view);
+  expect(view.state.doc.toString()).toBe(doc);
+});
+
+test("the drop place is the nearest one, the item's own spanning its lines; sideways steps pick the level", () => {
+  const slot = (line: number, indents: number[], minDepth = 0, original = false) => ({ line, indents, minDepth, original });
+  const targets = [
+    { slot: slot(0, [0]), top: 0, bottom: 0 },
+    // the dragged item and its child fill 20..60
+    { slot: slot(3, [0, 2], 0, true), top: 20, bottom: 60 },
+    { slot: slot(4, [2, 4], 1), top: 80, bottom: 80 },
+  ];
+  // anywhere over its own lines it stays put, even near their top
+  expect(chooseDrop(targets, 22, 0, 0)).toEqual({ slot: targets[1].slot, indent: 0, depth: 0, top: 20 });
+  expect(chooseDrop(targets, 4, 0, 0)!.slot.line).toBe(0);
+  expect(chooseDrop(targets, 75, 0, 0)!.slot.line).toBe(4);
+  // one step right nests it, more steps stop at the deepest level allowed, left stops at the top level
+  expect(chooseDrop(targets, 40, 0, 1)!.indent).toBe(2);
+  expect(chooseDrop(targets, 40, 0, 5)!.indent).toBe(2);
+  expect(chooseDrop(targets, 80, 2, -3)).toMatchObject({ indent: 2, depth: 1 });
+  expect(chooseDrop(targets, 80, 2, 1)).toMatchObject({ indent: 4, depth: 2 });
+  expect(chooseDrop([], 0, 0, 0)).toBeNull();
+});
+
+test("reading mode: no typing or keyboard, but checkboxes, keywords and dates respond to taps", () => {
+  const doc = "* TODO Task\nSCHEDULED: <2026-10-21 Wed> DEADLINE: <2026-10-30 Fri>\n- [ ] box\ntext";
+  const picked: [string, number][] = [];
+  const { view } = mount(doc, readingMode({ keywords: () => ({ todo: ["TODO"], done: ["DONE"] }), pickDate: (kind, pos) => void picked.push([kind, pos]) }), 0);
+  expect(view.contentDOM.getAttribute("contenteditable")).toBe("false");
+  expect(view.dom.classList.contains("org-reading")).toBe(true);
+  // typing (or a paste, a command) changes nothing
+  view.dispatch({ changes: { from: 0, insert: "x" }, userEvent: "input.type" });
+  expect(view.state.doc.toString()).toBe(doc);
+  // a change on disk still comes in
+  view.dispatch({ changes: { from: view.state.doc.length, insert: "!" }, userEvent: "external" });
+  expect(view.state.doc.toString()).toBe(doc + "!");
+  const keyword = () => view.contentDOM.querySelector(".org-keyword")!;
+  tap(keyword());
+  expect(view.state.doc.line(1).text).toBe("* DONE Task");
+  expect(mouse(keyword(), "mousedown").defaultPrevented).toBe(true);
+  expect(view.state.doc.line(1).text).toBe("* TODO Task");
+  tap(view.contentDOM.querySelector("input.task-list-item-checkbox")!);
+  expect(view.state.doc.line(3).text).toBe("- [X] box");
+  const dates = Array.from(view.contentDOM.querySelectorAll("[data-org-date]"));
+  expect(dates.map((d) => [d.getAttribute("data-org-date"), d.textContent])).toEqual([
+    ["SCHEDULED", "<2026-10-21 Wed>"], ["DEADLINE", "<2026-10-30 Fri>"],
+  ]);
+  tap(dates[1]);
+  expect(picked).toEqual([["DEADLINE", doc.indexOf("<2026-10-30")]]);
+  // a touch that moved is a scroll, not a tap
+  tap(keyword(), 30);
+  expect(view.state.doc.line(1).text).toBe("* TODO Task");
+  expect(view.state.selection.main.head).toBe(0);
+  expect(view.hasFocus).toBe(false);
+});
+
+test("a wrapped list item hangs: its later screen lines start under its text, not its bullet", async () => {
+  const doc = "- [ ] a long item\n  - nested\nplain text";
+  const { view } = mount(doc, [], doc.length);
+  // a fake layout: every character 10px wide, lines starting at 0
+  view.coordsAtPos = (pos: number) => {
+    const line = view.state.doc.lineAt(pos);
+    return { left: (pos - line.from) * 10, right: (pos - line.from) * 10 + 10, top: 0, bottom: 10 };
+  };
+  view.dispatch({ selection: { anchor: 1 } });
+  await new Promise((r) => setTimeout(r, 50));
+  const lines = Array.from(view.contentDOM.querySelectorAll<HTMLElement>(".cm-line"));
+  // the text starts after "- [ ] " and after "  - ", counted from the line's text box (past its padding)
+  const pad = parseFloat(getComputedStyle(lines[0]).paddingLeft) || 0;
+  expect(lines[0].classList.contains("org-list-hang")).toBe(true);
+  expect(lines[0].style.getPropertyValue("--org-list-hang").trim()).toBe(`${60 - pad}px`);
+  expect(lines[1].style.getPropertyValue("--org-list-hang").trim()).toBe(`${40 - pad}px`);
+  // the nested line keeps its depth too
+  expect(lines[1].style.getPropertyValue("--org-list-depth").trim()).toBe("1");
+  expect(lines[2].classList.contains("org-list-hang")).toBe(false);
+});
+
+test("a long press on a heading's arrow zooms into it, again zooms out; a short tap still folds", async () => {
+  const doc = "* A\na\n* B\nb";
+  const { view } = mount(doc, [], 0);
+  const arrow = (n: number) => view.contentDOM.querySelectorAll(".org-fold-toggle")[n];
+  const press = async (el: Element) => {
+    touch(el, "touchstart", 10, 10);
+    await new Promise((r) => setTimeout(r, 550));
+    return touch(el, "touchend", 10, 10);
+  };
+  const folds = foldedRanges(view.state).size;
+  expect((await press(arrow(1))).defaultPrevented).toBe(true);
+  expect(view.state.field(zoomField)).toEqual({ from: doc.indexOf("* B"), to: doc.length });
+  // the long press didn't also fold or unfold it
+  expect(foldedRanges(view.state).size).toBe(folds);
+  expect(view.hasFocus).toBe(false);
+  await press(arrow(0));
+  expect(view.state.field(zoomField)).toBeNull();
+  tap(arrow(0));
+  expect(foldedRanges(view.state).size).not.toBe(folds);
 });
