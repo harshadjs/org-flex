@@ -2,7 +2,8 @@
 
 This file says what the plugin is supposed to do, so that a future change can be
 checked against it. If a change breaks a rule here, either the change is wrong or
-this file must be updated in the same commit, on purpose.
+this file must be updated in the same commit, on purpose. The invariants in §0
+hold in every fork; every other rule is a default a fork may rewrite.
 
 - Each rule has an ID (`VIEW-2`, `CHK-5`, ...) so it can be referred to in commits
   and reviews.
@@ -19,6 +20,17 @@ Code locations are given as files. Line numbers change too often to be useful.
 The code is split into `src/org/` (pure Org logic, no editor or Obsidian),
 `src/editor/` (CodeMirror extensions), `src/ui/` (Obsidian dialogs, settings tab,
 task blocks), `src/view.ts` and `src/main.ts`.
+
+## 0. Invariants
+
+Org Flex is a base to be tailored: each user's fork, usually through their own coding agent (`TAILOR.md`), rewrites the rules below to fit how they use Org. Every rule after this section is **today's default** and may be changed, replaced or deleted, together with its tests, in the same change. These four may not: whatever a fork turns into, they hold, and the guard tests named here stay green.
+
+| ID | Rule |
+|---|---|
+| INV-1 | **Files stay plain Org.** What the plugin writes is Org that Emacs, Orgzly and other Org tools read the same way: no plugin-only syntax, no hidden markers, nothing stored in the file that only Org Flex understands (state of the view lives in the view or in settings). Opening a file and moving through it never changes it; only edits do. A fork that adds an edit writes standard Org for it and tests the exact text it produces. **Test:** "opening a file in the editor and saving it changes nothing". |
+| INV-2 | **Phone first.** Anything tappable in the editor goes through `onTap` (`src/editor/state.ts`), so a tap acts without placing the cursor or bringing up the keyboard, and a swipe is a scroll. The only raw listeners are the ones listed, with their reason, in the guard test. The layout rules of `AGENTS.md` (no `height: 100%` on flex children with siblings, one scrolling element on the phone) and full-size touch targets hold. **Test:** "everything tappable in the editor goes through onTap, so a tap never brings up the keyboard", "onTap runs on a still tap or a click, never on a swipe, and keeps focus away", "flex children with siblings never use height: 100%", "on mobile the editor's scroller is the one scrolling element", "bar buttons are full-size touch targets with no gaps between them". |
+| INV-3 | **Every rule is testable.** Rules a fork adds or rewrites follow the same form as the rest: an ID, and a Test part naming automated tests or a Manual part with a line in the §16 checklist. **Test:** "every spec rule names its tests or says why it is manual", "every test the spec cites exists", "every manual rule is on the manual checklist, and the checklist names real rules", "the invariants are listed first and each one is guarded". |
+| INV-4 | **Command ids are forever.** Users bind hotkeys to command ids, so an id once shipped is never renamed or dropped; its command may change what it does. New commands get new ids, listed in §9.3 and added to the guard's list of shipped ids. **Test:** "every command id ever shipped is still registered, and the spec lists exactly the registered ones". |
 
 ---
 

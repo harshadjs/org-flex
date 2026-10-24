@@ -1,0 +1,44 @@
+:PROPERTIES:
+:ID:       0b6e1c3a-1f2d-4c5e-9a8b-7c6d5e4f3a2b
+:END:
+#+title: Everything
+#+filetags: :sample:
+#+TODO: TODO NEXT | DONE
+
+Some *bold*, /italic/, _underline_, =verbatim=, ~code~ and +strike+ text.
+A [[https://orgmode.org][link]], an [[id:abc][ID link]], [[file:../a/pic.png]] and [[memo.m4a]].
+
+* TODO [#A] Heading with everything :work:home:
+SCHEDULED: <2026-10-23 Fri> DEADLINE: <2026-10-30 Fri +1w>
+:PROPERTIES:
+:ID:       h-1
+:CUSTOM:   value
+:END:
+:LOGBOOK:
+CLOCK: [2026-10-22 Thu 09:00]--[2026-10-22 Thu 10:00] =>  1:00
+:END:
+Body text that is long enough to wrap on a phone screen, with more words after it.
+- [ ] unchecked [1/2]
+  - [X] child done
+  - [ ] child open
+- [-] partial
+1. first
+2. second
+   + nested plus
+** DONE Child heading
+CLOSED: [2026-10-21 Wed 18:00]
+#+begin_src python
+def f():
+    return "* not a heading"
+#+end_src
+#+begin_quote
+Quoted.
+#+end_quote
+| a | b |
+|---+---|
+| 1 | 2 |
+*** Deeper
+: fixed width
+# a comment
+-----
+* Last heading without newline at end

@@ -50,3 +50,13 @@ test("every manual rule is on the manual checklist, and the checklist names real
   expect(manual.filter((id) => !listed.has(id))).toEqual([]);
   expect(Array.from(listed).filter((id) => !known.has(id))).toEqual([]);
 });
+
+// ---------------------------------------------------------------- §0 invariants
+
+test("the invariants are listed first and each one is guarded", () => {
+  const section = spec.slice(spec.indexOf("## 0. Invariants"), spec.indexOf("## 1."));
+  const ids = Array.from(section.matchAll(/^\| (INV-\d+) \|/gm), (m) => m[1]);
+  expect(ids).toEqual(["INV-1", "INV-2", "INV-3", "INV-4"]);
+  // an invariant is never only manual: some automated guard stands behind it
+  for (const rule of rules.filter((r) => r.id.startsWith("INV-"))) expect(rule.text, rule.id).toMatch(/\*\*Test:\*\*/);
+});
