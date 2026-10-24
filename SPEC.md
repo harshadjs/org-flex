@@ -274,7 +274,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 | ID | Rule |
 |---|---|
 | JRN-1 | Today's file is `<journalFolder>/YYYY/MM/YYYY-MM-DD.org`, using the **local** date. Leading and trailing slashes on the folder are ignored, and an empty folder means the vault root. **Test:** "journalDateString zero-pads month and day in local time", "journalPathForDate nests by year and month, tolerating slashes and an empty folder". |
-| JRN-2 | **Open today's journal** opens that file in the current tab. If it doesn't exist, the missing folders are created one at a time and the file is created from the flavour's `journalTemplate` (§12a), where every `{{date}}` becomes the day (`YYYY-MM-DD`) and every `{{id}}` a new UUID (ignoring case and spaces inside the braces). The base flavour's template is the block below; a fork whose org-roam setup links days by date uses `:ID:       {{date}}` instead. Errors show as a notice. **Test:** "journalFileContent fills the template's date and ID", "the base flavour has only TODO and DONE, and the UUID journal header". |
+| JRN-2 | **Open today's journal** opens that file in the current tab. If it doesn't exist, the missing folders are created one at a time and the file is created from the flavour's `journalTemplate` (§12a), where every `{{date}}` becomes the day (`YYYY-MM-DD`) and every `{{id}}` a new UUID (ignoring case and spaces inside the braces). The base flavour's template is the block below; a fork whose org-roam setup links days by date uses `:ID:       {{date}}` instead. Errors show as a notice. **Test:** "journalFileContent fills the template's date and ID", "this flavour's keywords are TODO NEXT DOING WAITING then DONE CANCELLED, with the UUID journal header". |
 | JRN-3 | **Browse journal entries** lists every `.org` file at any depth under the journal folder whose name is `YYYY-MM-DD.org`, newest first. Each is shown as `YYYY-MM-DD · Weekday, Month D`, so a date, weekday or month name can be searched. Choosing one opens it in the current tab. With no entries, a notice appears. **Test:** "journalEntries keeps dated files under the folder, newest first", "journal entries are labelled with weekday and month". |
 | JRN-4 | **Journal calendar** (command `open-journal-calendar`, optional `journal-calendar` bar button) shows a month grid, starting on the locale's first weekday (Monday when the engine can't tell), with full weeks padded from the months around it. Days with a journal file (JRN-3 naming) have a dot, and today is highlighted. Arrows change the month, and **Today** returns to the current month. Tapping a day closes the calendar and opens that day's journal, creating it as in JRN-2 if needed. **Test:** "calendarMonth lays a month out in full weeks from the first weekday". |
 
@@ -371,12 +371,12 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 12a. Flavour
 
-`src/flavour.ts` (`FLAVOUR`). The choices that fit one way of using Org, as code a fork edits (`TAILOR.md`) rather than settings. Which features are there is the feature list (PLAT-8). The base flavour is plain Org. **Test:** "the base flavour has only TODO and DONE, and the UUID journal header".
+`src/flavour.ts` (`FLAVOUR`). The choices that fit one way of using Org, as code a fork edits (`TAILOR.md`) rather than settings. Which features are there is the feature list (PLAT-8). This is the `harshad` flavour (see `FLAVOUR.md`); the base on `main` has `TODO | DONE`. **Test:** "this flavour's keywords are TODO NEXT DOING WAITING then DONE CANCELLED, with the UUID journal header".
 
-| Key | Base | Effect |
+| Key | This flavour (`harshad`) | Effect |
 |---|---|---|
-| `todoKeywords` | `TODO` | Open-task keywords, in cycling order (PARSE-3, ACT-3, TASK-2, CAP-7) |
-| `doneKeywords` | `DONE` | Closed-task keywords |
+| `todoKeywords` | `TODO, NEXT, DOING, WAITING` | Open-task keywords, in cycling order (PARSE-3, ACT-3, TASK-2, CAP-7) |
+| `doneKeywords` | `DONE, CANCELLED` | Closed-task keywords |
 | `defaultPriority` | `B` | Priority used when sorting tasks that have none |
 | `hideStars` | `false` | LP-7 |
 | `foldPropertyDrawers` | `true` | Drawers stay folded (FOLD-4); front matter starts collapsed (FM-4) |

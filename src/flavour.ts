@@ -26,8 +26,8 @@ export interface Flavour {
 }
 
 export const FLAVOUR: Flavour = {
-  todoKeywords: ["TODO"],
-  doneKeywords: ["DONE"],
+  todoKeywords: ["TODO", "NEXT", "DOING", "WAITING"],
+  doneKeywords: ["DONE", "CANCELLED"],
   defaultPriority: "B",
   hideStars: false,
   foldPropertyDrawers: true,

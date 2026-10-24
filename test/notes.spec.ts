@@ -118,8 +118,8 @@ describe("journal", () => {
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("the base flavour has only TODO and DONE, and the UUID journal header", () => {
-    expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO"], ["DONE"]]);
+  test("this flavour's keywords are TODO NEXT DOING WAITING then DONE CANCELLED, with the UUID journal header", () => {
+    expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "NEXT", "DOING", "WAITING"], ["DONE", "CANCELLED"]]);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
   });
 

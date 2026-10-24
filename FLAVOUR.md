@@ -1,10 +1,13 @@
-# Flavour: the base
+# Flavour: harshad
 
-This copy is the **base** of Org Flex, not anyone's own setup. It is plain Org mode with nothing assumed about how its user works:
+This branch (`harshad`) is the plugin author's own copy, kept on top of the base on `main`. Base work happens on `main` and is merged in here; what's below is committed only on this branch.
 
-- **Keywords:** `TODO | DONE`, as Org itself defaults.
-- **Journal:** a file per day, `journal/YYYY/MM/YYYY-MM-DD.org`, with a new UUID as `:ID:`.
-- **Features:** all of them are on: backlinks, front matter panel, journal, new note, go to node, capture, attachments, task blocks.
-- **Bar:** the editing buttons are on; the journal, note, capture and attachment buttons are off.
+## How Org is used
+- Org files shared with Emacs (org-roam) through Syncthing, edited in Obsidian on an Android phone and on the desktop.
+- Tasks, a daily journal, notes linked by ID, and quick capture on the phone.
 
-When you fork it for yourself, your coding agent replaces this file with a description of you: how you use Org, the tools you use with it, and the decisions made for your copy and why (see `TAILOR.md`, step 2).
+## Decisions
+- **Keywords:** open `TODO NEXT DOING WAITING`, done `DONE CANCELLED` (2026-10-24). This trims the older list, which also had `PENDING`, `CANCELED`, `CANCEL`, `REJECTED`, `STOP` and `STOPPED`; headings that still use those read as plain titles.
+- **Journal:** the base header, with a new UUID as `:ID:` (2026-10-24). Days made earlier keep `:ID: YYYY-MM-DD`.
+- **Features:** all kept. What shows is chosen per device with the shortcut bar buttons and settings.
+- **Releases:** tags like `0.9.0-harshad.0` (`npm version prerelease --preid harshad`) become pre-releases, so BRAT on the phone installs this flavour without it becoming the base's latest release.
