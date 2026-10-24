@@ -4,8 +4,11 @@ description: Tailor this Org Flex fork to how its owner uses Org mode - intervie
 ---
 
 Follow `TAILOR.md` at the repository root, step by step: read `AGENTS.md`,
-`FLAVOUR.md` and the SPEC sections involved, interview the user (in short
-rounds, with choices, using the question tool), propose, record the person in
+`FLAVOUR.md` and the SPEC sections involved, read the user's Emacs Org
+configuration and a few of their files, interview them about the packages
+and habits that shape their Org (org-roam or denote, org-attach,
+org-transclusion, capture, agenda, and whatever else they use; in short
+rounds, with choices, using the question tool, and open to anything new), propose, record the person in
 `FLAVOUR.md`, change `SPEC.md` first, then the code and tests, and finish with
 `npm test`, `npm run build` and `npm run deploy`. Never break the §0
 invariants in `SPEC.md`.

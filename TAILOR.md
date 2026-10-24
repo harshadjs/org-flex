@@ -35,22 +35,78 @@ Prefer changing code over adding a setting. The person can ask you again when th
 
 ## 1. Interview
 
-Before changing anything, find out how this person works. Ask in short rounds of a few questions, with concrete choices where you can (your agent's question tool, if it has one). Don't ask what you can see in their vault or their existing fork. Cover:
+Org is less one tool than the sum of the Emacs packages, habits and conventions a person has built up around it. Two people who both "use Org" may share almost nothing: one has a denote archive of small files with dated names, another one big outline per project, `org-attach` folders and a custom agenda. So the interview is about **what they actually use and how**, starting from Emacs if they use it, and it stays open: the areas below are prompts, not a menu. Anything the person mentions, follow up on.
 
-1. **What Org is for them:** tasks and GTD, a personal wiki or zettelkasten (org-roam style), a daily journal, project notes, writing, reference. Most people are two or three of these, so ask which matters most.
-2. **Other tools:** Emacs (which packages: org-roam, org-agenda, org-capture templates, org-journal), Orgzly, beorg, or Obsidian only. Their conventions decide IDs, file layout and keywords. If they use Emacs, ask for the relevant bits of their config; it answers many of the questions below.
-3. **Devices:** phone, desktop or both, and what they do on each (capture on the phone, review on the desktop?).
-4. **Tasks:** their keywords and the order they cycle in, priorities, whether DONE should log `CLOSED:`, repeaters, how they review (agenda, task blocks in Markdown notes).
-5. **Notes and links:** ID links or file links, one file per note or big outline files, how new notes are named and where they go.
-6. **Journal and capture:** daily files or a date tree, the header a new day gets, where captured things go and what they look like.
-7. **Each feature in `src/features/index.ts`:** keep it, change it, or drop it. Name the ones they'd never use; fewer features means a simpler bar and settings.
-8. **Pain:** what annoys them today, in Org Flex or in what they used before.
+### Start from what they have
+
+Before asking anything, ask for, and read:
+- their Org configuration: `init.el`, `config.org`, or the Org part of a Doom or Spacemacs config;
+- a few typical files: a note, a project or task file, a journal day, a file with attachments.
+
+Most answers are in there: keywords, capture templates, the file-naming scheme, link types, drawers, which packages are loaded. Then your questions confirm and explain instead of discovering, and you don't ask what you can already see.
+
+If they don't use Emacs, ask the same things about the tools they do use (Orgzly, beorg, Logseq's Org mode, plain Obsidian), or about how they want to work.
+
+### For each package or habit, three questions
+
+1. **What is it for, for them?** The same package serves different people differently. org-roam can be a zettelkasten for one person and only an ID-link system for another.
+2. **What does it leave in the files?** File names, properties, drawers, keywords, link types (`id:`, `denote:`, `attachment:`, `cite:`), directives (`#+transclude:`, `#+INCLUDE:`), directory layout. Org Flex can only work with what is in the files, and it must keep all of it intact (INV-1).
+3. **What do they need from it in Obsidian, and on which device?** Seeing it rendered, following it, creating it, or editing it. Often reading and following on the phone is enough, and creating can stay in Emacs.
+
+### Areas to explore
+
+Ask about the areas that fit the person. Leave out what plainly doesn't apply, and don't stop at these examples.
+
+- **Notes and linking.**
+  - org-roam: `:ID:` properties, `ROAM_ALIASES`, `ROAM_REFS`, dailies, node capture templates, how nodes are titled and filed.
+  - denote: file names like `20261024T091500--title__tag1_tag2.org`, `denote:` links, front matter, signatures, keywords in the name.
+  - Plain `org-id`, howm, file links only, one big file with headings as notes.
+  - How a new note is named and where it goes; how they find notes again.
+- **Attachments.**
+  - `org-attach`: per-heading folders from `:ID:` (`data/ab/cdef…`), `ATTACH_DIR` or `DIR` properties, `attachment:` links, `org-attach-id-dir`, the method (copy, move, link).
+  - `org-download`: screenshots and `#+DOWNLOADED:`.
+  - Plain `file:` links into an attachments folder.
+  - What they attach (photos, PDFs, audio), and whether they attach from the phone.
+- **Transclusion and composition.** `org-transclusion` (`#+transclude: [[id:…]]` with `:level`, `:only-contents`, `:lines`), `#+INCLUDE:`, and embedding parts of other notes. Should Org Flex show the transcluded text inline, and read-only or editable?
+- **Tasks and agenda.**
+  - Keywords, globally or per file (`#+TODO:`), and their meaning.
+  - Priorities, tags and tag inheritance, effort, `org-log-done`, and the `LOGBOOK` drawer (`org-log-into-drawer`).
+  - Repeaters and `org-habit`, clocking.
+  - How they review: `org-agenda` custom commands, `org-super-agenda`, `org-ql` queries.
+  - Refiling (`org-refile` targets) and archiving (`org-archive`, `_archive` files).
+- **Capture and journaling.**
+  - `org-capture` templates: ask them to paste them, since each template is a requirement.
+  - `org-journal`, `org-roam-dailies`, or date trees (`file+olp+datetree`).
+  - What a new day or entry looks like.
+- **Writing and reference.**
+  - Citations: `org-cite` or `citar` (`cite:` links, bibliography files), and `org-noter` for PDF notes.
+  - Babel: which languages, and whether `#+RESULTS:` matters.
+  - Export: `ox-hugo` front matter and other export settings that live in the file.
+  - Tables, LaTeX fragments, footnotes.
+- **Looks.** `org-modern`, `org-superstar`, `org-hide-emphasis-markers`, `olivetti`, `org-indent-mode`, mixed-pitch fonts. These say how they expect the live preview to look.
+- **Sync and other devices.** Syncthing, git or a cloud folder; whether Orgzly or beorg also edit the same files. That is what Org Flex must not disturb.
+- **Their own Elisp.** Commands, hooks or conventions they wrote themselves, which are often the most personal part of their workflow.
+- **Pain.** What annoys them today, in Emacs on the phone, in Org Flex, or in whatever they used before.
+
+Finally, go through the features in `src/features/index.ts` and ask whether to keep, change or drop each. Unused features mean a busier bar and settings.
+
+### Sort what you learned
+
+Put each thing you heard in one of these groups:
+- **Already works:** say so, and note it in `FLAVOUR.md`.
+- **A flavour value:** keywords, templates, folding (`src/flavour.ts`).
+- **A change to an existing feature or rule:** name the rule IDs.
+- **A new feature:** for example `denote` (dated file names, `denote:` links), `org-attach` (resolve `attachment:` links through the heading's `:ID:` folder), or `transclusion` (render `#+transclude:` read-only).
+- **Not possible, or not wise:** something that would break an invariant, or need Emacs itself (running Babel, for instance). Say why, and offer the nearest thing.
+- **Later:** wishes the person doesn't need now, kept under a "Wishes" heading in `FLAVOUR.md` so they aren't lost.
 
 Then write a short proposal and get a yes before you build:
 - each feature, marked keep, change, drop or new;
 - the flavour values;
 - the rules you will add, change or delete, by ID;
-- anything you won't do because it would break an invariant.
+- what you won't do, and why.
+
+Build the most-used things first. A first round can be small; the person can run `/tailor` again.
 
 ## 2. Record the person
 
