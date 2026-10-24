@@ -225,6 +225,8 @@ test("the tailoring guide, the flavour record and the skill are there, and the g
   const guide = read("TAILOR.md");
   for (const id of ["INV-1", "INV-2", "INV-3", "INV-4"]) expect(guide).toContain(id);
   for (const path of ["src/flavour.ts", "src/features/index.ts", "FLAVOUR.md", "recipes/", "RETIRED_COMMAND_IDS", "SHIPPED_COMMAND_IDS"]) expect(guide).toContain(path);
+  // the interview starts from the person's Emacs setup and asks about the packages that shape their files
+  for (const topic of ["init.el", "org-roam", "denote", "org-attach", "org-transclusion", "org-capture", "org-agenda", "Wishes"]) expect(guide).toContain(topic);
   expect(read("FLAVOUR.md")).toMatch(/^# Flavour: /);
   expect(read(".claude/skills/tailor/SKILL.md")).toMatch(/^---\nname: tailor\ndescription: .+\n---\n[\s\S]*TAILOR\.md/);
   expect(read("AGENTS.md")).toContain("TAILOR.md");
