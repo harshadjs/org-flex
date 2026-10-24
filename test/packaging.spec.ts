@@ -218,3 +218,26 @@ test("every bar button is run by the core or by exactly one feature", () => {
   for (const id of ids) expect([...core, ...owned].filter((x) => x === id).length, id).toBe(1);
   expect(owned.filter((id) => !ids.includes(id))).toEqual([]);
 });
+
+// ---------------------------------------------------------------- PLAT-9 tailoring
+
+test("the tailoring guide, the flavour record and the skill are there, and the guide keeps the invariants", () => {
+  const guide = read("TAILOR.md");
+  for (const id of ["INV-1", "INV-2", "INV-3", "INV-4"]) expect(guide).toContain(id);
+  for (const path of ["src/flavour.ts", "src/features/index.ts", "FLAVOUR.md", "recipes/", "RETIRED_COMMAND_IDS", "SHIPPED_COMMAND_IDS"]) expect(guide).toContain(path);
+  expect(read("FLAVOUR.md")).toMatch(/^# Flavour: /);
+  expect(read(".claude/skills/tailor/SKILL.md")).toMatch(/^---\nname: tailor\ndescription: .+\n---\n[\s\S]*TAILOR\.md/);
+  expect(read("AGENTS.md")).toContain("TAILOR.md");
+});
+
+test("every recipe says what to ask, and what to change in the spec, the code and the tests", () => {
+  const dir = join(__dirname, "..", "recipes");
+  const recipes = readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "README.md");
+  expect(recipes.length).toBeGreaterThanOrEqual(4);
+  const index = read("recipes/README.md");
+  for (const file of recipes) {
+    const text = read(`recipes/${file}`);
+    for (const section of ["## Ask", "## Spec", "## Code", "## Tests"]) expect(text, `${file}: ${section}`).toContain(section);
+    expect(index, file).toContain(`(${file})`);
+  }
+});
