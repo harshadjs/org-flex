@@ -19,7 +19,8 @@ hold in every fork; every other rule is a default a fork may rewrite.
 Code locations are given as files. Line numbers change too often to be useful.
 The code is split into `src/org/` (pure Org logic, no editor or Obsidian),
 `src/editor/` (CodeMirror extensions), `src/ui/` (Obsidian dialogs, settings tab,
-task blocks), `src/view.ts` and `src/main.ts`.
+task blocks), `src/features/` (optional parts, PLAT-8), `src/flavour.ts` (workflow
+choices, §12a), `src/view.ts` and `src/main.ts`.
 
 ## 0. Invariants
 
@@ -30,7 +31,7 @@ Org Flex is a base to be tailored: each user's fork, usually through their own c
 | INV-1 | **Files stay plain Org.** What the plugin writes is Org that Emacs, Orgzly and other Org tools read the same way: no plugin-only syntax, no hidden markers, nothing stored in the file that only Org Flex understands (state of the view lives in the view or in settings). Opening a file and moving through it never changes it; only edits do. A fork that adds an edit writes standard Org for it and tests the exact text it produces. **Test:** "opening a file in the editor and saving it changes nothing". |
 | INV-2 | **Phone first.** Anything tappable in the editor goes through `onTap` (`src/editor/state.ts`), so a tap acts without placing the cursor or bringing up the keyboard, and a swipe is a scroll. The only raw listeners are the ones listed, with their reason, in the guard test. The layout rules of `AGENTS.md` (no `height: 100%` on flex children with siblings, one scrolling element on the phone) and full-size touch targets hold. **Test:** "everything tappable in the editor goes through onTap, so a tap never brings up the keyboard", "onTap runs on a still tap or a click, never on a swipe, and keeps focus away", "flex children with siblings never use height: 100%", "on mobile the editor's scroller is the one scrolling element", "bar buttons are full-size touch targets with no gaps between them". |
 | INV-3 | **Every rule is testable.** Rules a fork adds or rewrites follow the same form as the rest: an ID, and a Test part naming automated tests or a Manual part with a line in the §16 checklist. **Test:** "every spec rule names its tests or says why it is manual", "every test the spec cites exists", "every manual rule is on the manual checklist, and the checklist names real rules", "the invariants are listed first and each one is guarded". |
-| INV-4 | **Command ids are forever.** Users bind hotkeys to command ids, so an id once shipped is never renamed or dropped; its command may change what it does. New commands get new ids, listed in §9.3 and added to the guard's list of shipped ids. **Test:** "every command id ever shipped is still registered, and the spec lists exactly the registered ones". |
+| INV-4 | **Command ids are forever.** Users bind hotkeys to command ids, so an id once shipped is never renamed, and never reused for something else; its command may change what it does. New commands get new ids, listed in §9.3 and added to the guard's list of shipped ids. A fork that drops a feature (PLAT-8) drops its commands with it, and moves their ids to the guard's retired list, never to be registered again. **Test:** "every command id ever shipped is still registered or retired, and the spec lists exactly the registered ones". |
 
 ---
 
@@ -45,6 +46,7 @@ Org Flex is a base to be tailored: each user's fork, usually through their own c
 | PLAT-5 | Build: `npm run build` type-checks (`tsc --noEmit`) and then bundles with esbuild (`esbuild.config.mjs`). The only files deployed to a vault are `main.js`, `manifest.json` and `styles.css`. `npm run deploy` builds and copies them (`scripts/deploy.mjs`) into the vault named by `OBSIDIAN_VAULT` or, failing that, the git-ignored `.deploy.json` (`{"vault": "<path>", "specCopy": "<path in the vault>"}`), and copies `SPEC.md` to `specCopy` when set (or `ORG_FLEX_SPEC_COPY`). No one's own vault path is in the repository. `.npmrc` sets `legacy-peer-deps`, because the `obsidian` typings pin CodeMirror versions the plugin doesn't use. **Test:** "the build type-checks then bundles, and deploys exactly the three artifacts". |
 | PLAT-6 | **Another org plugin:** if `.org` is already taken when Org Flex loads, it doesn't fail: a notice that stays until dismissed says which plugin has it ("Orgmode (cm6)" when `orgmode-cm6` is enabled, else the view type that took `.org`, else "another plugin"), to turn that off and then Org Flex off and on again. The rest of Org Flex (commands, Markdown task blocks) still loads. **Test:** "the .org conflict notice names the plugin to turn off". **Manual:** needs two plugins in Obsidian. |
 | PLAT-7 | **Releases:** `npm version <patch|minor|major>` bumps `package.json`, copies the version into `manifest.json` and adds it to `versions.json` with the `minAppVersion` (`scripts/version-bump.mjs`), and tags it without a `v` (`.npmrc`). Pushing the tag runs `.github/workflows/release.yml`: tests, build, a check that the tag is the manifest's version, then a **draft** GitHub release with `main.js`, `manifest.json` and `styles.css`, which BRAT and the community directory install from. The repository has an MIT `LICENSE`. The manifest's name and description don't say "Obsidian", and the description ends with a full stop. **Test:** "the versions agree, and the manifest is fit for the community directory". **Manual:** the workflow runs on GitHub. |
+| PLAT-8 | **Features:** the parts a fork is most likely to keep, change or drop are features (`src/features/`): `backlinks`, `front-matter`, `journal`, `new-note`, `node-find`, `capture`, `attachments`, `task-blocks`. Each is one file, `src/features/<id>.ts`, exporting a `Feature` (`src/features/feature.ts`): its id, the SPEC.md section it owns (which names the file), and what it adds: commands, ribbon icons and events when the plugin loads, editor extensions for each org view, work after a view loads a file, and what its bar buttons do. The core (`src/main.ts`, `src/view.ts`) reaches features only through the list in `src/features/index.ts`, so dropping one is deleting its line there, its file, the pure logic and dialogs only it uses, its spec section and its tests. A bar button belongs to the core (`CORE_BUTTONS`) or to exactly one feature, and shows, in the bar and in settings, only when the core or a listed feature runs it. Editing, folding, zoom, checklists, links, the index and reading mode are core. **Test:** "each feature is one file, listed once, and owns a section of the spec that names it", "only the feature list reaches into a feature, so dropping one stays local", "every bar button is run by the core or by exactly one feature". |
 
 ## 2. The org file view
 
@@ -119,7 +121,7 @@ Not parsed: lists as tree nodes (handled line by line instead, §8), horizontal 
 
 ## 5a. Index and backlinks
 
-`src/org/vault-index.ts` (index and pure functions), `src/editor/backlinks.ts` (the section), `src/main.ts` (vault events), `src/view.ts` (`refreshBacklinks`, `linkMention`). Tests in `test/index.spec.ts`. Flavour `backlinks` (§12a, on in the base).
+`src/org/vault-index.ts` (index and pure functions), `src/editor/backlinks.ts` (the section), `src/main.ts` (vault events, the index), `src/features/backlinks.ts` (feature `backlinks`: refreshing, `linkMention`). Tests in `test/index.spec.ts`. The index itself is core: ID links (LINK-3) and the `[[` list (LP-9) need it with or without this feature.
 
 | ID | Rule |
 |---|---|
@@ -160,7 +162,7 @@ Not parsed: lists as tree nodes (handled line by line instead, §8), horizontal 
 
 ## 7. Front matter panel
 
-`src/org/front-matter.ts` (pure), `src/editor/front-matter-panel.ts`. Tests in `test/notes.spec.ts` and `test/editor.spec.ts`. Flavour `frontMatterPanel` (§12a, on in the base).
+`src/org/front-matter.ts` (pure), `src/editor/front-matter-panel.ts`, `src/features/front-matter.ts` (feature `front-matter`). Tests in `test/notes.spec.ts` and `test/editor.spec.ts`. Without the feature, the drawer is an ordinary foldable drawer.
 
 | ID | Rule |
 |---|---|
@@ -203,7 +205,7 @@ Known gaps: Tab/Shift-Tab (VIEW-4) indent or outdent only the selected lines by 
 | ID | Rule |
 |---|---|
 | BAR-1 | The bar is a CodeMirror panel at the **bottom** of the editor (`.org-shortcut-bar`), shown when `showShortcutBar` is on. On phones the app shrinks above the keyboard, so the bar sits just above it while typing. While the keyboard is closed, it is lifted clear of Obsidian's floating navigation bar. While it is open, the bar sits flush on the keyboard with no gap: the view gets `org-keyboard-open` (`trackKeyboard` in `src/editor/setup.ts`), and that class drops the lift. The Obsidian app's `keyboardWillShow` / `keyboardWillHide` window events decide it (the ones Obsidian hides its own navigation bar on; a hide that only means a hardware keyboard was attached is ignored). Before the first of those, the keyboard counts as open when the visible height (the window's, or the visual viewport's on iOS) is under 3/4 of the tallest seen at that width, starting from the screen's height. It's **one row that scrolls sideways** and never wraps. **Test:** "the shortcut bar is a panel at the bottom of the editor", "the shortcut bar is one row that scrolls sideways", "trackKeyboard marks the view while the keyboard takes the bottom of the screen", "trackKeyboard follows the Obsidian app's keyboard events over the height". **Manual:** its place above the keyboard and the navigation bar needs a phone. |
-| BAR-2 | Buttons always appear in the order of `BUTTONS`: undo, redo, visibility, zoom, new-heading, demote, promote, todo, schedule, deadline, checkbox, src-block, quote-block, wiki-link, node-find, heading-id, journal, journal-picker, journal-calendar, new-note, capture, attach, record. A button shows when its id is in `shortcutBarButtons`. Ids not in the list (such as the old `stars`) are ignored. **Test:** "bar buttons keep BUTTONS order and ignore unknown ids". |
+| BAR-2 | Buttons always appear in the order of `BUTTONS`: undo, redo, visibility, zoom, new-heading, demote, promote, todo, schedule, deadline, checkbox, src-block, quote-block, wiki-link, node-find, heading-id, journal, journal-picker, journal-calendar, new-note, capture, attach, record. A button shows when its id is in `shortcutBarButtons` and the core or a feature of this copy runs it (PLAT-8). Ids not in the list (such as the old `stars`) are ignored. **Test:** "bar buttons keep BUTTONS order and ignore unknown ids". |
 | BAR-3 | Enabled by default: undo, redo, visibility, zoom, new-heading, demote, promote, todo, schedule, deadline, checkbox, src-block, quote-block, wiki-link, node-find, heading-id. Off by default: journal, journal-picker, journal-calendar, new-note, capture, attach, record. Adding an off-by-default button doesn't change anyone's bar, so it needs no version bump (BAR-8). **Test:** "a fresh bar has the editing buttons on and the journal and note buttons off". |
 | BAR-4 | **Focus:** tapping a button never takes focus away: the tap is handled on `touchend` (or `click` with `mousedown` prevented on desktop) with the default prevented, and a touch that moved (a swipe along the bar) does nothing. After the action, focus returns to the editor only for buttons with `refocus` (the ones that edit text) and only if the editor had focus before the tap. New heading, source block and quote block always focus the editor, so the keyboard comes up: they're pressed to start typing. Visibility, zoom, node-find, journal, journal-picker, journal-calendar, schedule and deadline never bring up the mobile keyboard; new-note does, on purpose, so you can type the title (NOTE-1). Schedule and deadline give focus back when their date picker closes, if the editor had it. **Test:** "bar taps keep focus where it was; editing buttons give it back, new heading takes it, swipes do nothing", "onTap runs on a still tap or a click, never on a swipe, and keeps focus away", "a long press on a heading's arrow zooms into it, again zooms out; a short tap still folds". **Manual:** the keyboard needs a phone. |
 | BAR-5 | Undo and Redo are dimmed (`is-disabled`) when there's nothing to undo or redo. They can still be tapped and then do nothing. **Test:** "undo and redo are dimmed when there is nothing to undo or redo". |
@@ -266,7 +268,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 10. Journal
 
-`src/org/journal.ts` (pure), `src/main.ts` (`openJournal`, `browseJournal`, `openCalendar`), `src/ui/modals.ts` (`JournalPickerModal`, `JournalCalendarModal`). Tests in `test/notes.spec.ts`. Setting `journalFolder` (default `journal`); flavour `journalTemplate` (§12a).
+`src/org/journal.ts` (pure), `src/features/journal.ts` (feature `journal`: `openJournal`, `browseJournal`, `openCalendar`, its commands, ribbon icon and bar buttons), `src/ui/modals.ts` (`JournalPickerModal`, `JournalCalendarModal`). Tests in `test/notes.spec.ts`. Setting `journalFolder` (default `journal`); flavour `journalTemplate` (§12a).
 
 | ID | Rule |
 |---|---|
@@ -286,7 +288,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 10a. New org note
 
-`src/org/new-note.ts` (pure), `src/main.ts` (`newNote`, `createNote`), `src/ui/modals.ts` (`NewNoteModal`). Tests in `test/notes.spec.ts`.
+`src/org/new-note.ts` (pure), `src/features/new-note.ts` (feature `new-note`: `newNote`, `createNote`, command, ribbon icon, folder menu), `src/main.ts` (`createRootNote`, `openNewNote`, shared with LP-10 and §10b), `src/ui/modals.ts` (`NewNoteModal`). Tests in `test/notes.spec.ts`.
 
 | ID | Rule |
 |---|---|
@@ -306,7 +308,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 10b. Go to node
 
-`src/org/node-find.ts` (pure), `src/main.ts` (`findNode`), `src/ui/modals.ts` (`NodeFinderModal`). Tests in `test/zoom.spec.ts`. Like org-roam's `org-roam-node-find`.
+`src/org/node-find.ts` (pure), `src/features/node-find.ts` (feature `node-find`: `findNode`), `src/ui/modals.ts` (`NodeFinderModal`). Tests in `test/zoom.spec.ts`. Like org-roam's `org-roam-node-find`.
 
 | ID | Rule |
 |---|---|
@@ -316,7 +318,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 10c. Capture
 
-`src/org/capture.ts` (pure), `src/main.ts` (`capture`, `fileCapture`), `src/ui/modals.ts` (`CaptureModal`), `src/view.ts` (`appendEntry`). Tests in `test/notes.spec.ts`. A single org-capture template: one box, one inbox file, the entry at its end.
+`src/org/capture.ts` (pure), `src/features/capture.ts` (feature `capture`: `capture`, `fileCapture`, command, ribbon icon, link handler), `src/ui/modals.ts` (`CaptureModal`), `src/view.ts` (`appendEntry`). Tests in `test/notes.spec.ts`. A single org-capture template: one box, one inbox file, the entry at its end.
 
 | ID | Rule |
 |---|---|
@@ -332,7 +334,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 10d. Attachments
 
-`src/view.ts` (`attach`, `record`, `saveAttachments`), `src/ui/modals.ts` (`RecorderModal`), `src/org/edit.ts` (`insertFileLinks`, `recordingName`, `recordingExtension`), `src/org/syntax.ts` (`relativeLinkPath`). Images and audio are then shown inline (LP-3, LP-11).
+`src/features/attachments.ts` (feature `attachments`: `attach`, `record`, `saveAttachments`), `src/ui/modals.ts` (`RecorderModal`), `src/org/edit.ts` (`insertFileLinks`, `recordingName`, `recordingExtension`), `src/org/syntax.ts` (`relativeLinkPath`). Images and audio are then shown inline (LP-3, LP-11).
 
 | ID | Rule |
 |---|---|
@@ -343,7 +345,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 11. Org tasks in Markdown notes
 
-`src/ui/tasks-block.ts` (code block processor), `src/org/tasks.ts`, `src/org/query.ts`. Tests in `test/tasks.spec.ts`.
+`src/features/task-blocks.ts` (feature `task-blocks`), `src/ui/tasks-block.ts` (code block processor), `src/org/tasks.ts`, `src/org/query.ts`. Tests in `test/tasks.spec.ts`.
 
 | ID | Rule |
 |---|---|
@@ -368,7 +370,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 12a. Flavour
 
-`src/flavour.ts` (`FLAVOUR`). The choices that fit one way of using Org, as code a fork edits (`TAILOR.md`) rather than settings. The base flavour is plain Org. **Test:** "the base flavour has only TODO and DONE, and the UUID journal header".
+`src/flavour.ts` (`FLAVOUR`). The choices that fit one way of using Org, as code a fork edits (`TAILOR.md`) rather than settings. Which features are there is the feature list (PLAT-8). The base flavour is plain Org. **Test:** "the base flavour has only TODO and DONE, and the UUID journal header".
 
 | Key | Base | Effect |
 |---|---|---|
@@ -378,8 +380,6 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 | `hideStars` | `false` | LP-7 |
 | `foldPropertyDrawers` | `true` | Drawers stay folded (FOLD-4); front matter starts collapsed (FM-4) |
 | `defaultFoldLevel` | `foldall` | FOLD-5 (`foldall` / `outline` / `expandall`) |
-| `frontMatterPanel` | `true` | §7 |
-| `backlinks` | `true` | §5a |
 | `journalTemplate` | first JRN-2 block | JRN-2 |
 
 ## 13. Layout and mobile requirements

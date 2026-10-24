@@ -1,17 +1,14 @@
 // Org Flex: Org mode files in Obsidian, on the desktop and the phone.
 
-import { getIcon, Notice, Plugin, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
-import { ButtonDef, buttonIconName, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
+import { getIcon, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
+import { ButtonDef, buttonIconName, CORE_BUTTONS, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
 import { readNote, VaultIndex } from "./org/vault-index";
-import { journalEntries, journalFileContent, journalPathForDate } from "./org/journal";
-import { appendEntry, captureEntry, capturePath, captureStates, noteCaptureText, sharedCaptureText } from "./org/capture";
-import { freeNotePath, noteFileContent, noteFileName, notePath, titleProblem } from "./org/new-note";
+import { freeNotePath, noteFileContent, noteFileName } from "./org/new-note";
 import { OrgFlexView, VIEW_TYPE } from "./view";
 import { FLAVOUR } from "./flavour";
 import { orgConflictMessage } from "./conflicts";
-import { CaptureChoice, CaptureModal, JournalCalendarModal, JournalPickerModal, NewNoteModal, NodeFinderModal } from "./ui/modals";
-import { registerTaskBlocks } from "./ui/tasks-block";
+import { buttonFeature, FEATURES } from "./features";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
 
 export default class OrgFlexPlugin extends Plugin {
@@ -30,7 +27,6 @@ export default class OrgFlexPlugin extends Plugin {
       },
       keywords: () => this.keywords(),
     });
-    this.register(this.index.onChange(() => this.forEachView((v) => v.refreshBacklinks())));
 
     this.registerView(VIEW_TYPE, (leaf) => new OrgFlexView(leaf, this));
     this.claimOrgFiles();
@@ -48,17 +44,8 @@ export default class OrgFlexPlugin extends Plugin {
     });
 
     this.addCommands();
-    this.addRibbonIcon("file-plus", "New org note", () => this.newNote());
-    this.addRibbonIcon("calendar-days", "Open today's journal", () => void this.openJournal(new Date()));
-    this.addRibbonIcon("inbox", "Capture to inbox", () => this.capture());
-    // CAP-6: obsidian://org-capture?title=…&text=…&url=…
-    this.registerObsidianProtocolHandler("org-capture", (params) => this.capture(sharedCaptureText({ title: params.title, text: params.text, url: params.url })));
-    this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-      if (!(file instanceof TFolder)) return;
-      menu.addItem((item) => item.setTitle("New org note").setIcon("file-plus").onClick(() => this.newNote(file)));
-    }));
-
-    registerTaskBlocks(this);
+    // PLAT-8: everything else comes from the features this copy has
+    for (const feature of FEATURES) feature.load?.(this);
     this.addSettingTab(new OrgFlexSettingTab(this.app, this));
   }
 
@@ -99,6 +86,11 @@ export default class OrgFlexPlugin extends Plugin {
     return { todo: FLAVOUR.todoKeywords, done: FLAVOUR.doneKeywords };
   }
 
+  /** BAR-2, PLAT-8: a button shows only when the core or one of this copy's features runs it. */
+  hasButton(def: ButtonDef): boolean {
+    return CORE_BUTTONS.has(def.id) || buttonFeature(def.id) !== undefined;
+  }
+
   /** BAR-7: the custom icon when Lucide knows it, else the default. */
   buttonIcon(def: ButtonDef): string {
     return buttonIconName(def, this.settings.shortcutCustomIcons[def.id], (name) => Boolean(getIcon(name)));
@@ -110,7 +102,7 @@ export default class OrgFlexPlugin extends Plugin {
     }
   }
 
-  private activeView(): OrgFlexView | null {
+  activeView(): OrgFlexView | null {
     return this.app.workspace.getActiveViewOfType(OrgFlexView);
   }
 
@@ -145,13 +137,7 @@ export default class OrgFlexPlugin extends Plugin {
     inView("org-insert-wiki-link", "Insert wiki link ([[]])", (v) => v.command("wiki-link"));
     inView("org-zoom", "Zoom into heading / zoom out", (v) => v.toggleZoom());
     inView("org-toggle-reading", "Toggle reading mode", (v) => v.toggleReading());
-    this.addCommand({ id: "org-roam-node-find", name: "Go to node (find or create)", callback: () => this.findNode() });
     inView("org-assign-id", "Assign ID to heading (:ID:)", (v) => v.command("heading-id"));
-    this.addCommand({ id: "open-todays-journal", name: "Open today's journal", callback: () => void this.openJournal(new Date()) });
-    this.addCommand({ id: "browse-journal-entries", name: "Browse journal entries", callback: () => this.browseJournal() });
-    this.addCommand({ id: "open-journal-calendar", name: "Open journal calendar", callback: () => this.openCalendar() });
-    this.addCommand({ id: "new-org-note", name: "New org note", callback: () => this.newNote() });
-    this.addCommand({ id: "org-capture", name: "Capture to inbox", callback: () => this.capture() });
   }
 
   // -------------------------------------------------------------------------
@@ -222,64 +208,16 @@ export default class OrgFlexPlugin extends Plugin {
   }
 
   // -------------------------------------------------------------------------
-  // Journal (§10)
+  // Notes, for links and the features
 
-  private async ensureFolder(path: string) {
+  /** Make the folders of `path` that are missing, one at a time. */
+  async ensureFolder(path: string) {
     const parts = path.split("/").filter(Boolean);
     let current = "";
     for (const part of parts) {
       current = current ? `${current}/${part}` : part;
       if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
     }
-  }
-
-  /** JRN-2: open (creating if needed) the journal file for `date` in the current tab. */
-  async openJournal(date: Date) {
-    try {
-      const path = journalPathForDate(this.settings.journalFolder, date);
-      let file = this.app.vault.getAbstractFileByPath(path);
-      if (!file) {
-        await this.ensureFolder(path.slice(0, path.lastIndexOf("/")));
-        file = await this.app.vault.create(path, journalFileContent(date, FLAVOUR.journalTemplate, crypto.randomUUID()));
-      }
-      if (!(file instanceof TFile)) throw new Error(`${path} is not a file`);
-      await this.app.workspace.getLeaf(false).openFile(file);
-    } catch (e) {
-      new Notice(`Couldn't open the journal: ${(e as Error).message}`);
-    }
-  }
-
-  private journalPaths(): string[] {
-    return this.app.vault.getFiles().filter((f) => f.extension === "org").map((f) => f.path);
-  }
-
-  /** JRN-3 */
-  browseJournal() {
-    const entries = journalEntries(this.journalPaths(), this.settings.journalFolder);
-    if (!entries.length) {
-      new Notice("No journal entries yet.");
-      return;
-    }
-    new JournalPickerModal(this.app, entries, (entry) => {
-      const file = this.app.vault.getAbstractFileByPath(entry.path);
-      if (file instanceof TFile) void this.app.workspace.getLeaf(false).openFile(file);
-    }).open();
-  }
-
-  /** JRN-4 */
-  openCalendar() {
-    const days = new Set(journalEntries(this.journalPaths(), this.settings.journalFolder).map((e) => e.date));
-    new JournalCalendarModal(this.app, (day) => days.has(day), (date) => void this.openJournal(date)).open();
-  }
-
-  // -------------------------------------------------------------------------
-  // New org note (§10a)
-
-  newNote(folder?: TFolder) {
-    const active = this.app.workspace.getActiveFile();
-    const parent = folder ?? this.app.fileManager.getNewFileParent(active?.path ?? "");
-    const dir = parent.isRoot() ? "" : parent.path;
-    new NewNoteModal(this.app, dir, (title) => this.createNote(dir, title)).open();
   }
 
   /** paths being created by createNoteFromLink, not yet in the vault */
@@ -294,7 +232,7 @@ export default class OrgFlexPlugin extends Plugin {
   }
 
   /** LP-10, FIND-3: a note at the vault root; the ID now, the file once written (null if it failed). */
-  private createRootNote(raw: string): { id: string; file: Promise<TFile | null> } {
+  createRootNote(raw: string): { id: string; file: Promise<TFile | null> } {
     const title = raw.trim();
     const id = crypto.randomUUID();
     const path = freeNotePath("", noteFileName(title),
@@ -309,87 +247,12 @@ export default class OrgFlexPlugin extends Plugin {
     return { id, file };
   }
 
-  /** FIND-1..3: org-roam-node-find. */
-  findNode() {
-    new NodeFinderModal(this.app, this.index.titles(), (choice) => {
-      const leaf = this.app.workspace.getLeaf(false);
-      if (choice.kind === "node") {
-        void this.openLink(`id:${choice.node.id}`, "", leaf);
-        return;
-      }
-      void this.createRootNote(choice.title).file.then((file) => file && this.openNewNote(leaf, file));
-    }).open();
-  }
-
   /** NOTE-5: open a new note with the cursor below its header, ready to type. */
-  private async openNewNote(leaf: WorkspaceLeaf, file: TFile) {
+  async openNewNote(leaf: WorkspaceLeaf, file: TFile) {
     await leaf.openFile(file);
     if (leaf.view instanceof OrgFlexView) {
       const view = leaf.view;
       view.revealPosition(view.editor?.state.doc.length ?? 0, { focus: true });
-    }
-  }
-
-  /** NOTE-3..5: create and open the note, or say why not. */
-  async createNote(folder: string, raw: string): Promise<string | null> {
-    const problem = titleProblem(raw);
-    if (problem) return problem;
-    const title = raw.trim();
-    const path = notePath(folder, title);
-    if (this.app.vault.getAbstractFileByPath(path)) return `${path} already exists.`;
-    try {
-      const file = await this.app.vault.create(path, noteFileContent(title, crypto.randomUUID()));
-      await this.openNewNote(this.app.workspace.getLeaf(false), file);
-      return null;
-    } catch (e) {
-      return (e as Error).message;
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Capture (§10c)
-
-  /**
-   * CAP-1: the capture dialog, with `initial` already typed (CAP-6), or, with
-   * none, a link to the org note being viewed (CAP-9).
-   */
-  capture(initial?: string) {
-    const path = capturePath(this.settings.captureFile);
-    const states = captureStates(FLAVOUR.todoKeywords, FLAVOUR.doneKeywords);
-    let text = initial ?? "";
-    let cursor = text.length;
-    const view = initial === undefined ? this.activeView() : null;
-    if (view?.file && view.file.path !== path) {
-      text = noteCaptureText(readNote(view.file.path, view.getViewData(), this.keywords()));
-      cursor = 0;
-    }
-    new CaptureModal(this.app, path, text, cursor, states, (choice) => this.fileCapture(path, choice)).open();
-  }
-
-  /** CAP-2, CAP-3, CAP-5: add the entry (CAP-7, CAP-8: with the chosen state and date) to the inbox, creating it when missing; why not, or null when done. */
-  private async fileCapture(path: string, choice: CaptureChoice): Promise<string | null> {
-    const entry = captureEntry(choice.text, choice.state, choice.scheduled);
-    if (!entry) return "Type something to capture.";
-    try {
-      let file = this.app.vault.getAbstractFileByPath(path);
-      if (!file) {
-        const slash = path.lastIndexOf("/");
-        if (slash > 0) await this.ensureFolder(path.slice(0, slash));
-        const name = path.slice(slash + 1).replace(/\.org$/, "");
-        file = await this.app.vault.create(path, noteFileContent(name, crypto.randomUUID()));
-      }
-      if (!(file instanceof TFile)) return `${path} is not a file.`;
-      // an open inbox takes it as an edit, so nothing typed there is lost
-      let done = false;
-      this.forEachView((v) => { if (!done && v.file?.path === path) done = v.appendEntry(entry); });
-      if (!done) await this.app.vault.process(file, (data) => {
-        const { from, insert } = appendEntry(data, entry);
-        return data.slice(0, from) + insert;
-      });
-      new Notice(`Captured to ${path}`);
-      return null;
-    } catch (e) {
-      return (e as Error).message;
     }
   }
 }

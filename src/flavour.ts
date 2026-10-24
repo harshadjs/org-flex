@@ -1,8 +1,9 @@
 // The flavour (§12a): how this copy of Org Flex is set up for the way its
 // user works with Org. These are code, not settings: a fork changes them here
 // (usually through TAILOR.md), next to the rules they feed, and the spec's
-// §12a table says what each one does. Settings (src/settings.ts) only hold
-// what differs between one person's vaults and devices.
+// §12a table says what each one does. Which features this copy has is the
+// list in src/features/index.ts (PLAT-8). Settings (src/settings.ts) only
+// hold what differs between one person's vaults and devices.
 
 import type { VisibilityLevel } from "./org/folding";
 import { DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
@@ -20,10 +21,6 @@ export interface Flavour {
   foldPropertyDrawers: boolean;
   /** FOLD-5 */
   defaultFoldLevel: VisibilityLevel;
-  /** §7 */
-  frontMatterPanel: boolean;
-  /** §5a */
-  backlinks: boolean;
   /** JRN-2: `{{date}}` and `{{id}}` are filled in */
   journalTemplate: string;
 }
@@ -35,7 +32,5 @@ export const FLAVOUR: Flavour = {
   hideStars: false,
   foldPropertyDrawers: true,
   defaultFoldLevel: "foldall",
-  frontMatterPanel: true,
-  backlinks: true,
   journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
 };

@@ -73,7 +73,9 @@ test("everything tappable in the editor goes through onTap, so a tap never bring
 
 /**
  * Every command id ever shipped. Users' hotkeys are bound to these, so a
- * fork may add ids here but must never remove one or stop registering it.
+ * fork may add ids here but never remove one: each stays registered, or, when
+ * a fork drops the feature that had it (PLAT-8), moves to RETIRED_COMMAND_IDS
+ * and is never used again.
  */
 const SHIPPED_COMMAND_IDS = [
   "cycle-orgmode-visibility", "org-toggle-stars", "org-insert-heading", "org-increase-heading-level",
@@ -82,6 +84,9 @@ const SHIPPED_COMMAND_IDS = [
   "org-insert-wiki-link", "org-zoom", "org-toggle-reading", "org-roam-node-find", "org-assign-id",
   "open-todays-journal", "browse-journal-entries", "open-journal-calendar", "new-org-note", "org-capture",
 ];
+
+/** Ids whose feature this copy dropped; they may never be registered again, for anything. */
+const RETIRED_COMMAND_IDS: string[] = [];
 
 function registeredCommandIds(): string[] {
   const ids: string[] = [];
@@ -93,9 +98,10 @@ function registeredCommandIds(): string[] {
   return ids;
 }
 
-test("every command id ever shipped is still registered, and the spec lists exactly the registered ones", () => {
+test("every command id ever shipped is still registered or retired, and the spec lists exactly the registered ones", () => {
   const registered = registeredCommandIds();
-  expect(SHIPPED_COMMAND_IDS.filter((id) => !registered.includes(id))).toEqual([]);
+  expect(SHIPPED_COMMAND_IDS.filter((id) => !registered.includes(id) && !RETIRED_COMMAND_IDS.includes(id))).toEqual([]);
+  expect(RETIRED_COMMAND_IDS.filter((id) => registered.includes(id) || !SHIPPED_COMMAND_IDS.includes(id))).toEqual([]);
   expect(registered.filter((id, i) => registered.indexOf(id) !== i)).toEqual([]);
   const spec = read("SPEC.md");
   const table = spec.slice(spec.indexOf("### 9.3 Commands"), spec.indexOf("Known gaps", spec.indexOf("### 9.3 Commands")));

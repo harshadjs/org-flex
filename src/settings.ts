@@ -46,6 +46,12 @@ export const BUTTONS: ButtonDef[] = [
   { id: "record", name: "Record voice note", icon: "mic", enabled: false, refocus: false },
 ];
 
+/** PLAT-8: the buttons the core runs (`OrgFlexView.runButton`); the others belong to features. */
+export const CORE_BUTTONS: ReadonlySet<ButtonId> = new Set<ButtonId>([
+  "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
+  "checkbox", "src-block", "quote-block", "wiki-link", "heading-id",
+]);
+
 /** BAR-2: the buttons to show, always in `BUTTONS` order; unknown ids are ignored. */
 export function barButtons(enabled: string[]): ButtonDef[] {
   return BUTTONS.filter((b) => enabled.includes(b.id));

@@ -11,7 +11,8 @@ Settings (`src/settings.ts`, the settings tab) hold only what differs between on
 
 ## Layout
 - `src/org/` — pure Org logic (parsing, lists, editing commands, folding rules, front matter, journal, notes, index, task queries). No Obsidian imports; tested directly.
-- `src/editor/` — CodeMirror extensions (live preview, folding, checklists, front matter panel, backlinks, heading drag, shortcut bar, completion).
+- `src/editor/` — CodeMirror extensions (live preview, folding, checklists, list dragging, front matter panel, backlinks section, shortcut bar, completion).
+- `src/features/` — the optional parts (journal, capture, backlinks, attachments...), one file each, listed in `src/features/index.ts` (SPEC PLAT-8). Add, change or drop whole features here.
 - `src/ui/` — Obsidian dialogs, the settings tab and the `orgmode-tasks` block.
 - `src/view.ts` — the org file view; `src/main.ts` — the plugin.
 - `test/` — vitest; `dom.spec.ts` and `ui.spec.ts` run the editor in happy-dom, `packaging.spec.ts` reads the manifest, build config and CSS, `spec.spec.ts` checks SPEC.md.

@@ -172,3 +172,49 @@ test("every style is scoped to the org view or the plugin's own classes", () => 
     }
   }
 });
+
+// ---------------------------------------------------------------- PLAT-8 features
+
+const featureFiles = readdirSync(join(__dirname, "..", "src/features"))
+  .filter((f) => f.endsWith(".ts") && f !== "feature.ts" && f !== "index.ts");
+
+function featureInfo(file: string) {
+  const text = read(`src/features/${file}`);
+  const m = /export const (\w+): Feature = \{\s*id: "([^"]+)",\s*section: "([^"]+)"/.exec(text);
+  const buttons = /buttons: \{([\s\S]*?)\n  \}/.exec(text)?.[1] ?? /buttons: \{([^}]*)\}/.exec(text)?.[1] ?? "";
+  return {
+    name: m?.[1], id: m?.[2], section: m?.[3],
+    buttons: Array.from(buttons.matchAll(/^\s*"?([a-z-]+)"?:\s*\(/gm), (b) => b[1]),
+  };
+}
+
+test("each feature is one file, listed once, and owns a section of the spec that names it", () => {
+  const index = read("src/features/index.ts");
+  const spec = read("SPEC.md");
+  const listed = /FEATURES: Feature\[\] = \[([^\]]*)\]/.exec(index)![1].split(",").map((s) => s.trim()).filter(Boolean);
+  expect(featureFiles.length).toBe(listed.length);
+  for (const file of featureFiles) {
+    const f = featureInfo(file);
+    expect(f.id, file).toBe(file.replace(/\.ts$/, ""));
+    expect(listed, file).toContain(f.name);
+    const start = spec.indexOf(`\n## ${f.section}\n`);
+    expect(start, `${file}: ## ${f.section}`).toBeGreaterThan(0);
+    const end = spec.indexOf("\n## ", start + 4);
+    expect(spec.slice(start, end), file).toContain(`src/features/${file}`);
+  }
+});
+
+test("only the feature list reaches into a feature, so dropping one stays local", () => {
+  for (const file of sources()) {
+    if (file.startsWith("src/features/")) continue;
+    for (const m of read(file).matchAll(/from "([^"]*features[^"]*)"/g)) expect(m[1], file).toMatch(/\/features$/);
+  }
+});
+
+test("every bar button is run by the core or by exactly one feature", () => {
+  const ids = Array.from(read("src/settings.ts").matchAll(/\{ id: "([a-z-]+)", name:/g), (m) => m[1]);
+  const core = /CORE_BUTTONS[^[]*\[([^\]]*)\]/.exec(read("src/settings.ts"))![1].match(/[a-z-]+/g)!;
+  const owned = featureFiles.flatMap((f) => featureInfo(f).buttons);
+  for (const id of ids) expect([...core, ...owned].filter((x) => x === id).length, id).toBe(1);
+  expect(owned.filter((id) => !ids.includes(id))).toEqual([]);
+});

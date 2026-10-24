@@ -1,8 +1,8 @@
 // The org file view (§2): a TextFileView holding the plugin's own CodeMirror
 // editor.
 
-import { Notice, setIcon, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
-import { Compartment, EditorSelection, EditorState, Extension, Prec, StateEffect, StateField } from "@codemirror/state";
+import { Notice, setIcon, TextFileView, WorkspaceLeaf } from "obsidian";
+import { Compartment, EditorSelection, EditorState, Extension, Prec, StateEffect } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { redo, undo } from "@codemirror/commands";
 import { foldedRanges, unfoldEffect } from "@codemirror/language";
@@ -10,24 +10,22 @@ import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
 import { barButtons, ButtonId } from "./settings";
 import { FLAVOUR } from "./flavour";
+import { buttonFeature, FEATURES, hasFeature } from "./features";
 import { nextVisibility } from "./org/folding";
 import { appendEntry } from "./org/capture";
 import {
   assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
-  currentPlanningDate, insertFileLinks, PlanningKind, recordingExtension, recordingName, setPlanningDate, toggleCheckbox, toggleLeadingStars,
+  currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
-import { linkDescription, mentionLink, Mention } from "./org/vault-index";
+import { linkDescription } from "./org/vault-index";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
 import { readingMode } from "./editor/reading";
 import { revealZoomEffects, toggleZoom, zoomToHeadingAt } from "./editor/zoom";
 import { applyVisibility, visibilityField } from "./editor/folding";
-import { frontMatterPanel } from "./editor/front-matter-panel";
-import { BacklinksData, backlinksSection, setBacklinks } from "./editor/backlinks";
 import { shortcutBar } from "./editor/shortcut-bar";
 import { insertLinkWithCompletion, linkButton } from "./editor/completion";
 import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard, VIEW_TYPE } from "./editor/setup";
-import { DatePickerModal, RecorderModal } from "./ui/modals";
-import { relativeLinkPath } from "./org/syntax";
+import { DatePickerModal } from "./ui/modals";
 
 export { VIEW_TYPE };
 
@@ -42,19 +40,9 @@ export class OrgFlexView extends TextFileView {
   /** RD-1: this tab shows its file in reading mode */
   reading = false;
   private readingButton: HTMLElement | null = null;
-  private sections = { linked: true, mentions: false };
-  private backlinksField: StateField<unknown>;
 
-  constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
+  constructor(leaf: WorkspaceLeaf, readonly plugin: OrgFlexPlugin) {
     super(leaf);
-    this.backlinksField = backlinksSection({
-      open: (path, line) => void this.plugin.openAt(this.leaf, path, { line }),
-      link: (mention) => void this.linkMention(mention),
-      toggle: (section) => {
-        this.sections[section] = !this.sections[section];
-        this.refreshBacklinks();
-      },
-    });
   }
 
   getViewType() {
@@ -126,7 +114,7 @@ export class OrgFlexView extends TextFileView {
     if (clear) {
       this.editor.setState(this.createState(data));
       applyVisibility(this.editor, FLAVOUR.defaultFoldLevel);
-      this.refreshBacklinks();
+      for (const feature of FEATURES) feature.opened?.(this);
       return;
     }
     // VIEW-9: a change on disk is applied as an edit, keeping cursor, folds and history
@@ -178,16 +166,13 @@ export class OrgFlexView extends TextFileView {
       keywords: this.plugin.keywords(),
       hideStars: s.hideStars,
       foldPropertyDrawers: s.foldPropertyDrawers,
-      frontMatterPanel: s.frontMatterPanel,
+      frontMatterPanel: hasFeature("front-matter"),
     });
   }
 
+  /** PLAT-8: what each feature adds to the editor. */
   private featureExtension(): Extension {
-    const s = FLAVOUR;
-    return [
-      s.frontMatterPanel ? frontMatterPanel() : [],
-      s.backlinks ? this.backlinksField : [],
-    ];
+    return FEATURES.map((f) => f.editor?.(this) ?? []);
   }
 
   private barExtension(): Extension {
@@ -195,7 +180,7 @@ export class OrgFlexView extends TextFileView {
     // RD-1: the bar edits, so reading mode has none
     if (!s.showShortcutBar || this.reading) return [];
     return shortcutBar({
-      buttons: barButtons(s.shortcutBarButtons),
+      buttons: barButtons(s.shortcutBarButtons).filter((b) => this.plugin.hasButton(b)),
       icon: (def) => this.plugin.buttonIcon(def),
       setIcon,
       run: (id, view) => this.runButton(id, view),
@@ -249,43 +234,6 @@ export class OrgFlexView extends TextFileView {
         this.barCompartment.reconfigure(this.barExtension()),
       ],
     });
-    this.refreshBacklinks();
-  }
-
-  /** BL-5: recompute the backlinks section from the index. */
-  refreshBacklinks() {
-    const editor = this.editor;
-    if (!editor || !FLAVOUR.backlinks) return;
-    const path = this.file?.path;
-    let data: BacklinksData | null = null;
-    if (path) {
-      data = {
-        backlinks: this.plugin.index.backlinks(path),
-        mentions: this.sections.mentions ? this.plugin.index.unlinkedMentions(path) : null,
-        linkedOpen: this.sections.linked,
-        mentionsOpen: this.sections.mentions,
-      };
-    }
-    editor.dispatch({ effects: setBacklinks.of(data) });
-  }
-
-  /** BL-3: turn a mention in another file into a link, if that file hasn't changed since. */
-  private async linkMention(mention: Mention) {
-    const note = this.file && this.plugin.index.notes.get(this.file.path);
-    const target = this.app.vault.getAbstractFileByPath(mention.path);
-    if (!note || !(target instanceof TFile)) return;
-    let stale = false;
-    await this.app.vault.process(target, (text) => {
-      if (text.slice(mention.from, mention.to) !== mention.words) {
-        stale = true;
-        return text;
-      }
-      return text.slice(0, mention.from) + mentionLink(note, mention.words) + text.slice(mention.to);
-    });
-    if (stale) {
-      new Notice(`${mention.title} changed since it was indexed; nothing was linked.`);
-      this.refreshBacklinks();
-    }
   }
 
   /**
@@ -321,50 +269,6 @@ export class OrgFlexView extends TextFileView {
     return true;
   }
 
-  /** ATT-2: pick images or audio files (on the phone: gallery, camera, recorder or files), save and link them. */
-  attach() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*,audio/*";
-    input.multiple = true;
-    // some phone web views only open the chooser for an input in the page
-    input.hide();
-    document.body.appendChild(input);
-    input.addEventListener("cancel", () => input.remove());
-    input.addEventListener("change", () => {
-      input.remove();
-      const files = Array.from(input.files ?? []);
-      if (files.length) void this.saveAttachments(files.map((f) => ({ name: f.name, data: f.arrayBuffer() })));
-    });
-    input.click();
-  }
-
-  /** ATT-4: record from the microphone, then save and link the recording. */
-  record() {
-    new RecorderModal(this.app, (blob, mime) => {
-      void this.saveAttachments([{ name: recordingName(new Date(), recordingExtension(mime)), data: blob.arrayBuffer() }]);
-    }).open();
-  }
-
-  /** ATT-3: each file saved where Obsidian puts attachments for this note, then linked at the cursor. */
-  private async saveAttachments(files: { name: string; data: Promise<ArrayBuffer> }[]) {
-    const note = this.file;
-    if (!note) return;
-    const paths: string[] = [];
-    for (const f of files) {
-      try {
-        const path = await this.app.fileManager.getAvailablePathForAttachment(f.name, note.path);
-        const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-        if (parent && !this.app.vault.getAbstractFileByPath(parent)) await this.app.vault.createFolder(parent);
-        const file = await this.app.vault.createBinary(path, await f.data);
-        paths.push(relativeLinkPath(note.path, file.path));
-      } catch (e) {
-        new Notice(`Couldn't save ${f.name}: ${(e as Error).message}`);
-      }
-    }
-    if (this.editor && this.file === note) this.run(insertFileLinks(this.editor.state, paths));
-  }
-
   revealLine(line: number, options: { top?: boolean; focus?: boolean } = {}) {
     if (!this.editor) return;
     const n = Math.max(1, Math.min(line + 1, this.editor.state.doc.lines));
@@ -393,14 +297,8 @@ export class OrgFlexView extends TextFileView {
       case "quote-block": this.run(insertBlock(state, "quote")); break;
       case "wiki-link": linkButton(view); break;
       case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
-      case "node-find": this.plugin.findNode(); break;
-      case "journal": void this.plugin.openJournal(new Date()); break;
-      case "journal-picker": this.plugin.browseJournal(); break;
-      case "journal-calendar": this.plugin.openCalendar(); break;
-      case "new-note": this.plugin.newNote(); break;
-      case "capture": this.plugin.capture(); break;
-      case "attach": this.attach(); break;
-      case "record": this.record(); break;
+      // PLAT-8: the rest belong to features
+      default: buttonFeature(id)?.buttons?.[id]?.(this.plugin, this);
     }
   }
 

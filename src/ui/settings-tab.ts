@@ -41,7 +41,7 @@ export class OrgFlexSettingTab extends PluginSettingTab {
         settings.showShortcutBar = v;
         await save();
       }));
-    for (const def of BUTTONS) {
+    for (const def of BUTTONS.filter((b) => this.plugin.hasButton(b))) {
       const setting = new Setting(containerEl).setName(def.name);
       const preview = setting.controlEl.createSpan({ cls: "org-icon-preview" });
       const showIcon = () => {
