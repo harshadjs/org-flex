@@ -49,12 +49,26 @@ test("the plugin id is org-flex, and it names the view type", () => {
   expect(VIEW_TYPE).toBe(manifest.id);
 });
 
-test("the manifest targets desktop and mobile, and no API newer than 1.4.0 is used", () => {
+test("the manifest targets desktop and mobile, and no API newer than 1.5.7 is used", () => {
   expect(manifest.isDesktopOnly).toBe(false);
-  expect(manifest.minAppVersion).toBe("1.4.0");
-  // methods Obsidian added after 1.4.0
-  const newer = /\.(getFileByPath|getFolderByPath|getAllFolders|getLanguage|onExternalSettingsChange)\(/;
+  expect(manifest.minAppVersion).toBe("1.5.7");
+  // methods Obsidian added after 1.5.7
+  const newer = /\.(getAllFolders|getLanguage)\(/;
   for (const file of sources()) expect(newer.exec(read(file))?.[0], file).toBeUndefined();
+});
+
+test("the versions agree, and the manifest is fit for the community directory", () => {
+  const versions = JSON.parse(read("versions.json"));
+  expect(pkg.version).toBe(manifest.version);
+  expect(versions[manifest.version]).toBe(manifest.minAppVersion);
+  expect(pkg.scripts.version).toContain("scripts/version-bump.mjs");
+  expect(read(".npmrc")).toContain('tag-version-prefix=""');
+  expect(manifest.description).not.toMatch(/obsidian|^this plugin/i);
+  expect(manifest.description).toMatch(/\.$/);
+  expect(manifest.name).not.toMatch(/obsidian/i);
+  expect(read("LICENSE")).toMatch(/^MIT License/);
+  const release = read(".github/workflows/release.yml");
+  for (const step of ["npm test", "npm run build", "main.js manifest.json styles.css"]) expect(release).toContain(step);
 });
 
 test("CodeMirror is bundled: only obsidian and electron stay external", () => {
@@ -68,7 +82,12 @@ test("CodeMirror is bundled: only obsidian and electron stay external", () => {
 test("the build type-checks then bundles, and deploys exactly the three artifacts", () => {
   expect(pkg.scripts.build).toBe("tsc --noEmit --skipLibCheck && node esbuild.config.mjs production");
   expect(read(".npmrc")).toContain("legacy-peer-deps=true");
-  expect(pkg.scripts.deploy).toContain("cp main.js manifest.json styles.css ~/base/personal/.obsidian/plugins/org-flex/");
+  expect(pkg.scripts.deploy).toBe("npm run build && node scripts/deploy.mjs");
+  const deploy = read("scripts/deploy.mjs");
+  expect(deploy).toContain('["main.js", "manifest.json", "styles.css"]');
+  // no one's own vault in the repository
+  expect(deploy).not.toMatch(/base\/personal/);
+  expect(read(".gitignore")).toContain(".deploy.json");
 });
 
 // ---------------------------------------------------------------- CSS

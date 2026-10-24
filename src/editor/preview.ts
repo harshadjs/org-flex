@@ -5,7 +5,7 @@
 
 import { EditorState, Range, RangeSetBuilder, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
-import { isImageTarget, parseHeading, parseInline, InlineNode } from "../org/syntax";
+import { isAudioTarget, isImageTarget, parseHeading, parseInline, InlineNode } from "../org/syntax";
 import { docInfo, orgConfig, orgHost, selectionTouches, structureOf } from "./state";
 
 const hidden = Decoration.replace({});
@@ -42,6 +42,28 @@ class ImageWidget extends WidgetType {
   }
 }
 
+/** LP-11: an audio link as a small player; taps on it stay in the player. */
+class AudioWidget extends WidgetType {
+  constructor(readonly src: string, readonly target: string) {
+    super();
+  }
+  eq(other: AudioWidget) {
+    return other.src === this.src;
+  }
+  toDOM() {
+    const audio = document.createElement("audio");
+    audio.className = "org-audio";
+    audio.controls = true;
+    audio.preload = "metadata";
+    audio.src = this.src;
+    audio.title = this.target;
+    return audio;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
 function inlineDecorations(
   state: EditorState,
   text: string,
@@ -70,6 +92,11 @@ function inlineDecorations(
         const target = node.target.replace(/^file:/, "");
         const src = host?.imageSrc(target) ?? target;
         out.push(Decoration.replace({ widget: new ImageWidget(src, node.target) }).range(from, to));
+        continue;
+      }
+      if (isAudioTarget(node.target) && node.description === null) {
+        const src = host?.imageSrc(node.target) ?? node.target.replace(/^file:/, "");
+        out.push(Decoration.replace({ widget: new AudioWidget(src, node.target) }).range(from, to));
         continue;
       }
       out.push(hidden.range(from, base + node.descFrom));

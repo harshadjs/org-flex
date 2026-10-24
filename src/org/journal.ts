@@ -1,5 +1,5 @@
 // Daily journal (§10): one file per day at <folder>/YYYY/MM/YYYY-MM-DD.org,
-// whose :ID: is the date.
+// started from a template.
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -27,10 +27,19 @@ export function journalPathForDate(folder: string, date: Date): string {
   return root ? `${root}/${path}` : path;
 }
 
-/** JRN-2: the header of a new journal file. */
-export function journalFileContent(date: Date): string {
+/** JRN-2: a fresh install's journal header: a new UUID as `:ID:`, the date as title. */
+export const DEFAULT_JOURNAL_TEMPLATE = ":PROPERTIES:\n:ID:       {{id}}\n:END:\n#+title: {{date}}\n\n";
+
+/**
+ * JRN-2: the header installs from before the template setting keep, which
+ * org-roam setups that link days by date rely on: the date as `:ID:`.
+ */
+export const DATE_ID_JOURNAL_TEMPLATE = ":PROPERTIES:\n:ID:       {{date}}\n:END:\n#+title: {{date}}\n#+filetags: :journal:\n\n";
+
+/** JRN-2: a new journal file: `{{date}}` becomes YYYY-MM-DD and `{{id}}` the given UUID, every time they occur. */
+export function journalFileContent(date: Date, template: string, id: string): string {
   const day = journalDateString(date);
-  return `:PROPERTIES:\n:ID:       ${day}\n:END:\n#+title: ${day}\n#+filetags: :journal:\n\n`;
+  return template.replace(/\{\{\s*(date|id)\s*\}\}/gi, (_m, key: string) => (key.toLowerCase() === "date" ? day : id));
 }
 
 export interface JournalEntry {

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { orgConflictMessage } from "../src/conflicts";
 import { Text } from "@codemirror/state";
 import { analyze } from "../src/org/syntax";
 import { foldAt, nextVisibility, visibilityFolds } from "../src/org/folding";
 import { displayValue, parseFrontMatter, propertyIcon, simplifyValue } from "../src/org/front-matter";
 import {
-  calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, journalPathForDate,
+  calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, DEFAULT_JOURNAL_TEMPLATE, DATE_ID_JOURNAL_TEMPLATE, journalPathForDate,
 } from "../src/org/journal";
 import { readNote } from "../src/org/vault-index";
 import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, sharedCaptureText } from "../src/org/capture";
@@ -110,8 +111,18 @@ describe("journal", () => {
     expect(journalPathForDate("", d)).toBe("2024/03/2024-03-05.org");
   });
 
-  test("journalFileContent uses the date as ID and title", () => {
-    expect(journalFileContent(d)).toBe(":PROPERTIES:\n:ID:       2024-03-05\n:END:\n#+title: 2024-03-05\n#+filetags: :journal:\n\n");
+  test("journalFileContent fills the template's date and ID", () => {
+    expect(journalFileContent(d, DEFAULT_JOURNAL_TEMPLATE, "u-1")).toBe(":PROPERTIES:\n:ID:       u-1\n:END:\n#+title: 2024-03-05\n\n");
+    expect(journalFileContent(d, DATE_ID_JOURNAL_TEMPLATE, "u-1")).toBe(":PROPERTIES:\n:ID:       2024-03-05\n:END:\n#+title: 2024-03-05\n#+filetags: :journal:\n\n");
+    expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
+  });
+
+  test("a fresh install uses TODO | DONE and the UUID journal header; older installs keep the date header", () => {
+    const fresh = mergeSettings(null);
+    expect([fresh.todoKeywords, fresh.doneKeywords]).toEqual([["TODO"], ["DONE"]]);
+    expect(fresh.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
+    expect(mergeSettings({ hideStars: true }).journalTemplate).toBe(DATE_ID_JOURNAL_TEMPLATE);
+    expect(mergeSettings({ journalTemplate: "x" }).journalTemplate).toBe("x");
   });
 
   test("journalEntries keeps dated files under the folder, newest first", () => {
@@ -274,7 +285,7 @@ describe("settings", () => {
   test("bar buttons keep BUTTONS order and ignore unknown ids", () => {
     expect(BUTTONS.map((b) => b.id)).toEqual([
       "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
-      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture",
+      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture", "attach", "record",
     ]);
     expect(barButtons(["todo", "stars", "undo"]).map((b) => b.id)).toEqual(["undo", "todo"]);
   });
@@ -296,5 +307,13 @@ describe("settings", () => {
 
   test("keyword lists accept commas or newlines", () => {
     expect(parseKeywordList("TODO, NEXT\nWAIT,,\n")).toEqual(["TODO", "NEXT", "WAIT"]);
+  });
+});
+
+describe("conflicts", () => {
+  test("the .org conflict notice names the plugin to turn off", () => {
+    expect(orgConflictMessage(["calendar", "orgmode-cm6"], "orgmode")).toContain('because "Orgmode (cm6)" already does');
+    expect(orgConflictMessage(["calendar"], "org-view")).toContain('because the plugin whose view is "org-view" already does');
+    expect(orgConflictMessage([], null)).toContain("because another plugin already does");
   });
 });

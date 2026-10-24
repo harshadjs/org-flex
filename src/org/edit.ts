@@ -487,3 +487,35 @@ export function inBlock(lines: string[], n: number): boolean {
 }
 
 export type { BoxState };
+
+// ---------------------------------------------------------------------------
+// Attachments
+
+/**
+ * ATT-3: `[[file:<path>]]` links in place of the selection, separated by
+ * spaces, with a space before them when they would touch a word, and the
+ * cursor after them.
+ */
+export function insertFileLinks(state: EditorState, paths: string[]): TransactionSpec | null {
+  if (!paths.length) return null;
+  const { from, to } = state.selection.main;
+  const before = from > state.doc.lineAt(from).from ? state.sliceDoc(from - 1, from) : "";
+  const links = paths.map((p) => `[[file:${p}]]`).join(" ");
+  const insert = (before && !/\s/.test(before) ? " " : "") + links;
+  return { changes: { from, to, insert }, selection: EditorSelection.cursor(from + insert.length), userEvent: "input" };
+}
+
+/** ATT-4: a recording's file name, `Recording YYYYMMDDHHMMSS.<ext>` in local time, as Obsidian's recorder names them. */
+export function recordingName(date: Date, ext: string): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `Recording ${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.${ext}`;
+}
+
+/** ATT-4: the file extension for a recorder's MIME type (`audio/webm;codecs=opus` → `webm`). */
+export function recordingExtension(mime: string): string {
+  const type = mime.split(";")[0].trim().toLowerCase();
+  if (type === "audio/mp4" || type === "audio/x-m4a" || type === "audio/aac") return "m4a";
+  if (type === "audio/ogg") return "ogg";
+  if (type === "audio/wav" || type === "audio/x-wav") return "wav";
+  return "webm";
+}

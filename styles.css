@@ -215,6 +215,14 @@
   margin: var(--size-4-1) 0;
   border-radius: var(--radius-s);
 }
+.org-flex-view .org-audio {
+  display: inline-block;
+  vertical-align: middle;
+  width: 100%;
+  max-width: 22em;
+  height: 2.5em;
+  margin: var(--size-4-1) 0;
+}
 
 .org-flex-view .org-planning {
   color: var(--text-muted);
@@ -671,6 +679,21 @@ body:not(.is-mobile) .org-flex-view .cm-line:hover .org-list-grip,
 .is-mobile .org-capture-date,
 .is-mobile .org-capture-chip {
   min-height: 44px;
+}
+.org-recorder-status {
+  color: var(--text-muted);
+}
+.org-recorder-status.is-recording {
+  color: var(--text-error);
+}
+.org-recorder-status.is-recording::before {
+  content: "● ";
+}
+.org-recorder-time {
+  font-size: 2em;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin: var(--size-4-3) 0;
 }
 .org-new-note-error,
 .org-capture-error {

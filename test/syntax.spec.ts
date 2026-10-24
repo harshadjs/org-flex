@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { analyze, classifyLink, findLinks, isImageTarget, parseHeading, parseInline, walkInline } from "../src/org/syntax";
+import { analyze, classifyLink, findLinks, isImageTarget, parseHeading, parseInline, walkInline, isAudioTarget, resolveRelative, relativeLinkPath } from "../src/org/syntax";
 
 const kw = { todo: ["TODO", "DOING"], done: ["DONE"] };
 
@@ -121,10 +121,27 @@ describe("inline syntax", () => {
 
 test("link classification and images", () => {
   expect(classifyLink("https://example.com")).toEqual({ kind: "external", url: "https://example.com" });
-  expect(classifyLink("file:notes.org")).toEqual({ kind: "external", url: "file:notes.org" });
+  expect(classifyLink("file:notes.org")).toEqual({ kind: "file", path: "notes.org" });
+  expect(classifyLink("file:../attachments/a b.jpg")).toEqual({ kind: "file", path: "../attachments/a b.jpg" });
+  expect(classifyLink("file:///home/me/x.pdf")).toEqual({ kind: "external", url: "file:///home/me/x.pdf" });
   expect(classifyLink("id:My Note")).toEqual({ kind: "id", id: "My Note" });
   expect(classifyLink("unicorn")).toEqual({ kind: "file", path: "unicorn" });
   expect(isImageTarget("pics/cat.PNG")).toBe(true);
   expect(isImageTarget("https://x.y/a.webp?size=2")).toBe(true);
   expect(isImageTarget("notes.org")).toBe(false);
+  expect(isAudioTarget("file:memo.M4A")).toBe(true);
+  expect(isAudioTarget("Recording 1.webm")).toBe(true);
+  expect(isAudioTarget("cat.png")).toBe(false);
+});
+
+test("relative links resolve from the note's folder, and attachments are linked relative to it", () => {
+  expect(resolveRelative("journal/2026/10/day.org", "file:../../../attachments/a.jpg")).toBe("attachments/a.jpg");
+  expect(resolveRelative("notes/n.org", "./pic.png")).toBe("notes/pic.png");
+  expect(resolveRelative("n.org", "file:pic.png::*Heading")).toBe("pic.png");
+  expect(resolveRelative("n.org", "../x.png")).toBeNull();
+  expect(resolveRelative("n.org", "/abs.png")).toBeNull();
+  expect(relativeLinkPath("journal/2026/10/day.org", "attachments/a.jpg")).toBe("../../../attachments/a.jpg");
+  expect(relativeLinkPath("notes/n.org", "notes/media/a.jpg")).toBe("media/a.jpg");
+  expect(relativeLinkPath("n.org", "attachments/a.jpg")).toBe("attachments/a.jpg");
+  expect(relativeLinkPath("a/b/n.org", "a/c.png")).toBe("../c.png");
 });

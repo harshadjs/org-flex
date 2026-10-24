@@ -2,12 +2,13 @@
 
 import { getIcon, Notice, Plugin, TAbstractFile, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import { ButtonDef, buttonIconName, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
-import { Keywords, classifyLink } from "./org/syntax";
+import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
 import { readNote, VaultIndex } from "./org/vault-index";
 import { journalEntries, journalFileContent, journalPathForDate } from "./org/journal";
 import { appendEntry, captureEntry, capturePath, captureStates, noteCaptureText, sharedCaptureText } from "./org/capture";
 import { freeNotePath, noteFileContent, noteFileName, notePath, titleProblem } from "./org/new-note";
 import { OrgFlexView, VIEW_TYPE } from "./view";
+import { orgConflictMessage } from "./conflicts";
 import { CaptureChoice, CaptureModal, JournalCalendarModal, JournalPickerModal, NewNoteModal, NodeFinderModal } from "./ui/modals";
 import { registerTaskBlocks } from "./ui/tasks-block";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
@@ -31,7 +32,7 @@ export default class OrgFlexPlugin extends Plugin {
     this.register(this.index.onChange(() => this.forEachView((v) => v.refreshBacklinks())));
 
     this.registerView(VIEW_TYPE, (leaf) => new OrgFlexView(leaf, this));
-    this.registerExtensions(["org"], VIEW_TYPE);
+    this.claimOrgFiles();
 
     this.app.workspace.onLayoutReady(() => {
       void this.index.build();
@@ -58,6 +59,21 @@ export default class OrgFlexPlugin extends Plugin {
 
     registerTaskBlocks(this);
     this.addSettingTab(new OrgFlexSettingTab(this.app, this));
+  }
+
+  /** PLAT-3, PLAT-6: open .org files in the org view, or explain who has them already. */
+  private claimOrgFiles() {
+    try {
+      this.registerExtensions(["org"], VIEW_TYPE);
+    } catch {
+      // not public API: only used to name the culprit, so guarded
+      const app = this.app as unknown as {
+        plugins?: { enabledPlugins?: Set<string> };
+        viewRegistry?: { getTypeByExtension?: (ext: string) => string | undefined };
+      };
+      const owner = app.viewRegistry?.getTypeByExtension?.("org") ?? null;
+      new Notice(orgConflictMessage(app.plugins?.enabledPlugins ?? [], owner), 0);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -172,13 +188,22 @@ export default class OrgFlexPlugin extends Plugin {
       return;
     }
     const path = link.path.split("::")[0];
-    const cache = this.app.metadataCache;
-    const file = cache.getFirstLinkpathDest(path, sourcePath) ?? cache.getFirstLinkpathDest(`${path}.org`, sourcePath);
+    const file = this.resolveFile(path, sourcePath);
     if (!file) {
       new Notice(`Not found: ${path}`);
       return;
     }
     await leaf.openFile(file);
+  }
+
+  /** LINK-2: a file link's target: relative to the note first (as Org reads it), then as Obsidian finds links, then with `.org`. */
+  resolveFile(target: string, sourcePath: string): TFile | null {
+    const relative = resolveRelative(sourcePath, target);
+    const exact = relative !== null ? this.app.vault.getAbstractFileByPath(relative) : null;
+    if (exact instanceof TFile) return exact;
+    const path = target.replace(/^file:/i, "").split("::")[0];
+    const cache = this.app.metadataCache;
+    return cache.getFirstLinkpathDest(path, sourcePath) ?? cache.getFirstLinkpathDest(`${path}.org`, sourcePath);
   }
 
   /** LINK-3: the index first; an ID it doesn't know yet makes us read every org file. */
@@ -214,7 +239,7 @@ export default class OrgFlexPlugin extends Plugin {
       let file = this.app.vault.getAbstractFileByPath(path);
       if (!file) {
         await this.ensureFolder(path.slice(0, path.lastIndexOf("/")));
-        file = await this.app.vault.create(path, journalFileContent(date));
+        file = await this.app.vault.create(path, journalFileContent(date, this.settings.journalTemplate, crypto.randomUUID()));
       }
       if (!(file instanceof TFile)) throw new Error(`${path} is not a file`);
       await this.app.workspace.getLeaf(false).openFile(file);

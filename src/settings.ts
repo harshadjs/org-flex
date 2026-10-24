@@ -2,10 +2,11 @@
 // imports, so the defaults and the upgrade step can be tested.
 
 import type { VisibilityLevel } from "./org/folding";
+import { DATE_ID_JOURNAL_TEMPLATE, DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
 
 export type ButtonId =
   | "undo" | "redo" | "visibility" | "zoom" | "new-heading" | "demote" | "promote" | "todo" | "schedule" | "deadline"
-  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture";
+  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture" | "attach" | "record";
 
 export interface ButtonDef {
   id: ButtonId;
@@ -43,6 +44,8 @@ export const BUTTONS: ButtonDef[] = [
   { id: "journal-calendar", name: "Journal calendar", icon: "calendar", enabled: false, refocus: false },
   { id: "new-note", name: "New org note", icon: "file-plus", enabled: false, refocus: false },
   { id: "capture", name: "Capture to inbox", icon: "inbox", enabled: false, refocus: false },
+  { id: "attach", name: "Attach image or audio", icon: "paperclip", enabled: false, refocus: false },
+  { id: "record", name: "Record voice note", icon: "mic", enabled: false, refocus: false },
 ];
 
 /** BAR-2: the buttons to show, always in `BUTTONS` order; unknown ids are ignored. */
@@ -68,6 +71,7 @@ export interface OrgFlexSettings {
   shortcutCustomIcons: Record<string, string>;
   shortcutBarVersion: number;
   journalFolder: string;
+  journalTemplate: string;
   captureFile: string;
   frontMatterPanel: boolean;
   backlinks: boolean;
@@ -76,8 +80,8 @@ export interface OrgFlexSettings {
 export const BAR_VERSION = 8;
 
 export const DEFAULT_SETTINGS: OrgFlexSettings = {
-  todoKeywords: ["TODO", "DOING", "WAITING", "NEXT", "PENDING"],
-  doneKeywords: ["DONE", "CANCELLED", "CANCELED", "CANCEL", "REJECTED", "STOP", "STOPPED"],
+  todoKeywords: ["TODO"],
+  doneKeywords: ["DONE"],
   defaultPriority: "B",
   hideStars: false,
   foldPropertyDrawers: true,
@@ -87,6 +91,7 @@ export const DEFAULT_SETTINGS: OrgFlexSettings = {
   shortcutCustomIcons: {},
   shortcutBarVersion: BAR_VERSION,
   journalFolder: "journal",
+  journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
   captureFile: "inbox.org",
   frontMatterPanel: true,
   backlinks: true,
@@ -103,6 +108,8 @@ export function mergeSettings(saved: Partial<OrgFlexSettings> | null | undefined
   merged.shortcutCustomIcons = { ...merged.shortcutCustomIcons };
   // a fresh install starts at the current version; saved settings without one are version 1
   if (saved && saved.shortcutBarVersion === undefined) merged.shortcutBarVersion = 1;
+  // JRN-2: installs from before the template setting keep the header they had
+  if (saved && saved.journalTemplate === undefined) merged.journalTemplate = DATE_ID_JOURNAL_TEMPLATE;
   return merged;
 }
 

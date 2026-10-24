@@ -1,5 +1,6 @@
 // Dialogs: the date picker for SCHEDULED/DEADLINE, the journal list, the
-// journal calendar, the new note dialog and the capture dialog.
+// journal calendar, the new note dialog, the capture dialog and the voice
+// recorder.
 
 import { App, FuzzySuggestModal, Modal, Platform, prepareFuzzySearch, setIcon, SuggestModal } from "obsidian";
 import { findNodes, NodeChoice } from "../org/node-find";
@@ -299,6 +300,81 @@ export class CaptureModal extends Modal {
   }
 
   onClose() {
+    this.contentEl.empty();
+  }
+}
+
+/** ATT-4: the recorder's MIME type: MP4 (AAC) where it records that, as on iOS, else WebM (Opus), else the default. */
+function recorderType(): string | undefined {
+  for (const type of ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return undefined;
+}
+
+/** ATT-4: record from the microphone with a running time; Stop saves, Cancel or closing throws it away. */
+export class RecorderModal extends Modal {
+  private recorder: MediaRecorder | null = null;
+  private stream: MediaStream | null = null;
+  private timer = 0;
+  private keep = false;
+
+  constructor(app: App, private onSave: (blob: Blob, mime: string) => void) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    this.titleEl.setText("Record voice note");
+    contentEl.addClass("org-recorder");
+    const status = contentEl.createDiv({ cls: "org-recorder-status", text: "Starting the microphone…" });
+    const time = contentEl.createDiv({ cls: "org-recorder-time", text: "0:00" });
+    const buttons = contentEl.createDiv({ cls: "modal-button-container" });
+    buttons.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    const stop = buttons.createEl("button", { text: "Stop and save", cls: "mod-cta" });
+    stop.disabled = true;
+    stop.addEventListener("click", () => {
+      this.keep = true;
+      this.close();
+    });
+    void this.start(status, time, stop);
+  }
+
+  private async start(status: HTMLElement, time: HTMLElement, stop: HTMLButtonElement) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!this.contentEl.isConnected) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      this.stream = stream;
+      const type = recorderType();
+      const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const chunks: Blob[] = [];
+      recorder.addEventListener("dataavailable", (e) => { if (e.data.size) chunks.push(e.data); });
+      recorder.addEventListener("stop", () => {
+        const mime = recorder.mimeType || type || "audio/webm";
+        if (this.keep && chunks.length) this.onSave(new Blob(chunks, { type: mime }), mime);
+      });
+      recorder.start(1000);
+      this.recorder = recorder;
+      const started = Date.now();
+      status.setText("Recording");
+      status.addClass("is-recording");
+      stop.disabled = false;
+      this.timer = window.setInterval(() => {
+        const s = Math.floor((Date.now() - started) / 1000);
+        time.setText(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+      }, 250);
+    } catch (e) {
+      status.setText(`Can't record: ${(e as Error).message}`);
+    }
+  }
+
+  onClose() {
+    window.clearInterval(this.timer);
+    if (this.recorder && this.recorder.state !== "inactive") this.recorder.stop();
+    this.stream?.getTracks().forEach((t) => t.stop());
     this.contentEl.empty();
   }
 }

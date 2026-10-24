@@ -41,7 +41,7 @@ export interface Completion {
 export interface OrgHost {
   setIcon(el: HTMLElement, icon: string): void;
   openLink(target: string, view: EditorView): void;
-  /** a URL for an image link target, or null to use the target as is */
+  /** a URL for an image or audio link target, or null to use the target as is */
   imageSrc(target: string): string | null;
   /** after `[[`: notes and headings by title, then files without an ID */
   linkCompletions(): Completion[];

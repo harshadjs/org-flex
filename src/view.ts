@@ -13,7 +13,7 @@ import { nextVisibility } from "./org/folding";
 import { appendEntry } from "./org/capture";
 import {
   assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
-  currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
+  currentPlanningDate, insertFileLinks, PlanningKind, recordingExtension, recordingName, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { linkDescription, mentionLink, Mention } from "./org/vault-index";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
@@ -25,7 +25,8 @@ import { BacklinksData, backlinksSection, setBacklinks } from "./editor/backlink
 import { shortcutBar } from "./editor/shortcut-bar";
 import { insertLinkWithCompletion, linkButton } from "./editor/completion";
 import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard, VIEW_TYPE } from "./editor/setup";
-import { DatePickerModal } from "./ui/modals";
+import { DatePickerModal, RecorderModal } from "./ui/modals";
+import { relativeLinkPath } from "./org/syntax";
 
 export { VIEW_TYPE };
 
@@ -142,7 +143,7 @@ export class OrgFlexView extends TextFileView {
       setIcon,
       openLink: (target) => void this.plugin.openLink(target, this.file?.path ?? "", this.leaf),
       imageSrc: (target) => {
-        const file = app.metadataCache.getFirstLinkpathDest(target, this.file?.path ?? "");
+        const file = this.plugin.resolveFile(target, this.file?.path ?? "");
         return file ? app.vault.getResourcePath(file) : null;
       },
       linkCompletions: () => {
@@ -319,6 +320,50 @@ export class OrgFlexView extends TextFileView {
     return true;
   }
 
+  /** ATT-2: pick images or audio files (on the phone: gallery, camera, recorder or files), save and link them. */
+  attach() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*,audio/*";
+    input.multiple = true;
+    // some phone web views only open the chooser for an input in the page
+    input.hide();
+    document.body.appendChild(input);
+    input.addEventListener("cancel", () => input.remove());
+    input.addEventListener("change", () => {
+      input.remove();
+      const files = Array.from(input.files ?? []);
+      if (files.length) void this.saveAttachments(files.map((f) => ({ name: f.name, data: f.arrayBuffer() })));
+    });
+    input.click();
+  }
+
+  /** ATT-4: record from the microphone, then save and link the recording. */
+  record() {
+    new RecorderModal(this.app, (blob, mime) => {
+      void this.saveAttachments([{ name: recordingName(new Date(), recordingExtension(mime)), data: blob.arrayBuffer() }]);
+    }).open();
+  }
+
+  /** ATT-3: each file saved where Obsidian puts attachments for this note, then linked at the cursor. */
+  private async saveAttachments(files: { name: string; data: Promise<ArrayBuffer> }[]) {
+    const note = this.file;
+    if (!note) return;
+    const paths: string[] = [];
+    for (const f of files) {
+      try {
+        const path = await this.app.fileManager.getAvailablePathForAttachment(f.name, note.path);
+        const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+        if (parent && !this.app.vault.getAbstractFileByPath(parent)) await this.app.vault.createFolder(parent);
+        const file = await this.app.vault.createBinary(path, await f.data);
+        paths.push(relativeLinkPath(note.path, file.path));
+      } catch (e) {
+        new Notice(`Couldn't save ${f.name}: ${(e as Error).message}`);
+      }
+    }
+    if (this.editor && this.file === note) this.run(insertFileLinks(this.editor.state, paths));
+  }
+
   revealLine(line: number, options: { top?: boolean; focus?: boolean } = {}) {
     if (!this.editor) return;
     const n = Math.max(1, Math.min(line + 1, this.editor.state.doc.lines));
@@ -353,6 +398,8 @@ export class OrgFlexView extends TextFileView {
       case "journal-calendar": this.plugin.openCalendar(); break;
       case "new-note": this.plugin.newNote(); break;
       case "capture": this.plugin.capture(); break;
+      case "attach": this.attach(); break;
+      case "record": this.record(); break;
     }
   }
 

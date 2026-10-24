@@ -412,11 +412,21 @@ export function* walkInline(nodes: InlineNode[]): Generator<InlineNode> {
 // Link targets
 
 export const IMAGE_EXTENSIONS = ["apng", "avif", "gif", "jpeg", "jpg", "png", "svg", "webp"];
+export const AUDIO_EXTENSIONS = ["3gp", "aac", "flac", "m4a", "mp3", "oga", "ogg", "opus", "wav", "webm"];
+
+function extension(target: string): string {
+  const clean = target.replace(/^file:/, "").split(/[?#]/)[0].split("::")[0];
+  const dot = clean.lastIndexOf(".");
+  return dot >= 0 ? clean.slice(dot + 1).toLowerCase() : "";
+}
 
 export function isImageTarget(target: string): boolean {
-  const clean = target.replace(/^file:/, "").split(/[?#]/)[0];
-  const dot = clean.lastIndexOf(".");
-  return dot >= 0 && IMAGE_EXTENSIONS.includes(clean.slice(dot + 1).toLowerCase());
+  return IMAGE_EXTENSIONS.includes(extension(target));
+}
+
+/** LP-11: a link target that plays as audio. */
+export function isAudioTarget(target: string): boolean {
+  return AUDIO_EXTENSIONS.includes(extension(target));
 }
 
 export type LinkKind = { kind: "external"; url: string } | { kind: "id"; id: string } | { kind: "file"; path: string };
@@ -427,6 +437,36 @@ const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 export function classifyLink(target: string): LinkKind {
   const t = target.trim();
   if (/^id:/i.test(t)) return { kind: "id", id: t.slice(3).trim() };
+  // a relative file: link is a file in the vault, as Org reads it
+  if (/^file:(?!\/)/i.test(t)) return { kind: "file", path: t.slice(5) };
   if (SCHEME_RE.test(t)) return { kind: "external", url: t };
   return { kind: "file", path: t };
+}
+
+/**
+ * LINK-2: the vault path a relative link names from the note at `notePath`:
+ * `file:` and `::search` dropped, `.` and `..` worked out from the note's
+ * folder. Null when it climbs above the vault or is absolute.
+ */
+export function resolveRelative(notePath: string, target: string): string | null {
+  const t = target.trim().replace(/^file:/i, "").split("::")[0];
+  if (!t || t.startsWith("/")) return null;
+  const parts = notePath.split("/").slice(0, -1);
+  for (const part of t.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (!parts.length) return null;
+      parts.pop();
+    } else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+/** ATT-3: the path of `filePath` as seen from the folder of the note at `notePath`, for a `file:` link. */
+export function relativeLinkPath(notePath: string, filePath: string): string {
+  const from = notePath.split("/").slice(0, -1);
+  const to = filePath.split("/");
+  let common = 0;
+  while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
+  return [...from.slice(common).map(() => ".."), ...to.slice(common)].join("/");
 }

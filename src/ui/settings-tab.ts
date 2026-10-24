@@ -87,6 +87,17 @@ export class OrgFlexSettingTab extends PluginSettingTab {
         settings.journalFolder = v;
         await save();
       }));
+    new Setting(containerEl)
+      .setName("New journal file")
+      .setDesc("What a new day's file starts with. {{date}} is the day (YYYY-MM-DD), {{id}} a new UUID.")
+      .addTextArea((t) => {
+        t.inputEl.rows = 6;
+        t.inputEl.addClass("org-template-input");
+        t.setValue(settings.journalTemplate).onChange(async (v) => {
+          settings.journalTemplate = v;
+          await save();
+        });
+      });
 
     new Setting(containerEl).setName("Capture").setHeading();
     new Setting(containerEl)

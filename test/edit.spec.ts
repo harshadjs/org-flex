@@ -3,7 +3,7 @@ import { EditorSelection, EditorState, TransactionSpec } from "@codemirror/state
 import { history, undo } from "@codemirror/commands";
 import { codeFolding, foldEffect } from "@codemirror/language";
 import {
-  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink,
+  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension,
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
 import { dropSlots, itemExtent, listDepths, moveItem, parseItem } from "../src/org/lists";
@@ -439,4 +439,26 @@ test("tapping a keyword in reading mode toggles open and done, never to none", (
   expect(tap("* CANCELLED a")).toBe("* TODO a");
   expect(tap("* a")).toBeNull();
   expect(tap("text")).toBeNull();
+});
+
+describe("attachments", () => {
+  test("insertFileLinks puts file links at the cursor, spaced from a word, cursor after", () => {
+    let s0 = at("see|");
+    let s = apply(s0, insertFileLinks(s0, ["a.jpg", "../m/b c.m4a"])!);
+    expect(s.doc.toString()).toBe("see [[file:a.jpg]] [[file:../m/b c.m4a]]");
+    expect(s.selection.main.head).toBe(s.doc.length);
+    s0 = at("|");
+    expect(apply(s0, insertFileLinks(s0, ["a.jpg"])!).doc.toString()).toBe("[[file:a.jpg]]");
+    s0 = at("x |y");
+    expect(apply(s0, insertFileLinks(s0, ["a.jpg"])!).doc.toString()).toBe("x [[file:a.jpg]]y");
+    expect(insertFileLinks(s0, [])).toBeNull();
+  });
+
+  test("recordings are named by local time and typed by the recorder's format", () => {
+    expect(recordingName(new Date(2026, 9, 23, 9, 5, 7), "m4a")).toBe("Recording 20261023090507.m4a");
+    expect(recordingExtension("audio/webm;codecs=opus")).toBe("webm");
+    expect(recordingExtension("audio/mp4")).toBe("m4a");
+    expect(recordingExtension("audio/ogg; codecs=opus")).toBe("ogg");
+    expect(recordingExtension("")).toBe("webm");
+  });
 });

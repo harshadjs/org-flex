@@ -15,22 +15,23 @@ This repository contains the Org Flex Obsidian plugin (ID: `org-flex`): Org mode
 
 ## Obsidian Vault Integration & Deployment
 
-- **Obsidian Vault Location**: `~/base/personal`
-- **Plugin Directory**: `~/base/personal/.obsidian/plugins/org-flex`
-- **Artifacts**: `main.js`, `manifest.json`, `styles.css`
-- Only one plugin can own `.org` files: disable `orgmode-cm6` before enabling Org Flex.
+- **Vault:** set in the git-ignored `.deploy.json` (`{"vault": "~/my-vault", "specCopy": "attachments/org-flex-SPEC.md"}`) or the `OBSIDIAN_VAULT` environment variable. Never commit a personal path.
+- **Plugin directory:** `<vault>/.obsidian/plugins/org-flex`
+- **Artifacts:** `main.js`, `manifest.json`, `styles.css`
+- Only one plugin can own `.org` files: disable `orgmode-cm6` (or any other org plugin) before enabling Org Flex.
 
 ```bash
 npm install          # .npmrc sets legacy-peer-deps (obsidian pins CodeMirror versions)
 npm test
 npm run build        # tsc --noEmit, then esbuild
-npm run deploy       # build, copy the three artifacts to the vault, copy SPEC.md to the vault
+npm run deploy       # build, copy the three artifacts to the vault, and SPEC.md to specCopy when set
 npm run dev          # watch mode
+npm version patch    # release: bumps manifest.json and versions.json; push the tag for a draft GitHub release
 ```
 
-The vault keeps a live copy of the spec at `~/base/personal/attachments/org-flex-SPEC.md`. Whenever `SPEC.md` changes, refresh it (`npm run deploy`, or `cp SPEC.md ~/base/personal/attachments/org-flex-SPEC.md`). Never edit the vault copy; it is overwritten.
+When `specCopy` is set, the vault keeps a live copy of the spec there. Whenever `SPEC.md` changes, refresh it with `npm run deploy`. Never edit the vault copy; it is overwritten.
 
-The phone vault doesn't sync `.obsidian` (Syncthing ignore), so copy the three files there by hand or use BRAT.
+A vault synced without `.obsidian` (e.g. a Syncthing ignore) doesn't get plugin builds: copy the three files by hand or install through BRAT.
 
 ## Obsidian Mobile & CodeMirror 6 Layout Guidelines
 

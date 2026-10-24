@@ -744,3 +744,16 @@ test("a long press on a heading's arrow zooms into it, again zooms out; a short 
   tap(arrow(0));
   expect(foldedRanges(view.state).size).not.toBe(folds);
 });
+
+test("audio links play inline while the cursor is elsewhere; images still show as images", () => {
+  const { view } = mount("Memo [[file:../a/Recording 1.m4a]] and [[pic.png]]\n[[memo.mp3][My memo]]\nend", [], 70);
+  const audio = view.dom.querySelectorAll<HTMLAudioElement>("audio.org-audio");
+  expect(audio.length).toBe(1);
+  expect(audio[0].controls).toBe(true);
+  expect(audio[0].getAttribute("src")).toBe("../a/Recording 1.m4a");
+  expect(view.dom.querySelectorAll("img.org-image").length).toBe(1);
+  // with a description it stays a link
+  expect(view.dom.textContent).toContain("My memo");
+  view.dispatch({ selection: { anchor: 8 } });
+  expect(view.dom.querySelectorAll("audio.org-audio").length).toBe(0);
+});
