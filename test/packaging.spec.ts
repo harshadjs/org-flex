@@ -68,7 +68,7 @@ test("the versions agree, and the manifest is fit for the community directory", 
   expect(manifest.name).not.toMatch(/obsidian/i);
   expect(read("LICENSE")).toMatch(/^MIT License/);
   const release = read(".github/workflows/release.yml");
-  for (const step of ["npm test", "npm run build", "main.js manifest.json styles.css", "*-*) pre=\"--prerelease\""]) expect(release).toContain(step);
+  for (const step of ["npm test", "npm run build", "main.js manifest.json styles.css"]) expect(release).toContain(step);
 });
 
 test("CodeMirror is bundled: only obsidian and electron stay external", () => {

@@ -9,7 +9,7 @@ What makes a fork safe to change is the spec. Every behaviour is a numbered rule
 A copy can be a fork, or a branch of its own in the base repository (for example `harshad`), which suits the base's own author:
 - **The base stays on `main`:** keep base work there, and merge `main` into the flavour branch to pick it up. Resolve conflicts in favour of the flavour's rules, using the rule IDs in the commits.
 - **Flavour-only changes:** the flavour's `FLAVOUR.md`, `src/flavour.ts`, dropped features and changed rules are committed on the flavour branch only, never on `main`.
-- **Releases:** tag with a suffix, `npm version prerelease --preid <name>` (giving `0.9.0-harshad.0`). Those become pre-releases, so other people's BRAT never installs them. The owner's BRAT can still pick that version.
+- **No releases from a flavour branch:** tags and GitHub releases are the base's; a release made from a flavour would become the one everybody else installs. A flavour reaches its owner's vaults with `npm run deploy` (and by copying the three files to other devices).
 
 ## What never changes
 
