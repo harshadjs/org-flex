@@ -12,7 +12,7 @@ import { readNote } from "../src/org/vault-index";
 import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, sharedCaptureText } from "../src/org/capture";
 import { freeNotePath, noteFileName, notePath, noteFileContent, titleProblem } from "../src/org/new-note";
 import {
-  barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, DEFAULT_SETTINGS,
+  barButtons, BUTTONS, buttonIconName, mergeSettings, migrateShortcutButtons, moveButton, toggleButton, DEFAULT_SETTINGS,
 } from "../src/settings";
 
 function folds(lines: string[]) {
@@ -236,13 +236,18 @@ describe("capture", () => {
   });
 });
 
+/** a button list in BUTTONS order, as every upgrade before version 9 leaves it (BAR-8) */
+function inBarOrder(ids: string[]): string[] {
+  return BUTTONS.map((b) => b.id as string).filter((id) => ids.includes(id));
+}
+
 describe("settings", () => {
   test("saved settings merge over copied defaults", () => {
     const s = mergeSettings({ journalFolder: "days" });
     expect(s.journalFolder).toBe("days");
     s.shortcutBarButtons.push("X");
     expect(DEFAULT_SETTINGS.shortcutBarButtons).not.toContain("X");
-    expect(mergeSettings(null).shortcutBarVersion).toBe(8);
+    expect(mergeSettings(null).shortcutBarVersion).toBe(9);
     expect(mergeSettings({ journalFolder: "days" }).shortcutBarVersion).toBe(1);
   });
 
@@ -256,43 +261,48 @@ describe("settings", () => {
   });
 
   test("migrateShortcutButtons enables undo/redo/visibility once and drops stars", () => {
-    expect(migrateShortcutButtons(["stars", "todo"], 1).buttons).toEqual(["undo", "redo", "visibility", "todo", "wiki-link", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
-    expect(migrateShortcutButtons(["todo"], 8)).toEqual({ buttons: ["todo"], changed: false });
+    expect(migrateShortcutButtons(["stars", "todo"], 1).buttons).toEqual(inBarOrder(["undo", "redo", "visibility", "todo", "wiki-link", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]));
+    expect(migrateShortcutButtons(["todo"], 9)).toEqual({ buttons: ["todo"], changed: false });
   });
 
   test("migrateShortcutButtons replaces id-link with wiki-link in place", () => {
-    expect(migrateShortcutButtons(["undo", "id-link", "todo"], 3).buttons).toEqual(["undo", "wiki-link", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
-    expect(migrateShortcutButtons(["undo", "todo"], 3).buttons).toEqual(["undo", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
+    expect(migrateShortcutButtons(["undo", "id-link", "todo"], 3).buttons).toEqual(inBarOrder(["undo", "wiki-link", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]));
+    expect(migrateShortcutButtons(["undo", "todo"], 3).buttons).toEqual(inBarOrder(["undo", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]));
   });
 
   test("migrateShortcutButtons adds heading-id once", () => {
-    expect(migrateShortcutButtons(["undo", "todo"], 4)).toEqual({ buttons: ["undo", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"], changed: true });
-    expect(migrateShortcutButtons(["heading-id", "undo"], 4).buttons).toEqual(["heading-id", "undo", "new-heading", "src-block", "quote-block", "zoom", "node-find"]);
+    expect(migrateShortcutButtons(["undo", "todo"], 4)).toEqual({ buttons: inBarOrder(["undo", "todo", "heading-id", "new-heading", "src-block", "quote-block", "zoom", "node-find"]), changed: true });
+    expect(migrateShortcutButtons(["heading-id", "undo"], 4).buttons).toEqual(inBarOrder(["heading-id", "undo", "new-heading", "src-block", "quote-block", "zoom", "node-find"]));
   });
 
   test("migrateShortcutButtons adds new-heading once", () => {
-    expect(migrateShortcutButtons(["undo", "todo"], 5)).toEqual({ buttons: ["undo", "todo", "new-heading", "src-block", "quote-block", "zoom", "node-find"], changed: true });
-    expect(migrateShortcutButtons(["new-heading", "undo"], 5).buttons).toEqual(["new-heading", "undo", "src-block", "quote-block", "zoom", "node-find"]);
+    expect(migrateShortcutButtons(["undo", "todo"], 5)).toEqual({ buttons: inBarOrder(["undo", "todo", "new-heading", "src-block", "quote-block", "zoom", "node-find"]), changed: true });
+    expect(migrateShortcutButtons(["new-heading", "undo"], 5).buttons).toEqual(inBarOrder(["new-heading", "undo", "src-block", "quote-block", "zoom", "node-find"]));
     // turned off after the upgrade, it stays off
-    expect(migrateShortcutButtons(["undo"], 8)).toEqual({ buttons: ["undo"], changed: false });
+    expect(migrateShortcutButtons(["undo"], 9)).toEqual({ buttons: ["undo"], changed: false });
   });
 
   test("migrateShortcutButtons adds the source and quote block buttons once", () => {
-    expect(migrateShortcutButtons(["undo"], 6)).toEqual({ buttons: ["undo", "src-block", "quote-block", "zoom", "node-find"], changed: true });
-    expect(migrateShortcutButtons(["quote-block", "undo"], 6).buttons).toEqual(["quote-block", "undo", "src-block", "zoom", "node-find"]);
+    expect(migrateShortcutButtons(["undo"], 6)).toEqual({ buttons: inBarOrder(["undo", "src-block", "quote-block", "zoom", "node-find"]), changed: true });
+    expect(migrateShortcutButtons(["quote-block", "undo"], 6).buttons).toEqual(inBarOrder(["quote-block", "undo", "src-block", "zoom", "node-find"]));
   });
 
   test("migrateShortcutButtons adds zoom and go to node once", () => {
-    expect(migrateShortcutButtons(["undo"], 7)).toEqual({ buttons: ["undo", "zoom", "node-find"], changed: true });
-    expect(migrateShortcutButtons(["node-find"], 7).buttons).toEqual(["node-find", "zoom"]);
+    expect(migrateShortcutButtons(["undo"], 7)).toEqual({ buttons: inBarOrder(["undo", "zoom", "node-find"]), changed: true });
+    expect(migrateShortcutButtons(["node-find"], 7).buttons).toEqual(inBarOrder(["node-find", "zoom"]));
   });
 
-  test("bar buttons keep BUTTONS order and ignore unknown ids", () => {
+  test("migrateShortcutButtons puts a saved list in the old bar order once, then keeps the user's order", () => {
+    expect(migrateShortcutButtons(["zoom", "undo", "stars", "todo"], 8)).toEqual({ buttons: ["undo", "zoom", "todo"], changed: true });
+    expect(migrateShortcutButtons(["zoom", "undo", "todo"], 9)).toEqual({ buttons: ["zoom", "undo", "todo"], changed: false });
+  });
+
+  test("bar buttons follow the saved order and ignore unknown and repeated ids", () => {
     expect(BUTTONS.map((b) => b.id)).toEqual([
       "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
       "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture", "attach", "record",
     ]);
-    expect(barButtons(["todo", "stars", "undo"]).map((b) => b.id)).toEqual(["undo", "todo"]);
+    expect(barButtons(["todo", "stars", "undo", "todo"]).map((b) => b.id)).toEqual(["todo", "undo"]);
   });
 
   test("a fresh bar has the editing buttons on and the journal and note buttons off", () => {
@@ -300,6 +310,19 @@ describe("settings", () => {
       "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline", "checkbox",
       "src-block", "quote-block", "wiki-link", "node-find", "heading-id",
     ]);
+  });
+
+  test("a button turned on goes to the end of the bar, and arrows move it past the shown buttons", () => {
+    expect(toggleButton(["undo", "todo"], "zoom", true)).toEqual(["undo", "todo", "zoom"]);
+    expect(toggleButton(["undo", "todo", "zoom"], "todo", false)).toEqual(["undo", "zoom"]);
+    expect(toggleButton(["undo", "todo"], "undo", true)).toEqual(["todo", "undo"]);
+    expect(moveButton(["undo", "todo", "zoom"], "zoom", -1)).toEqual(["undo", "zoom", "todo"]);
+    expect(moveButton(["undo", "todo", "zoom"], "undo", -1)).toEqual(["undo", "todo", "zoom"]);
+    expect(moveButton(["undo", "todo", "zoom"], "zoom", 1)).toEqual(["undo", "todo", "zoom"]);
+    // a button no feature runs (here "journal") is skipped over and stays put
+    const shown = (id: string) => id !== "journal";
+    expect(moveButton(["undo", "journal", "todo"], "undo", 1, shown)).toEqual(["todo", "journal", "undo"]);
+    expect(moveButton(["journal", "undo"], "undo", -1, shown)).toEqual(["journal", "undo"]);
   });
 
   test("a custom icon is used only when it names a known icon", () => {

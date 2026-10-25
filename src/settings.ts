@@ -19,7 +19,7 @@ export interface ButtonDef {
   refocus: boolean | "always";
 }
 
-/** BAR-2: every button, in bar order. */
+/** BAR-2: every button, in the default bar order. */
 export const BUTTONS: ButtonDef[] = [
   { id: "undo", name: "Undo", icon: "undo-2", enabled: true, refocus: true },
   { id: "redo", name: "Redo", icon: "redo-2", enabled: true, refocus: true },
@@ -52,9 +52,38 @@ export const CORE_BUTTONS: ReadonlySet<ButtonId> = new Set<ButtonId>([
   "checkbox", "src-block", "quote-block", "wiki-link", "heading-id",
 ]);
 
-/** BAR-2: the buttons to show, always in `BUTTONS` order; unknown ids are ignored. */
+/** BAR-2: the buttons to show, in the order of the saved list; unknown and repeated ids are ignored. */
 export function barButtons(enabled: string[]): ButtonDef[] {
-  return BUTTONS.filter((b) => enabled.includes(b.id));
+  const seen = new Set<string>();
+  const out: ButtonDef[] = [];
+  for (const id of enabled) {
+    const def = BUTTONS.find((b) => b.id === id);
+    if (def && !seen.has(id)) out.push(def);
+    seen.add(id);
+  }
+  return out;
+}
+
+/** BAR-10: turning a button on puts it at the end of the bar; off takes it out. */
+export function toggleButton(list: string[], id: string, on: boolean): string[] {
+  const rest = list.filter((b) => b !== id);
+  return on ? [...rest, id] : rest;
+}
+
+/**
+ * BAR-10: move a button one place towards the start (-1) or the end (+1),
+ * past the next button that `shown` says is on the bar (ids of dropped
+ * features stay where they are).
+ */
+export function moveButton(list: string[], id: string, delta: -1 | 1, shown: (id: string) => boolean = () => true): string[] {
+  const out = [...list];
+  const from = out.indexOf(id);
+  if (from < 0) return out;
+  let to = from + delta;
+  while (to >= 0 && to < out.length && !shown(out[to])) to += delta;
+  if (to < 0 || to >= out.length) return out;
+  [out[from], out[to]] = [out[to], out[from]];
+  return out;
 }
 
 /** BAR-7: a custom icon when it names a known icon, else the button's default. */
@@ -73,7 +102,7 @@ export interface OrgFlexSettings {
   captureFile: string;
 }
 
-export const BAR_VERSION = 8;
+export const BAR_VERSION = 9;
 
 export const DEFAULT_SETTINGS: OrgFlexSettings = {
   showShortcutBar: true,
@@ -117,5 +146,7 @@ export function migrateShortcutButtons(buttons: string[], version: number): { bu
   if (version < 6 && !list.includes("new-heading")) list.push("new-heading");
   if (version < 7) for (const id of ["src-block", "quote-block"]) if (!list.includes(id)) list.push(id);
   if (version < 8) for (const id of ["zoom", "node-find"]) if (!list.includes(id)) list.push(id);
+  // until version 9 the bar ignored the list's order and used BUTTONS'; keep the bar looking the same
+  if (version < 9) list = BUTTONS.map((b) => b.id as string).filter((id) => list.includes(id));
   return { buttons: list, changed: true };
 }
