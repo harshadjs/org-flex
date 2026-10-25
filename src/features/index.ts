@@ -10,6 +10,7 @@ import { backlinks } from "./backlinks";
 import { captureFeature } from "./capture";
 import { frontMatter } from "./front-matter";
 import { journal } from "./journal";
+import { linkUpdate } from "./link-update";
 import { newNoteFeature } from "./new-note";
 import { nodeFind } from "./node-find";
 import { taskBlocks } from "./task-blocks";
@@ -18,6 +19,7 @@ export type { Feature };
 
 export const FEATURES: Feature[] = [
   backlinks,
+  linkUpdate,
   frontMatter,
   journal,
   newNoteFeature,
