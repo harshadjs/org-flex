@@ -2,9 +2,47 @@
 
 Edit [Org mode](https://orgmode.org) files in Obsidian, on the phone as comfortably as on the desktop. `.org` files open in a live-preview editor that reads like a note and still saves plain Org, so the same files keep working in Emacs.
 
+**Org Flex is meant to be forked.** No two people use Org the same way: one lives in org-roam, another in denote, a third in one big outline with `org-attach` folders and a custom agenda. Rather than one plugin with a setting for every Org option, Org Flex is a base you fork and turn into *your own* plugin, with a coding agent doing the work.
+
 <!-- Screenshots: add phone and desktop captures to docs/ and link them here. -->
 
-## Features
+## Your configuration is code, not settings
+
+In most plugins, making it yours means a long settings page. In Org Flex, your choices live in the plugin's source:
+
+- **Your keywords, templates and what is folded or hidden** are values in [`src/flavour.ts`](src/flavour.ts).
+- **The features you use** are files in [`src/features/`](src/features/), listed in `src/features/index.ts`. A feature you don't use is deleted, not switched off. A feature you need and nobody else does (denote file names, `org-attach` folders, transclusion) is written for you.
+- **How each thing behaves** is a numbered rule in [`SPEC.md`](SPEC.md), with tests. Your agent changes the rule, then the code and the tests, and the test suite tells it whether everything else still holds.
+- **Who you are and why** is recorded in `FLAVOUR.md`, so the next agent session doesn't ask again.
+
+The settings tab keeps only what differs between your own vaults and devices: the journal folder, the capture inbox, the shortcut bar. Everything about *how you work with Org* is code you own, in a plain git history you can read, diff and undo.
+
+Four invariants hold in every fork, guarded by tests: files stay plain Org, the phone comes first, every rule is tested, and command ids never change.
+
+## Get started: the tailoring interview
+
+1. **Fork this repository.** You can also make a branch of your own in your copy, the way the author keeps theirs (see [`TAILOR.md`](TAILOR.md)). Then `npm install`.
+2. **Have Org Flex interview you.** In Claude Code, run `/tailor`. With another coding agent, ask it to follow [`TAILOR.md`](TAILOR.md). The interview starts from what you already have:
+   - **Your setup:** it asks for your Emacs configuration (`init.el`, `config.org`, Doom or Spacemacs) and a few typical files, and reads them first, so it doesn't ask what it can see.
+   - **Your packages:** for each one you use (org-roam or denote, `org-attach`, `org-transclusion`, `org-capture` templates, `org-agenda`, org-journal, citar, org-modern...), it asks what it does for you, what it leaves in your files, and what you need from it in Obsidian and on which device.
+   - **Open questions:** it follows up on whatever you mention, your own Elisp and habits included, and asks what annoys you today. If you don't use Emacs, it asks the same about Orgzly, beorg, or how you want to work.
+3. **Approve the proposal.** The agent sorts what it heard:
+   - what already works;
+   - your flavour values;
+   - rules to change;
+   - new features to write;
+   - what isn't possible, and the nearest alternative;
+   - wishes for later.
+
+   It shows you the plan, and builds only after you say yes. A first round can be small, and you can run `/tailor` again whenever your workflow changes.
+4. **Deploy.** Put your vault in `.deploy.json` (`{"vault": "~/my-vault"}`) or `$OBSIDIAN_VAULT`, then run `npm run deploy`. Copy `main.js`, `manifest.json` and `styles.css` to other devices.
+
+After the interview, keep asking your agent for changes the same way: "log `CLOSED:` when I finish a task", "drop the journal", "make capture file into a date tree". [`recipes/`](recipes/) has worked examples of these kinds of change: GTD keywords, org-roam dailies with date IDs, logging `CLOSED:`, capture into a date tree, and dropping a feature.
+
+## What the base ships
+
+This is the starting point every fork inherits, with plain `TODO | DONE` keywords and every feature on.
+
 
 **Editing**
 - **Live preview:** headings sized like Markdown headings, emphasis without its markers, links showing their description, styled quote and source blocks with syntax highlighting. The line with the cursor shows its raw text.
@@ -17,7 +55,7 @@ Edit [Org mode](https://orgmode.org) files in Obsidian, on the phone as comforta
 **Lists and tasks**
 - **Checklists:** tap to tick, `[n/m]` and `[n%]` counters, parent boxes that follow their children, Enter continues the list.
 - **Drag to reorder** list items by their grip, sideways to indent, children included.
-- **TODO keywords** of your own, with scheduled and deadline dates from a date picker.
+- **TODO keywords**, with scheduled and deadline dates from a date picker.
 - **Task lists in Markdown notes:** an ` ```orgmode-tasks ` block lists an org file's tasks, filtered and sorted with Orgzly's search language, or as an agenda.
 
 **Notes and links**
@@ -29,22 +67,12 @@ Edit [Org mode](https://orgmode.org) files in Obsidian, on the phone as comforta
 
 **Capture and journal**
 - **Capture:** one box from anywhere (command, ribbon, bar or an `obsidian://org-capture` link from other apps) files a TODO, with its state and scheduled date, into your inbox, linked back to the note you were in.
-- **Journal:** today's file, a searchable list and a calendar, stored as `journal/YYYY/MM/YYYY-MM-DD.org`, started from a template you set.
+- **Journal:** today's file, a searchable list and a calendar, stored as `journal/YYYY/MM/YYYY-MM-DD.org`, started from the template in `src/flavour.ts`.
 - **New org notes** named after their title, with an org-roam style UUID `:ID:`.
 
-## Make it yours
+## Install the base as it is
 
-Org is used in very different ways, so Org Flex doesn't try to offer every option as a setting. It is a base you fork and shape to your own workflow with a coding agent. Every behaviour is a numbered rule in [`SPEC.md`](SPEC.md) with tests, so an agent can change it safely, and four invariants keep every fork sound: files stay plain Org, the phone comes first, every rule is tested, and command ids never change.
-
-1. Fork this repository, or make a branch for yourself in your own copy (see [`TAILOR.md`](TAILOR.md)).
-2. Ask your coding agent to tailor it. In Claude Code, run `/tailor`; other agents, point them at [`TAILOR.md`](TAILOR.md). It interviews you about how you use Org: tasks, notes, journal, capture, and Emacs or not. Then it keeps, changes or drops features, sets your keywords and templates in `src/flavour.ts`, and records your choices in `FLAVOUR.md`.
-3. `npm run deploy` builds it into your vault (set the vault in `.deploy.json`); copy `main.js`, `manifest.json` and `styles.css` to other devices.
-
-[`recipes/`](recipes/) has worked examples: GTD keywords, org-roam dailies with date IDs, logging `CLOSED:`, capture into a date tree, and dropping a feature.
-
-## Install
-
-Org Flex is in beta and not yet in the community plugin directory. To install it:
+To try Org Flex before tailoring it, install the base. It is in beta and not yet in the community plugin directory:
 
 1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/harshadjs/org-flex/releases) into `<vault>/.obsidian/plugins/org-flex/`, or build them yourself (`npm install && npm run build`).
 2. Turn on *Settings → Files and links → Detect all file extensions*, so `.org` files show in the file explorer.
