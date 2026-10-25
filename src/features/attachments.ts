@@ -7,11 +7,10 @@ import { relativeLinkPath } from "../org/syntax";
 import { RecorderModal } from "../ui/modals";
 import type { Feature } from "./feature";
 
-/** ATT-2: pick images or audio files (on the phone: gallery, camera, recorder or files), save and link them. */
+/** ATT-2: pick any files (on the phone: gallery, camera, recorder or files), save and link them. */
 function attach(view: OrgFlexView) {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = "image/*,audio/*";
   input.multiple = true;
   // some phone web views only open the chooser for an input in the page
   input.hide();

@@ -42,7 +42,7 @@ export const BUTTONS: ButtonDef[] = [
   { id: "journal-calendar", name: "Journal calendar", icon: "calendar", enabled: false, refocus: false },
   { id: "new-note", name: "New org note", icon: "file-plus", enabled: false, refocus: false },
   { id: "capture", name: "Capture to inbox", icon: "inbox", enabled: false, refocus: false },
-  { id: "attach", name: "Attach image or audio", icon: "paperclip", enabled: false, refocus: false },
+  { id: "attach", name: "Attach file", icon: "paperclip", enabled: false, refocus: false },
   { id: "record", name: "Record voice note", icon: "mic", enabled: false, refocus: false },
 ];
 
