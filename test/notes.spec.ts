@@ -257,7 +257,13 @@ describe("settings", () => {
     for (const key of ["headingDragHandles", "todoKeywords", "hideStars", "backlinks", "journalTemplate"]) expect(key in s, key).toBe(false);
     expect(s.captureFile).toBe("in.org");
     expect(Object.keys(DEFAULT_SETTINGS).sort()).toEqual(
-      ["captureFile", "journalFolder", "shortcutBarButtons", "shortcutBarVersion", "shortcutCustomIcons", "showShortcutBar"]);
+      ["captureFile", "journalFolder", "shortcutBarButtons", "shortcutBarVersion", "shortcutCustomIcons", "showBacklinks", "showShortcutBar"]);
+  });
+
+  test("backlinks are on by default and can be turned off per vault", () => {
+    expect(DEFAULT_SETTINGS.showBacklinks).toBe(true);
+    expect(mergeSettings({ showBacklinks: false }).showBacklinks).toBe(false);
+    expect(mergeSettings({ journalFolder: "days" }).showBacklinks).toBe(true);
   });
 
   test("migrateShortcutButtons enables undo/redo/visibility once and drops stars", () => {

@@ -100,6 +100,8 @@ export interface OrgFlexSettings {
   shortcutBarVersion: number;
   journalFolder: string;
   captureFile: string;
+  /** BL-6: show the backlinks section at the end of notes */
+  showBacklinks: boolean;
 }
 
 export const BAR_VERSION = 9;
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: OrgFlexSettings = {
   shortcutBarVersion: BAR_VERSION,
   journalFolder: "journal",
   captureFile: "inbox.org",
+  showBacklinks: true,
 };
 
 /** §12: saved keys that are no longer settings (gone, or moved to the flavour, §12a); dropped on load. */

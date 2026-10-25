@@ -10,4 +10,5 @@ This branch (`harshad`) is the plugin author's own copy, kept on top of the base
 - **Keywords:** open `TODO NEXT DOING WAITING`, done `DONE CANCELLED` (2026-10-24). This trims the older list, which also had `PENDING`, `CANCELED`, `CANCEL`, `REJECTED`, `STOP` and `STOPPED`; headings that still use those read as plain titles.
 - **Journal:** the base header, with a new UUID as `:ID:` (2026-10-24). Days made earlier keep `:ID: YYYY-MM-DD`.
 - **Features:** all kept. What shows is chosen per device with the shortcut bar buttons and settings.
+- **Backlinks:** a *Show backlinks* setting turns the section at the end of notes on or off per vault and device (BL-6, 2026-10-24).
 - **Getting it onto devices:** `npm run deploy` on the desktop; on the phone, copy `main.js`, `manifest.json` and `styles.css` by hand. No releases or tags are made from this branch.

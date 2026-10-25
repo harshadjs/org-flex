@@ -39,7 +39,8 @@ function refresh(view: OrgFlexView) {
   const index = view.plugin.index;
   const path = view.file?.path;
   let data: BacklinksData | null = null;
-  if (path) {
+  // BL-6: turned off, the section is empty and nothing is computed
+  if (path && view.plugin.settings.showBacklinks) {
     data = {
       backlinks: index.backlinks(path),
       mentions: sections.mentions ? index.unlinkedMentions(path) : null,
@@ -78,4 +79,5 @@ export const backlinks: Feature = {
   },
   editor: (view) => stateOf(view).field,
   opened: refresh,
+  settingsChanged: refresh,
 };

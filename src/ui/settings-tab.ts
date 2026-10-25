@@ -4,6 +4,7 @@
 import { App, getIcon, PluginSettingTab, setIcon, Setting } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { BUTTONS, barButtons, moveButton, toggleButton } from "../settings";
+import { hasFeature } from "../features";
 
 export class OrgFlexSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: OrgFlexPlugin) {
@@ -33,6 +34,17 @@ export class OrgFlexSettingTab extends PluginSettingTab {
         settings.captureFile = v;
         await save();
       }));
+
+    if (hasFeature("backlinks")) {
+      new Setting(containerEl).setName("Backlinks").setHeading();
+      new Setting(containerEl)
+        .setName("Show backlinks")
+        .setDesc("Linked and unlinked mentions at the end of every org note.")
+        .addToggle((t) => t.setValue(settings.showBacklinks).onChange(async (v) => {
+          settings.showBacklinks = v;
+          await save();
+        }));
+    }
 
     new Setting(containerEl).setName("Shortcut bar").setHeading();
     new Setting(containerEl)

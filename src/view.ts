@@ -234,6 +234,7 @@ export class OrgFlexView extends TextFileView {
         this.barCompartment.reconfigure(this.barExtension()),
       ],
     });
+    for (const feature of FEATURES) feature.settingsChanged?.(this);
   }
 
   /**

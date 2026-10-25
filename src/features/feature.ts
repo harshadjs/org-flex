@@ -20,6 +20,8 @@ export interface Feature {
   editor?(view: OrgFlexView): Extension;
   /** after a view has loaded a file */
   opened?(view: OrgFlexView): void;
+  /** after the settings changed, for each open view */
+  settingsChanged?(view: OrgFlexView): void;
   /** what its shortcut bar buttons do */
   buttons?: Partial<Record<ButtonId, (plugin: OrgFlexPlugin, view: OrgFlexView) => void>>;
 }
