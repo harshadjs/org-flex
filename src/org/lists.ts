@@ -320,6 +320,25 @@ export function moveItem(input: string[], n: number, slot: DropSlot, indent: num
 }
 
 /**
+ * ACT-13: indent (+1) or outdent (-1) the item on line `n` by one level, with
+ * its children, as dragging it sideways does (CHK-11, CHK-12): one level
+ * deeper nests it under the item above, one shallower makes it a sibling of
+ * its parent. Returns the new lines, or null when it can't go that way (the
+ * first item of a list can't be indented; an item can't be outdented past
+ * the top level, or while a later sibling would become its child).
+ */
+export function shiftItem(lines: string[], n: number, delta: 1 | -1, allowed = itemLines(lines)): string[] | null {
+  const item = allowed[n] ? parseItem(lines[n]) : null;
+  if (!item) return null;
+  const slot = dropSlots(lines, n, allowed).find((s) => s.original);
+  if (!slot) return null;
+  const target = delta > 0
+    ? slot.indents.find((i) => i > item.indent)
+    : [...slot.indents].reverse().find((i) => i < item.indent);
+  return target === undefined ? null : moveItem(lines, n, slot, target);
+}
+
+/**
  * CHK-13: for each line, the nesting depth of the list item it shows (0 at
  * the top level), the depth of the item whose text continues on it for a
  * nested non-item line, or -1 (not in a list, blank, inside a block).
