@@ -3,7 +3,7 @@ import { EditorSelection, EditorState, TransactionSpec } from "@codemirror/state
 import { history, undo } from "@codemirror/commands";
 import { codeFolding, foldEffect } from "@codemirror/language";
 import {
-  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension,
+  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension, pastedFiles, pastedName,
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
 import { dropSlots, itemExtent, listDepths, moveItem, parseItem } from "../src/org/lists";
@@ -479,6 +479,18 @@ describe("attachments", () => {
     s0 = at("x |y");
     expect(apply(s0, insertFileLinks(s0, ["a.jpg"])!).doc.toString()).toBe("x [[file:a.jpg]]y");
     expect(insertFileLinks(s0, [])).toBeNull();
+  });
+
+  test("pasted images are named by local time, copied files keep their names, and text wins", () => {
+    const at = new Date(2026, 9, 25, 14, 3, 9);
+    expect(pastedName("image.png", "image/png", at)).toBe("Pasted image 20261025140309.png");
+    expect(pastedName("", "image/jpeg", at)).toBe("Pasted image 20261025140309.jpg");
+    expect(pastedName("image.webp", "", at)).toBe("Pasted image 20261025140309.webp");
+    expect(pastedName("receipt.pdf", "application/pdf", at)).toBe("receipt.pdf");
+    const png = { name: "image.png", type: "image/png" };
+    expect(pastedFiles([png], "")).toEqual([png]);
+    expect(pastedFiles([png], "some copied text")).toEqual([]);
+    expect(pastedFiles([], "")).toEqual([]);
   });
 
   test("recordings are named by local time and typed by the recorder's format", () => {

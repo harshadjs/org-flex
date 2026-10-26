@@ -63,7 +63,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 - **Go to node:** find any note or heading by title, or create it.
 - **Backlinks:** linked and unlinked mentions at the end of every note, with a button to turn a mention into a link.
 - **Front matter panel:** the property drawer and `#+` lines at the top show as a title and properties.
-- **Images and audio inline:** `[[photo.jpg]]` shows the picture and `[[memo.m4a]]` a player. Attach any file, or record a voice note, from the bar; it is linked as a relative `[[file:…]]` link.
+- **Images and audio inline:** `[[photo.jpg]]` shows the picture and `[[memo.m4a]]` a player. Paste images, attach any file or record a voice note from the bar; it is linked as a relative `[[file:…]]` link.
 - **Links follow renames:** rename or move a file or folder and the file links to it in org notes are updated, relative to each note, as Obsidian does for Markdown.
 
 **Capture and journal**

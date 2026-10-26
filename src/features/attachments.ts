@@ -1,8 +1,9 @@
 // Attachments (§10d): attach images and audio, or record a voice note.
 
 import { Notice } from "obsidian";
+import { EditorView } from "@codemirror/view";
 import type { OrgFlexView } from "../view";
-import { insertFileLinks, recordingExtension, recordingName } from "../org/edit";
+import { insertFileLinks, pastedFiles, pastedName, recordingExtension, recordingName } from "../org/edit";
 import { relativeLinkPath } from "../org/syntax";
 import { RecorderModal } from "../ui/modals";
 import type { Feature } from "./feature";
@@ -31,6 +32,22 @@ function record(view: OrgFlexView) {
   }).open();
 }
 
+/** ATT-5: a paste of images or files saves them as attachments and links them, instead of pasting nothing. */
+function pasteHandler(view: OrgFlexView) {
+  return EditorView.domEventHandlers({
+    paste(event) {
+      const data = event.clipboardData;
+      if (!data || view.reading) return false;
+      const files = pastedFiles(Array.from(data.files), data.getData("text/plain"));
+      if (!files.length) return false;
+      event.preventDefault();
+      const now = new Date();
+      void saveAttachments(view, files.map((f) => ({ name: pastedName(f.name, f.type, now), data: f.arrayBuffer() })));
+      return true;
+    },
+  });
+}
+
 /** ATT-3: each file saved where Obsidian puts attachments for this note, then linked at the cursor. */
 async function saveAttachments(view: OrgFlexView, files: { name: string; data: Promise<ArrayBuffer> }[]) {
   const { app } = view;
@@ -56,6 +73,7 @@ async function saveAttachments(view: OrgFlexView, files: { name: string; data: P
 export const attachments: Feature = {
   id: "attachments",
   section: "10d. Attachments",
+  editor: pasteHandler,
   buttons: {
     attach: (_plugin, view) => attach(view),
     record: (_plugin, view) => record(view),
