@@ -538,6 +538,29 @@ export function recordingName(date: Date, ext: string): string {
   return `Recording ${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.${ext}`;
 }
 
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg",
+  "image/avif": "avif", "image/apng": "apng", "image/heic": "heic", "image/bmp": "bmp", "image/tiff": "tiff",
+};
+
+/** ATT-5: what a paste of `files` saves: nothing when it also carries text, which pastes as text. */
+export function pastedFiles<T extends { name: string; type: string }>(files: T[], text: string): T[] {
+  return text.trim() ? [] : files;
+}
+
+/**
+ * ATT-5: the name a pasted file is saved under. A file copied in a file
+ * manager keeps its name; an image from the clipboard (a screenshot, "Copy
+ * image", named `image.png` or nothing) gets `Pasted image YYYYMMDDHHMMSS.<ext>`
+ * in local time, as Obsidian names them.
+ */
+export function pastedName(name: string, mime: string, date: Date): string {
+  if (name && !/^image\.\w+$/i.test(name)) return name;
+  const ext = IMAGE_EXTENSIONS[mime.split(";")[0].trim().toLowerCase()] ?? (/\.(\w+)$/.exec(name)?.[1] ?? "png");
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `Pasted image ${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.${ext}`;
+}
+
 /** ATT-4: the file extension for a recorder's MIME type (`audio/webm;codecs=opus` → `webm`). */
 export function recordingExtension(mime: string): string {
   const type = mime.split(";")[0].trim().toLowerCase();
