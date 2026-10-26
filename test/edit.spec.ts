@@ -46,6 +46,33 @@ describe("heading levels", () => {
     expect(decreaseHeadingLevel(at("*bold*|"))).toBeNull();
   });
 
+  test("on a list item, indent and outdent move the item with its children, never add stars", () => {
+    const run = (doc: string, f: typeof increaseHeadingLevel) => {
+      const state = at(doc);
+      const spec = f(state);
+      return spec ? text(state.update(spec).state) : null;
+    };
+    // nests under the item above, children along, the parent box recounted
+    expect(run("* H\n- [ ] a\n- [X] b|\n  - [X] c\n- [ ] d", increaseHeadingLevel))
+      .toBe("* H\n- [X] a\n  - [X] b\n    - [X] c\n- [ ] d");
+    expect(run("- a\n  - b|\n    - c\n- d", decreaseHeadingLevel)).toBe("- a\n- b\n  - c\n- d");
+    // ordered lists are renumbered (CHK-12: nested ones keep the lowest number among them)
+    expect(run("1. a\n2. b|\n3. c", increaseHeadingLevel)).toBe("1. a\n   2. b\n2. c");
+    // can't go that way: nothing happens, and no stars
+    expect(run("- [ ] a|\n- [ ] b", increaseHeadingLevel)).toBeNull();
+    expect(run("- a|\n- b", decreaseHeadingLevel)).toBeNull();
+    expect(run("- a\n  - b|\n  - c", decreaseHeadingLevel)).toBeNull();
+    // a list item inside a block is text, and a heading still gets its star
+    expect(run("#+begin_src\n- a\n- b|\n#+end_src", increaseHeadingLevel)).toBe("#+begin_src\n- a\n* - b\n#+end_src");
+    expect(run("** H|\n- a", increaseHeadingLevel)).toBe("*** H\n- a");
+  });
+
+  test("indenting a selection of list items moves each once", () => {
+    const doc = "- a\n- b\n  - c\n- d";
+    const state = EditorState.create({ doc, selection: EditorSelection.range(doc.indexOf("b"), doc.length) });
+    expect(text(state.update(increaseHeadingLevel(state)!).state)).toBe("- a\n  - b\n    - c\n  - d");
+  });
+
   test("toggleLeadingStars adds and removes stars", () => {
     expect(text(apply(at("x|"), toggleLeadingStars(at("x|"))))).toBe("* x");
     expect(text(apply(at("*** x|"), toggleLeadingStars(at("*** x|"))))).toBe("x");

@@ -5,7 +5,7 @@
 import { ChangeSpec, EditorSelection, EditorState, Text, TransactionSpec } from "@codemirror/state";
 import { foldedRanges } from "@codemirror/language";
 import { analyze, headingLevel, isPlanningLine, Keywords, parseHeading } from "./syntax";
-import { BoxState, itemLines, nextBullet, parseItem, recountSection, sectionAround, setItemState, toggledState } from "./lists";
+import { BoxState, itemExtent, itemLines, nextBullet, parseItem, recountSection, sectionAround, setItemState, shiftItem, toggledState } from "./lists";
 
 export function docLines(doc: Text): string[] {
   const lines: string[] = [];
@@ -46,8 +46,33 @@ function selectedLines(state: EditorState): number[] {
 // ---------------------------------------------------------------------------
 // Heading level and stars
 
-/** ACT-1: a heading gets one more star; any other line becomes a level-1 heading. */
+/**
+ * ACT-13: on a list item, indent or outdent the items the selection touches,
+ * each with its children (an item inside one already moved goes with it).
+ * Null when the selection starts on no list item; an item that can't move
+ * that way gives no change, never stars.
+ */
+function shiftItems(state: EditorState, delta: 1 | -1): TransactionSpec | null | "not-a-list" {
+  const before = docLines(state.doc);
+  const numbers = selectedLines(state).map((n) => n - 1);
+  if (!itemLines(before)[numbers[0]] || !parseItem(before[numbers[0]])) return "not-a-list";
+  let lines = before;
+  let covered = -1;
+  for (const n of numbers) {
+    if (n < covered) continue;
+    const next = shiftItem(lines, n, delta);
+    if (!next) continue;
+    covered = itemExtent(next, n);
+    lines = next;
+  }
+  if (lines === before) return null;
+  return { changes: lineChanges(state.doc, before, lines), userEvent: delta > 0 ? "input" : "delete" };
+}
+
+/** ACT-1: a heading gets one more star; any other line becomes a level-1 heading (on a list item, ACT-13). */
 export function increaseHeadingLevel(state: EditorState): TransactionSpec | null {
+  const list = shiftItems(state, 1);
+  if (list !== "not-a-list") return list;
   const changes = selectedLines(state).map((n) => {
     const line = state.doc.line(n);
     return headingLevel(line.text) ? { from: line.from, insert: "*" } : { from: line.from, insert: "* " };
@@ -55,8 +80,10 @@ export function increaseHeadingLevel(state: EditorState): TransactionSpec | null
   return { changes, userEvent: "input" };
 }
 
-/** ACT-2: one star less; a level-1 heading becomes plain text. Other lines are left alone. */
+/** ACT-2: one star less; a level-1 heading becomes plain text (on a list item, ACT-13). Other lines are left alone. */
 export function decreaseHeadingLevel(state: EditorState): TransactionSpec | null {
+  const list = shiftItems(state, -1);
+  if (list !== "not-a-list") return list;
   const changes: ChangeSpec[] = [];
   for (const n of selectedLines(state)) {
     const line = state.doc.line(n);
