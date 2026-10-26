@@ -215,13 +215,32 @@
   margin: var(--size-4-1) 0;
   border-radius: var(--radius-s);
 }
-.org-flex-view .org-audio {
-  display: inline-block;
+.org-flex-view .org-audio-player {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-1);
   vertical-align: middle;
   width: 100%;
-  max-width: 22em;
-  height: 2.5em;
+  max-width: 25em;
   margin: var(--size-4-1) 0;
+}
+.org-flex-view .org-audio {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 2.5em;
+}
+.org-flex-view .org-audio-loop {
+  flex: none;
+  min-width: 2.5em;
+  min-height: 2.5em;
+}
+.is-mobile .org-flex-view .org-audio-loop {
+  min-width: 44px;
+  min-height: 44px;
+}
+.org-flex-view .org-audio-loop.is-active {
+  color: var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
 }
 
 .org-flex-view .org-planning {

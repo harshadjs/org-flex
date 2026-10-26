@@ -6,7 +6,7 @@
 import { EditorState, Range, RangeSetBuilder, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { isAudioTarget, isImageTarget, parseHeading, parseInline, InlineNode } from "../org/syntax";
-import { docInfo, orgConfig, orgHost, selectionTouches, structureOf } from "./state";
+import { docInfo, onTap, orgConfig, orgHost, selectionTouches, structureOf } from "./state";
 
 const hidden = Decoration.replace({});
 const marks = new Map<string, Decoration>();
@@ -50,14 +50,27 @@ class AudioWidget extends WidgetType {
   eq(other: AudioWidget) {
     return other.src === this.src;
   }
-  toDOM() {
-    const audio = document.createElement("audio");
+  toDOM(view: EditorView) {
+    const wrap = document.createElement("span");
+    wrap.className = "org-audio-player";
+    const audio = wrap.appendChild(document.createElement("audio"));
     audio.className = "org-audio";
     audio.controls = true;
     audio.preload = "metadata";
     audio.src = this.src;
     audio.title = this.target;
-    return audio;
+    // LP-12: play it over and over
+    const loop = wrap.appendChild(document.createElement("button"));
+    loop.className = "org-audio-loop clickable-icon";
+    loop.setAttribute("aria-label", "Loop");
+    loop.setAttribute("aria-pressed", "false");
+    view.state.facet(orgHost)?.setIcon(loop, "repeat");
+    onTap(loop, () => {
+      audio.loop = !audio.loop;
+      loop.setAttribute("aria-pressed", String(audio.loop));
+      loop.classList.toggle("is-active", audio.loop);
+    });
+    return wrap;
   }
   ignoreEvent() {
     return true;
