@@ -9,6 +9,7 @@ import type { VisibilityLevel } from "./org/folding";
 import { DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
 import { timestampId } from "./org/denote";
 import { microsecondId } from "./org/ids";
+import { countedMediaName, type MediaKind } from "./org/edit";
 import type { LinkScheme } from "./org/vault-index";
 
 export interface Flavour {
@@ -34,6 +35,8 @@ export interface Flavour {
   denoteId(date: Date, taken: ReadonlySet<string>): string;
   /** DEN-6: the identifier for the journal file of the day `date` */
   journalId(date: Date, taken: ReadonlySet<string>): string;
+  /** ATT-6: the name for a recording or pasted image made at `date`; `taken` is the names already in its folder */
+  mediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string;
 }
 
 export const FLAVOUR: Flavour = {
@@ -48,4 +51,5 @@ export const FLAVOUR: Flavour = {
   links: "id",
   denoteId: timestampId,
   journalId: timestampId,
+  mediaName: countedMediaName,
 };

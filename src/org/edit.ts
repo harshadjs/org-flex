@@ -535,10 +535,40 @@ export function insertFileLinks(state: EditorState, targets: string[]): Transact
   return { changes: { from, to, insert }, selection: EditorSelection.cursor(from + insert.length), userEvent: "input" };
 }
 
-/** ATT-4: a recording's file name, `Recording YYYYMMDDHHMMSS.<ext>` in local time, as Obsidian's recorder names them. */
+/** What a new file the plugin names is: a voice recording (ATT-4) or an image pasted from the clipboard (ATT-5). */
+export type MediaKind = "recording" | "image";
+
+/**
+ * ATT-6: the base's names, in local time, as Obsidian names them:
+ * `Recording YYYYMMDDHHMMSS.<ext>` and `Pasted image YYYYMMDDHHMMSS.<ext>`.
+ */
+export function stampedMediaName(kind: MediaKind, date: Date, ext: string): string {
+  const stamp = `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`;
+  return `${kind === "recording" ? "Recording" : "Pasted image"} ${stamp}.${ext}`;
+}
+
+const COUNTED_SLUG: Record<MediaKind, string> = { recording: "voice-note", image: "pasted-image" };
+
+/**
+ * ATT-6: `YYMM-voice-note-CC.<ext>` or `YYMM-pasted-image-CC.<ext>`, CC
+ * counting that month's files of the kind: one more than the highest count
+ * among `taken` (the names in the folder), any extension, `YYMM-voice-note`
+ * alone counting as 1. Two digits, more past 99.
+ */
+export function countedMediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string {
+  const base = `${pad2(date.getFullYear() % 100)}${pad2(date.getMonth() + 1)}-${COUNTED_SLUG[kind]}`;
+  const re = new RegExp(`^${base}(?:-(\\d+))?(?:\\.|$)`);
+  let count = 0;
+  for (const name of taken) {
+    const m = re.exec(name);
+    if (m) count = Math.max(count, m[1] ? Number(m[1]) : 1);
+  }
+  return `${base}-${pad2(count + 1)}.${ext}`;
+}
+
+/** ATT-4: a recording's file name in the base (ATT-6). */
 export function recordingName(date: Date, ext: string): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `Recording ${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.${ext}`;
+  return stampedMediaName("recording", date, ext);
 }
 
 const IMAGE_EXTENSIONS: Record<string, string> = {
@@ -552,16 +582,19 @@ export function pastedFiles<T extends { name: string; type: string }>(files: T[]
 }
 
 /**
- * ATT-5: the name a pasted file is saved under. A file copied in a file
- * manager keeps its name; an image from the clipboard (a screenshot, "Copy
- * image", named `image.png` or nothing) gets `Pasted image YYYYMMDDHHMMSS.<ext>`
- * in local time, as Obsidian names them.
+ * ATT-5: whether a pasted file is an image from the clipboard (a screenshot,
+ * "Copy image", named `image.png` or nothing), and then its extension from
+ * its type; null for a file copied in a file manager, which keeps its name.
  */
+export function pastedImageExtension(name: string, mime: string): string | null {
+  if (name && !/^image\.\w+$/i.test(name)) return null;
+  return IMAGE_EXTENSIONS[mime.split(";")[0].trim().toLowerCase()] ?? (/\.(\w+)$/.exec(name)?.[1] ?? "png");
+}
+
+/** ATT-5: the name a pasted file is saved under in the base (ATT-6). */
 export function pastedName(name: string, mime: string, date: Date): string {
-  if (name && !/^image\.\w+$/i.test(name)) return name;
-  const ext = IMAGE_EXTENSIONS[mime.split(";")[0].trim().toLowerCase()] ?? (/\.(\w+)$/.exec(name)?.[1] ?? "png");
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `Pasted image ${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.${ext}`;
+  const ext = pastedImageExtension(name, mime);
+  return ext === null ? name : stampedMediaName("image", date, ext);
 }
 
 /**

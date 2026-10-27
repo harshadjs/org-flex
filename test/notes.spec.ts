@@ -118,12 +118,14 @@ describe("journal", () => {
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("this flavour has TODO NEXT DOING WAITING then DONE CANCELLED, org-roam links and microsecond IDs", () => {
+  test("this flavour has TODO NEXT DOING WAITING then DONE CANCELLED, org-roam links, microsecond IDs and counted voice notes", () => {
     expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "NEXT", "DOING", "WAITING"], ["DONE", "CANCELLED"]]);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
     expect(FLAVOUR.links).toBe("id");
     expect(FLAVOUR.orgId(1793101200123456, new Set())).toBe("1793101200123456");
     expect(FLAVOUR.orgId(1793101200123456, new Set(["1793101200123456"]))).toBe("1793101200123457");
+    expect(FLAVOUR.mediaName("recording", new Date(2026, 9, 27), "m4a", new Set(["2610-voice-note-03.mp3"]))).toBe("2610-voice-note-04.m4a");
+    expect(FLAVOUR.mediaName("image", new Date(2026, 9, 27), "png", new Set())).toBe("2610-pasted-image-01.png");
   });
 
   test("journalEntries keeps dated files under the folder, newest first", () => {
