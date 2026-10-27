@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { microsecondId } from "../src/org/ids";
-import { backlinksTo, linkDescription, mentionLink, noteLinkTarget, readNote, titleCompletions, unlinkedMentionsOf, VaultIndex } from "../src/org/vault-index";
+import { backlinksTo, fileBacklinksTo, isMediaFile, linkDescription, mentionLink, noteLinkTarget, readNote, titleCompletions, unlinkedMentionsOf, VaultIndex } from "../src/org/vault-index";
 
 const pkm = readNote("topics/pkm.org", [
   ":PROPERTIES:",
@@ -129,4 +129,26 @@ test("VaultIndex finds IDs and follows file changes", async () => {
 test("a microsecond ID is the time as digits, one more while taken", () => {
   expect(microsecondId(1793101200123456.7, new Set())).toBe("1793101200123456");
   expect(microsecondId(1793101200123456, new Set(["1793101200123456", "1793101200123457"]))).toBe("1793101200123458");
+});
+
+test("notes with file links to a media file are its backlinks, one entry per note with each line", () => {
+  const day = readNote("journal/2026/10/2026-10-27.org", [
+    "* Morning",
+    "[[file:../../../attachments/2610-photo.jpg]] and [[file:../../../attachments/2610-photo.jpg][again]]",
+    "[[file:../../../attachments/2610-voice-note-01.m4a]]",
+  ].join("\n"));
+  const note = readNote("notes/2610-trip.org", "#+title: Trip\nSee [[file:../attachments/2610-photo.jpg::12]].\n[[id:2610-photo.jpg]]\n");
+  expect(day.fileLinks).toEqual([
+    { target: "attachments/2610-photo.jpg", line: 1 }, { target: "attachments/2610-photo.jpg", line: 1 },
+    { target: "attachments/2610-voice-note-01.m4a", line: 2 },
+  ]);
+  // file links aren't note links
+  expect(day.links).toEqual([]);
+  expect(fileBacklinksTo("attachments/2610-photo.jpg", [note, day])).toEqual([
+    { path: day.path, title: "2026-10-27", lines: [{ line: 1, text: day.text.split("\n")[1] }] },
+    { path: note.path, title: "Trip", lines: [{ line: 1, text: "See [[file:../attachments/2610-photo.jpg::12]]." }] },
+  ]);
+  expect(fileBacklinksTo("attachments/none.png", [note, day])).toEqual([]);
+  for (const media of ["a/b.JPG", "x.m4a", "x.mp3", "x.mp4", "x.mov", "x.pdf", "x.webp"]) expect(isMediaFile(media), media).toBe(true);
+  for (const other of ["x.org", "x.md", "x.canvas", "x.txt", "README", ".jpg"]) expect(isMediaFile(other), other).toBe(false);
 });

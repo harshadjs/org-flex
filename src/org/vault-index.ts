@@ -2,7 +2,7 @@
 // It answers "where is ID X" and "who links to this note" without reading
 // files, and finds unlinked mentions in the text it keeps.
 
-import { analyze, findLinks, Keywords, parseHeading, parseProperty } from "./syntax";
+import { analyze, AUDIO_EXTENSIONS, findLinks, IMAGE_EXTENSIONS, Keywords, parseHeading, parseProperty, resolveRelative } from "./syntax";
 import { denoteIdOf } from "./denote";
 
 /** DEN-1: how notes are linked: by `:ID:` (org-roam) or by the identifier in Denote file names. */
@@ -45,6 +45,8 @@ export interface NoteRecord {
   /** DEN-7: headings with a `CUSTOM_ID`, which Denote links to as `denote:ID::#custom-id` */
   customIds: NoteId[];
   links: NoteLink[];
+  /** BL-7: `[[file:…]]` links, the target as a vault path */
+  fileLinks: NoteLink[];
   text: string;
 }
 
@@ -92,6 +94,7 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
   const ids: NoteId[] = [];
   const customIds: NoteId[] = [];
   const links: NoteLink[] = [];
+  const fileLinks: NoteLink[] = [];
   let title: string | null = null;
   let entry = 0;
   let heading: string | undefined;
@@ -119,6 +122,11 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
     if (line.includes("[[")) {
       for (const link of findLinks(line)) {
         if (link.style !== "regular") continue;
+        if (/^file:/i.test(link.target.trim())) {
+          const file = resolveRelative(path, link.target);
+          if (file) fileLinks.push({ target: file, line: n });
+          continue;
+        }
         const target = noteLinkTarget(link.target);
         if (target) links.push({ target, line: n });
       }
@@ -126,7 +134,7 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
     offset += line.length + 1;
   }
   const name = fileName(path);
-  return { path, name, title: title ?? name, ids, denoteId: denoteIdOf(path), customIds, links, text };
+  return { path, name, title: title ?? name, ids, denoteId: denoteIdOf(path), customIds, links, fileLinks, text };
 }
 
 function lineOf(text: string, n: number): string {
@@ -144,6 +152,30 @@ export function backlinksTo(note: NoteRecord, notes: Iterable<NoteRecord>): Back
   for (const other of notes) {
     if (other.path === note.path) continue;
     const lines = Array.from(new Set(other.links.filter((l) => names.has(l.target)).map((l) => l.line)));
+    if (!lines.length) continue;
+    result.push({
+      path: other.path,
+      title: other.title,
+      lines: lines.map((line) => ({ line, text: lineOf(other.text, line).trim() })),
+    });
+  }
+  return result.sort(byTitle);
+}
+
+/** BL-7: the files whose backlinks show in their own view: images, audio, video and PDFs. */
+const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS, "mp4", "m4v", "mov", "mkv", "pdf"]);
+
+export function isMediaFile(path: string): boolean {
+  const base = path.slice(path.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 && MEDIA_EXTENSIONS.has(base.slice(dot + 1).toLowerCase());
+}
+
+/** BL-7: the notes with a `[[file:…]]` link to the file at `path`, as BL-1 lists them. */
+export function fileBacklinksTo(path: string, notes: Iterable<NoteRecord>): Backlink[] {
+  const result: Backlink[] = [];
+  for (const other of notes) {
+    const lines = Array.from(new Set(other.fileLinks.filter((l) => l.target === path).map((l) => l.line)));
     if (!lines.length) continue;
     result.push({
       path: other.path,
@@ -346,6 +378,10 @@ export class VaultIndex {
   backlinks(path: string): Backlink[] {
     const note = this.notes.get(path);
     return note ? backlinksTo(note, this.notes.values()) : [];
+  }
+
+  fileBacklinks(path: string): Backlink[] {
+    return fileBacklinksTo(path, this.notes.values());
   }
 
   unlinkedMentions(path: string): Mention[] {
