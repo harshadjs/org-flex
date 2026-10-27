@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { microsecondId } from "../src/org/ids";
-import { backlinksTo, fileBacklinksTo, isMediaFile, linkDescription, mentionLink, noteLinkTarget, readNote, titleCompletions, unlinkedMentionsOf, VaultIndex } from "../src/org/vault-index";
+import { attachmentCompletion, backlinksTo, fileBacklinksTo, isMediaFile, linkDescription, mentionLink, noteLinkTarget, readNote, titleCompletions, unlinkedMentionsOf, VaultIndex } from "../src/org/vault-index";
 
 const pkm = readNote("topics/pkm.org", [
   ":PROPERTIES:",
@@ -151,4 +151,14 @@ test("notes with file links to a media file are its backlinks, one entry per not
   expect(fileBacklinksTo("attachments/none.png", [note, day])).toEqual([]);
   for (const media of ["a/b.JPG", "x.m4a", "x.mp3", "x.mp4", "x.mov", "x.pdf", "x.webp"]) expect(isMediaFile(media), media).toBe(true);
   for (const other of ["x.org", "x.md", "x.canvas", "x.txt", "README", ".jpg"]) expect(isMediaFile(other), other).toBe(false);
+});
+
+test("attachments in the link list are marked and link as file: relative to the note", () => {
+  expect(attachmentCompletion("journal/2026/10/2026-10-27.org", "attachments/2610-photo.jpg")).toEqual({
+    label: "2610-photo.jpg", displayLabel: "📎 2610-photo.jpg", detail: "attachments",
+    target: "file:../../../attachments/2610-photo.jpg", type: "attachment",
+  });
+  expect(attachmentCompletion("notes.org", "scan.pdf")).toEqual({
+    label: "scan.pdf", displayLabel: "📎 scan.pdf", target: "file:scan.pdf", type: "attachment",
+  });
 });

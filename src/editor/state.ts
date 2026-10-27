@@ -35,6 +35,8 @@ export interface Completion {
   /** inserted as the link's description when present */
   description?: string;
   type?: string;
+  /** shown instead of the label, which is still what's matched (LP-9's attachment marker) */
+  displayLabel?: string;
 }
 
 /** What the editor needs from Obsidian. */

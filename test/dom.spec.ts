@@ -11,6 +11,7 @@ import { srcHighlight } from "../src/editor/src-highlight";
 import { applyVisibility, orgFolding } from "../src/editor/folding";
 import { checklists } from "../src/editor/checklists";
 import { frontMatterPanel } from "../src/editor/front-matter-panel";
+import { attachmentCompletion } from "../src/org/vault-index";
 import { backlinksSection, renderBacklinks, setBacklinks } from "../src/editor/backlinks";
 import { shortcutBar } from "../src/editor/shortcut-bar";
 import { CompletionContext, completionStatus, currentCompletions } from "@codemirror/autocomplete";
@@ -98,6 +99,7 @@ test("picking a title after [[ inserts an ID link with the title as description"
     linkCompletions: () => [
       { label: "Org roam", detail: "notes", target: "id:5f0c-uuid", description: "Org roam", type: "note" },
       { label: "img.png", target: "img.png", type: "file" },
+      attachmentCompletion("journal/2026/10/2026-10-27.org", "attachments/2610-voice-note-04.m4a"),
     ],
   };
   const pick = (doc: string, label: string) => {
@@ -119,6 +121,8 @@ test("picking a title after [[ inserts an ID link with the title as description"
   // a closing ]] already there (the link button) is reused, and the cursor ends after it
   expect(pick("See [[|]] next", "Org roam")).toEqual({ text: "See [[id:5f0c-uuid][Org roam]] next", cursor: 30 });
   expect(pick("[[im|", "img.png")).toEqual({ text: "[[img.png]]", cursor: 11 });
+  // an attachment is marked, and inserts a file: link relative to the note
+  expect(pick("[[voice|", "2610-voice-note-04.m4a")).toEqual({ text: "[[file:../../../attachments/2610-voice-note-04.m4a]]", cursor: 52 });
 });
 
 test("after [[denote: the list offers Denote identifiers, after [[id: org IDs", () => {

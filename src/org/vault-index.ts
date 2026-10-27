@@ -2,7 +2,7 @@
 // It answers "where is ID X" and "who links to this note" without reading
 // files, and finds unlinked mentions in the text it keeps.
 
-import { analyze, AUDIO_EXTENSIONS, findLinks, IMAGE_EXTENSIONS, Keywords, parseHeading, parseProperty, resolveRelative } from "./syntax";
+import { analyze, AUDIO_EXTENSIONS, findLinks, IMAGE_EXTENSIONS, Keywords, parseHeading, parseProperty, relativeLinkPath, resolveRelative } from "./syntax";
 import { denoteIdOf } from "./denote";
 
 /** DEN-1: how notes are linked: by `:ID:` (org-roam) or by the identifier in Denote file names. */
@@ -184,6 +184,23 @@ export function fileBacklinksTo(path: string, notes: Iterable<NoteRecord>): Back
     });
   }
   return result.sort(byTitle);
+}
+
+/**
+ * LP-9: a file that isn't a note (an image, a recording, a PDF...) in the
+ * `[[` list: marked 📎, its folder beside it, and linked as `file:` with the
+ * path relative to the note, as attachments are (ATT-3).
+ */
+export function attachmentCompletion(notePath: string, path: string): { label: string; displayLabel: string; detail?: string; target: string; type: string } {
+  const slash = path.lastIndexOf("/");
+  const name = path.slice(slash + 1);
+  return {
+    label: name,
+    displayLabel: `📎 ${name}`,
+    ...(slash > 0 ? { detail: path.slice(0, slash) } : {}),
+    target: `file:${relativeLinkPath(notePath, path)}`,
+    type: "attachment",
+  };
 }
 
 /** BL-2: the words a mention may use. */
