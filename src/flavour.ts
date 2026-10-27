@@ -35,7 +35,7 @@ export interface Flavour {
   denoteId(date: Date, taken: ReadonlySet<string>): string;
   /** DEN-6: the identifier for the journal file of the day `date` */
   journalId(date: Date, taken: ReadonlySet<string>): string;
-  /** ATT-6: the name for a recording or pasted image made at `date`; `taken` is the names already in its folder */
+  /** ATT-6: the name for a recording or pasted image made at `date`; `taken` is the names of the vault's files */
   mediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string;
 }
 
