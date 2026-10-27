@@ -101,13 +101,15 @@ function inlineDecorations(
         out.push(mark("org-link org-link-source").range(from, to));
         continue;
       }
-      if (isImageTarget(node.target) && node.description === null) {
+      // DEN-8: a denote: link shows inline when the file it names is an image or audio
+      const media = /^denote:/i.test(node.target) ? host?.mediaPath?.(node.target) ?? "" : node.target;
+      if (isImageTarget(media) && node.description === null) {
         const target = node.target.replace(/^file:/, "");
         const src = host?.imageSrc(target) ?? target;
         out.push(Decoration.replace({ widget: new ImageWidget(src, node.target) }).range(from, to));
         continue;
       }
-      if (isAudioTarget(node.target) && node.description === null) {
+      if (isAudioTarget(media) && node.description === null) {
         const src = host?.imageSrc(node.target) ?? node.target.replace(/^file:/, "");
         out.push(Decoration.replace({ widget: new AudioWidget(src, node.target) }).range(from, to));
         continue;

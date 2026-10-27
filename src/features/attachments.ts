@@ -5,6 +5,7 @@ import { EditorView } from "@codemirror/view";
 import type { OrgFlexView } from "../view";
 import { insertFileLinks, pastedFiles, pastedName, recordingExtension, recordingName } from "../org/edit";
 import { relativeLinkPath } from "../org/syntax";
+import { denoteFileName } from "../org/denote";
 import { RecorderModal } from "../ui/modals";
 import type { Feature } from "./feature";
 
@@ -48,25 +49,39 @@ function pasteHandler(view: OrgFlexView) {
   });
 }
 
-/** ATT-3: each file saved where Obsidian puts attachments for this note, then linked at the cursor. */
+/** DEN-8: with Denote, `name.ext` becomes `ID--name.ext`, with a new identifier. */
+function savedName(view: OrgFlexView, name: string): { name: string; id: string | null } {
+  if (view.plugin.scheme() !== "denote") return { name, id: null };
+  const dot = name.lastIndexOf(".");
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+  const id = view.plugin.newDenoteId(new Date());
+  return { name: denoteFileName(id, stem, [], ext), id };
+}
+
+/**
+ * ATT-3: each file saved where Obsidian puts attachments for this note, then
+ * linked at the cursor: a relative `file:` link, or `denote:ID` with Denote (DEN-8).
+ */
 async function saveAttachments(view: OrgFlexView, files: { name: string; data: Promise<ArrayBuffer> }[]) {
   const { app } = view;
   const note = view.file;
   if (!note) return;
-  const paths: string[] = [];
+  const targets: string[] = [];
   for (const f of files) {
     try {
-      const path = await app.fileManager.getAvailablePathForAttachment(f.name, note.path);
+      const saved = savedName(view, f.name);
+      const path = await app.fileManager.getAvailablePathForAttachment(saved.name, note.path);
       const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
       if (parent && !app.vault.getAbstractFileByPath(parent)) await app.vault.createFolder(parent);
       const file = await app.vault.createBinary(path, await f.data);
-      paths.push(relativeLinkPath(note.path, file.path));
+      targets.push(saved.id !== null ? `denote:${saved.id}` : `file:${relativeLinkPath(note.path, file.path)}`);
     } catch (e) {
       new Notice(`Couldn't save ${f.name}: ${(e as Error).message}`);
     }
   }
   const editor = view.editor;
-  const spec = editor && view.file === note ? insertFileLinks(editor.state, paths) : null;
+  const spec = editor && view.file === note ? insertFileLinks(editor.state, targets) : null;
   if (editor && spec) editor.dispatch(spec);
 }
 

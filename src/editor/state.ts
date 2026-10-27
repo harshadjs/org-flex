@@ -43,13 +43,15 @@ export interface OrgHost {
   openLink(target: string, view: EditorView): void;
   /** a URL for an image or audio link target, or null to use the target as is */
   imageSrc(target: string): string | null;
+  /** DEN-8: the vault path of the file a `denote:` link names, so it can show inline; null when none */
+  mediaPath?(target: string): string | null;
   /** after `[[`: notes and headings by title, then files without an ID */
   linkCompletions(): Completion[];
-  /** after `[[id:`: every raw ID */
-  idCompletions(): Completion[];
+  /** after `[[id:` (or `[[denote:`, DEN-7): every raw ID of that kind */
+  idCompletions(scheme?: "id" | "denote"): Completion[];
   /**
-   * LP-10: start creating a note titled `title` and return its new ID
-   * straight away; the file is written in the background.
+   * LP-10: start creating a note titled `title` and return the link target
+   * for it (`id:…` or `denote:…`) straight away; the file is written in the background.
    */
   createNote?(title: string): string;
   /** ZOOM-2: the file's title, for the first breadcrumb */

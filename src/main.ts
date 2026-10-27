@@ -3,8 +3,9 @@
 import { getIcon, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { ButtonDef, buttonIconName, CORE_BUTTONS, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
-import { readNote, VaultIndex } from "./org/vault-index";
-import { freeNotePath, noteFileContent, noteFileName } from "./org/new-note";
+import { LinkScheme, readNote, searchOffset, VaultIndex } from "./org/vault-index";
+import { freeNotePath, noteFileContent, noteFileName, notePath } from "./org/new-note";
+import { DenoteFiles, denoteFrontMatter } from "./org/denote";
 import { OrgFlexView, VIEW_TYPE } from "./view";
 import { FLAVOUR } from "./flavour";
 import { orgConflictMessage } from "./conflicts";
@@ -14,6 +15,8 @@ import { OrgFlexSettingTab } from "./ui/settings-tab";
 export default class OrgFlexPlugin extends Plugin {
   settings!: OrgFlexSettings;
   index!: VaultIndex;
+  /** DEN-2: every file with a Denote identifier in its name, org or not */
+  denote = new DenoteFiles();
 
   async onload() {
     await this.loadSettings();
@@ -33,11 +36,19 @@ export default class OrgFlexPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       void this.index.build();
+      this.denote = new DenoteFiles(this.app.vault.getFiles().map((f) => f.path));
       const isOrg = (f: TAbstractFile): f is TFile => f instanceof TFile && f.extension === "org";
-      this.registerEvent(this.app.vault.on("create", (f) => { if (isOrg(f)) void this.index.update(f.path); }));
+      this.registerEvent(this.app.vault.on("create", (f) => {
+        if (f instanceof TFile) this.denote.add(f.path);
+        if (isOrg(f)) void this.index.update(f.path);
+      }));
       this.registerEvent(this.app.vault.on("modify", (f) => { if (isOrg(f)) void this.index.update(f.path); }));
-      this.registerEvent(this.app.vault.on("delete", (f) => { if (isOrg(f)) this.index.remove(f.path); }));
+      this.registerEvent(this.app.vault.on("delete", (f) => {
+        if (f instanceof TFile) this.denote.remove(f.path);
+        if (isOrg(f)) this.index.remove(f.path);
+      }));
       this.registerEvent(this.app.vault.on("rename", (f, old) => {
+        if (f instanceof TFile) this.denote.rename(old, f.path);
         if (isOrg(f)) void this.index.rename(old, f.path);
         else if (old.endsWith(".org")) this.index.remove(old);
       }));
@@ -84,6 +95,22 @@ export default class OrgFlexPlugin extends Plugin {
 
   keywords(): Keywords {
     return { todo: FLAVOUR.todoKeywords, done: FLAVOUR.doneKeywords };
+  }
+
+  /** DEN-1: how this copy links notes. */
+  scheme(): LinkScheme {
+    return FLAVOUR.links;
+  }
+
+  /** identifiers handed out this session, before their files show up */
+  private givenIds = new Set<string>();
+
+  /** DEN-5, DEN-6: a new Denote identifier, never one a file has or one already given out. */
+  newDenoteId(date: Date, journal = false): string {
+    const taken = new Set([...this.denote.ids(), ...this.givenIds]);
+    const id = (journal ? FLAVOUR.journalId : FLAVOUR.denoteId)(date, taken);
+    this.givenIds.add(id);
+    return id;
   }
 
   /** BAR-2, PLAT-8: a button shows only when the core or one of this copy's features runs it. */
@@ -165,6 +192,24 @@ export default class OrgFlexPlugin extends Plugin {
       window.open(link.url, "_blank");
       return;
     }
+    if (link.kind === "denote") {
+      // DEN-1: the file named with the identifier, at the `::` search if there is one
+      const path = this.denote.path(link.id);
+      if (!path) {
+        new Notice(`No file has the Denote identifier "${link.id}".`);
+        return;
+      }
+      if (path.endsWith(".org")) {
+        await Promise.race([this.index.ready, new Promise((r) => window.setTimeout(r, 2000))]);
+        const note = this.index.notes.get(path);
+        const offset = note && link.search ? searchOffset(note, link.search, this.keywords()) : null;
+        await this.openAt(leaf, path, offset !== null ? { offset, top: true, zoom: true } : {});
+        return;
+      }
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) await leaf.openFile(file);
+      return;
+    }
     if (link.kind === "id") {
       const found = await this.findId(link.id);
       if (!found) {
@@ -191,6 +236,17 @@ export default class OrgFlexPlugin extends Plugin {
     const path = target.replace(/^file:/i, "").split("::")[0];
     const cache = this.app.metadataCache;
     return cache.getFirstLinkpathDest(path, sourcePath) ?? cache.getFirstLinkpathDest(`${path}.org`, sourcePath);
+  }
+
+  /** LINK-2, DEN-1: the file a link names: by Denote identifier, or as a file link. */
+  linkFile(target: string, sourcePath: string): TFile | null {
+    const link = classifyLink(target);
+    if (link.kind === "denote") {
+      const path = this.denote.path(link.id);
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      return file instanceof TFile ? file : null;
+    }
+    return link.kind === "file" ? this.resolveFile(link.path, sourcePath) : null;
   }
 
   /** LINK-3: the index first; an ID it doesn't know yet makes us read every org file. */
@@ -225,26 +281,43 @@ export default class OrgFlexPlugin extends Plugin {
 
   /**
    * LP-10: create a note at the vault root for a title picked in the `[[`
-   * list, without opening it. The ID is returned straight away, for the link.
+   * list, without opening it. The link target is returned straight away.
    */
   createNoteFromLink(raw: string): string {
-    return this.createRootNote(raw).id;
+    return this.createRootNote(raw).target;
   }
 
-  /** LP-10, FIND-3: a note at the vault root; the ID now, the file once written (null if it failed). */
-  createRootNote(raw: string): { id: string; file: Promise<TFile | null> } {
-    const title = raw.trim();
+  /**
+   * NOTE-3, NOTE-5, DEN-5: a new note's path in `folder` and its contents:
+   * `<title>.org` with a UUID `:ID:`, or with Denote `ID--title.org` and Denote's front matter.
+   */
+  newNote(folder: string, title: string): { path: string; content: string; target: string } {
+    if (this.scheme() === "denote") {
+      const now = new Date();
+      const id = this.newDenoteId(now);
+      return { path: notePath(folder, title, id), content: denoteFrontMatter(title, now, [], id), target: `denote:${id}` };
+    }
     const id = crypto.randomUUID();
-    const path = freeNotePath("", noteFileName(title),
-      (p) => this.pendingNotes.has(p) || this.app.vault.getAbstractFileByPath(p) !== null);
+    return { path: notePath(folder, title), content: noteFileContent(title, id), target: `id:${id}` };
+  }
+
+  /** LP-10, FIND-3: a note at the vault root; the link target now, the file once written (null if it failed). */
+  createRootNote(raw: string): { target: string; file: Promise<TFile | null> } {
+    const title = raw.trim();
+    const note = this.newNote("", title);
+    // the title as file name may be taken; a Denote name has a new identifier, so it can't be
+    const { path, content } = this.scheme() === "denote" ? note : {
+      path: freeNotePath("", noteFileName(title), (p) => this.pendingNotes.has(p) || this.app.vault.getAbstractFileByPath(p) !== null),
+      content: note.content,
+    };
     this.pendingNotes.add(path);
-    const file = this.app.vault.create(path, noteFileContent(title, id))
+    const file = this.app.vault.create(path, content)
       .catch((e: Error) => {
         new Notice(`Org Flex: couldn't create ${path}: ${e.message}`);
         return null;
       })
       .finally(() => this.pendingNotes.delete(path));
-    return { id, file };
+    return { target: note.target, file };
   }
 
   /** NOTE-5: open a new note with the cursor below its header, ready to type. */

@@ -7,6 +7,8 @@
 
 import type { VisibilityLevel } from "./org/folding";
 import { DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
+import { timestampId } from "./org/denote";
+import type { LinkScheme } from "./org/vault-index";
 
 export interface Flavour {
   /** open-task keywords, in cycling order (PARSE-3, ACT-3) */
@@ -21,8 +23,14 @@ export interface Flavour {
   foldPropertyDrawers: boolean;
   /** FOLD-5 */
   defaultFoldLevel: VisibilityLevel;
-  /** JRN-2: `{{date}}` and `{{id}}` are filled in */
+  /** JRN-2: `{{date}}` and `{{id}}` are filled in (not used with Denote, DEN-6) */
   journalTemplate: string;
+  /** DEN-1: link notes by `:ID:` as org-roam does, or by the identifier in Denote file names */
+  links: LinkScheme;
+  /** DEN-5: the identifier for a note or file made at `date`, not one of `taken` */
+  denoteId(date: Date, taken: ReadonlySet<string>): string;
+  /** DEN-6: the identifier for the journal file of the day `date` */
+  journalId(date: Date, taken: ReadonlySet<string>): string;
 }
 
 export const FLAVOUR: Flavour = {
@@ -33,4 +41,7 @@ export const FLAVOUR: Flavour = {
   foldPropertyDrawers: true,
   defaultFoldLevel: "foldall",
   journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
+  links: "id",
+  denoteId: timestampId,
+  journalId: timestampId,
 };

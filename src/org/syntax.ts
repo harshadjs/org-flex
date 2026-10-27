@@ -5,6 +5,8 @@
 // drawers, blocks, keywords, comments, text). Inline syntax (markup and
 // links) is parsed per line on demand.
 
+import { parseDenoteLink } from "./denote";
+
 export interface Keywords {
   todo: string[];
   done: string[];
@@ -429,7 +431,11 @@ export function isAudioTarget(target: string): boolean {
   return AUDIO_EXTENSIONS.includes(extension(target));
 }
 
-export type LinkKind = { kind: "external"; url: string } | { kind: "id"; id: string } | { kind: "file"; path: string };
+export type LinkKind =
+  | { kind: "external"; url: string }
+  | { kind: "id"; id: string }
+  | { kind: "denote"; id: string; search: string }
+  | { kind: "file"; path: string };
 
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -437,6 +443,9 @@ const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 export function classifyLink(target: string): LinkKind {
   const t = target.trim();
   if (/^id:/i.test(t)) return { kind: "id", id: t.slice(3).trim() };
+  // DEN-1: the identifier, and what follows `::`
+  const denote = parseDenoteLink(t);
+  if (denote) return { kind: "denote", ...denote };
   // a relative file: link is a file in the vault, as Org reads it
   if (/^file:(?!\/)/i.test(t)) return { kind: "file", path: t.slice(5) };
   if (SCHEME_RE.test(t)) return { kind: "external", url: t };

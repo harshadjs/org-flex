@@ -3,6 +3,10 @@
 // files, and finds unlinked mentions in the text it keeps.
 
 import { analyze, findLinks, Keywords, parseHeading, parseProperty } from "./syntax";
+import { denoteIdOf } from "./denote";
+
+/** DEN-1: how notes are linked: by `:ID:` (org-roam) or by the identifier in Denote file names. */
+export type LinkScheme = "id" | "denote";
 
 export interface NoteId {
   id: string;
@@ -36,6 +40,10 @@ export interface NoteRecord {
   name: string;
   title: string;
   ids: NoteId[];
+  /** DEN-2: the identifier in the file name, for a Denote file */
+  denoteId: string | null;
+  /** DEN-7: headings with a `CUSTOM_ID`, which Denote links to as `denote:ID::#custom-id` */
+  customIds: NoteId[];
   links: NoteLink[];
   text: string;
 }
@@ -63,6 +71,7 @@ const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 export function noteLinkTarget(raw: string): string | null {
   let t = raw.trim();
   if (/^id:/i.test(t)) t = t.slice(3).trim();
+  else if (/^denote:/i.test(t)) t = t.slice(7).trim();
   else if (SCHEME_RE.test(t) || t.startsWith("*") || t.startsWith("#")) return null;
   const search = t.indexOf("::");
   if (search >= 0) t = t.slice(0, search);
@@ -81,6 +90,7 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
   const lines = text.split("\n");
   const structure = analyze(lines);
   const ids: NoteId[] = [];
+  const customIds: NoteId[] = [];
   const links: NoteLink[] = [];
   let title: string | null = null;
   let entry = 0;
@@ -96,8 +106,11 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
       seenHeading = true;
     } else if (kind === "property") {
       const prop = parseProperty(line);
-      if (prop && prop.key.toUpperCase() === "ID" && prop.value.trim() && structure.drawers[structure.lines[n].drawer].name === "PROPERTIES") {
-        ids.push(heading === undefined ? { id: prop.value.trim(), offset: entry } : { id: prop.value.trim(), offset: entry, heading });
+      const key = prop?.key.toUpperCase();
+      if (prop && (key === "ID" || key === "CUSTOM_ID") && prop.value.trim() && structure.drawers[structure.lines[n].drawer].name === "PROPERTIES") {
+        const found = heading === undefined ? { id: prop.value.trim(), offset: entry } : { id: prop.value.trim(), offset: entry, heading };
+        if (key === "ID") ids.push(found);
+        else if (heading !== undefined) customIds.push(found);
       }
     } else if (kind === "keyword" && !seenHeading && title === null) {
       const m = /^[ \t]*#\+title:[ \t]*(.*?)[ \t]*$/i.exec(line);
@@ -113,7 +126,7 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
     offset += line.length + 1;
   }
   const name = fileName(path);
-  return { path, name, title: title ?? name, ids, links, text };
+  return { path, name, title: title ?? name, ids, denoteId: denoteIdOf(path), customIds, links, text };
 }
 
 function lineOf(text: string, n: number): string {
@@ -126,7 +139,7 @@ function byTitle(a: { title: string; path: string }, b: { title: string; path: s
 
 /** BL-1: other files linking to `note` by file name or by any of its IDs. */
 export function backlinksTo(note: NoteRecord, notes: Iterable<NoteRecord>): Backlink[] {
-  const names = new Set([note.name, ...note.ids.map((i) => i.id)]);
+  const names = new Set([note.name, ...note.ids.map((i) => i.id), ...(note.denoteId ? [note.denoteId] : [])]);
   const result: Backlink[] = [];
   for (const other of notes) {
     if (other.path === note.path) continue;
@@ -187,13 +200,21 @@ export function linkDescription(text: string): string {
   return text.replace(/[\[\]]/g, "").trim();
 }
 
+/** BL-3, CAP-9, DEN-1: the link target naming the whole note in `scheme`, or null when it has none. */
+export function noteTarget(note: NoteRecord, scheme: LinkScheme): string | null {
+  if (scheme === "denote") return note.denoteId !== null ? `denote:${note.denoteId}` : null;
+  const fileId = note.ids.find((i) => i.offset === 0 && i.heading === undefined)?.id;
+  return fileId !== undefined ? `id:${fileId}` : null;
+}
+
 /**
  * BL-3: the link that replaces a mention: [[id:ID][words]] with the note's
- * file-level ID; a note without one is linked by file name.
+ * file-level ID ([[denote:ID][words]] with Denote); a note without one is
+ * linked by file name.
  */
-export function mentionLink(note: NoteRecord, words: string): string {
-  const fileId = note.ids.find((i) => i.offset === 0 && i.heading === undefined)?.id;
-  if (fileId !== undefined) return `[[id:${fileId}][${linkDescription(words)}]]`;
+export function mentionLink(note: NoteRecord, words: string, scheme: LinkScheme = "id"): string {
+  const target = noteTarget(note, scheme);
+  if (target !== null) return `[[${target}][${linkDescription(words)}]]`;
   return words === note.name ? `[[${note.name}]]` : `[[${note.name}][${linkDescription(words)}]]`;
 }
 
@@ -203,20 +224,52 @@ export interface TitleCompletion {
   /** the folder for a note, the note's title for a heading */
   detail?: string;
   id: string;
+  /** the link target: `id:ID`, `denote:ID` or `denote:ID::#custom-id` */
+  target: string;
 }
 
-/** LP-9: every ID in the vault, by title, notes before their headings. */
-export function titleCompletions(notes: Iterable<NoteRecord>): TitleCompletion[] {
+/**
+ * LP-9: every ID in the vault, by title, notes before their headings. With
+ * Denote (DEN-7), every Denote org note and its headings with a `CUSTOM_ID`.
+ */
+export function titleCompletions(notes: Iterable<NoteRecord>, scheme: LinkScheme = "id"): TitleCompletion[] {
   const result: TitleCompletion[] = [];
   for (const note of Array.from(notes).sort(byTitle)) {
     const slash = note.path.lastIndexOf("/");
     const folder = slash > 0 ? note.path.slice(0, slash) : undefined;
+    if (scheme === "denote") {
+      const fileId = note.denoteId;
+      if (fileId === null) continue;
+      result.push({ label: note.title, detail: folder, id: fileId, target: `denote:${fileId}` });
+      for (const { id, heading } of note.customIds) {
+        result.push({ label: heading || note.title, detail: note.title, id: `${fileId}::#${id}`, target: `denote:${fileId}::#${id}` });
+      }
+      continue;
+    }
     for (const { id, heading } of note.ids) {
-      if (heading === undefined) result.push({ label: note.title, detail: folder, id });
-      else result.push({ label: heading || note.title, detail: note.title, id });
+      if (heading === undefined) result.push({ label: note.title, detail: folder, id, target: `id:${id}` });
+      else result.push({ label: heading || note.title, detail: note.title, id, target: `id:${id}` });
     }
   }
   return result;
+}
+
+/**
+ * DEN-1: where in `note` a link's `::search` part points: `#custom-id` is the
+ * heading with that `CUSTOM_ID`, `*Heading` the first heading with that title
+ * (keyword, priority and tags left out); null when nothing matches or there's no search.
+ */
+export function searchOffset(note: NoteRecord, search: string, keywords: Keywords = DEFAULT_KEYWORDS): number | null {
+  const s = search.trim();
+  if (s.startsWith("#")) return note.customIds.find((c) => c.id === s.slice(1))?.offset ?? null;
+  if (!s.startsWith("*")) return null;
+  const want = s.slice(1).trim();
+  let offset = 0;
+  for (const line of note.text.split("\n")) {
+    if (/^\*+[ \t]/.test(line) && headingTitle(line, keywords) === want) return offset;
+    offset += line.length + 1;
+  }
+  return null;
 }
 
 export interface IndexSource {
@@ -286,8 +339,8 @@ export class VaultIndex {
     return all;
   }
 
-  titles(): TitleCompletion[] {
-    return titleCompletions(this.notes.values());
+  titles(scheme: LinkScheme = "id"): TitleCompletion[] {
+    return titleCompletions(this.notes.values(), scheme);
   }
 
   backlinks(path: string): Backlink[] {

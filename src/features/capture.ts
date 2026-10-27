@@ -20,7 +20,7 @@ function capture(plugin: OrgFlexPlugin, initial?: string) {
   let cursor = text.length;
   const view = initial === undefined ? plugin.activeView() : null;
   if (view?.file && view.file.path !== path) {
-    text = noteCaptureText(readNote(view.file.path, view.getViewData(), plugin.keywords()));
+    text = noteCaptureText(readNote(view.file.path, view.getViewData(), plugin.keywords()), plugin.scheme());
     cursor = 0;
   }
   new CaptureModal(plugin.app, path, text, cursor, states, (choice) => fileCapture(plugin, path, choice)).open();

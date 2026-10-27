@@ -3,7 +3,7 @@
 import { Notice, TFile } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { FLAVOUR } from "../flavour";
-import { journalEntries, journalFileContent, journalPathForDate } from "../org/journal";
+import { denoteJournalContent, journalDateString, journalEntries, journalFileContent, journalPathForDate } from "../org/journal";
 import { JournalCalendarModal, JournalPickerModal } from "../ui/modals";
 import type { Feature } from "./feature";
 
@@ -11,13 +11,22 @@ import type { Feature } from "./feature";
 async function openJournal(plugin: OrgFlexPlugin, date: Date) {
   const { app } = plugin;
   try {
-    const path = journalPathForDate(plugin.settings.journalFolder, date);
-    let file = app.vault.getAbstractFileByPath(path);
+    const folder = plugin.settings.journalFolder;
+    // DEN-6: a Denote day file is found by its date, whatever its identifier
+    const day = journalDateString(date);
+    const denote = plugin.scheme() === "denote";
+    const existing = denote ? journalEntries(orgPaths(plugin), folder).find((e) => e.date === day)?.path : journalPathForDate(folder, date);
+    let file = existing ? app.vault.getAbstractFileByPath(existing) : null;
     if (!file) {
-      await plugin.ensureFolder(path.slice(0, path.lastIndexOf("/")));
-      file = await app.vault.create(path, journalFileContent(date, FLAVOUR.journalTemplate, crypto.randomUUID()));
+      const id = denote ? plugin.newDenoteId(date, true) : crypto.randomUUID();
+      const path = journalPathForDate(folder, date, denote ? id : undefined);
+      file = app.vault.getAbstractFileByPath(path);
+      if (!file) {
+        await plugin.ensureFolder(path.slice(0, path.lastIndexOf("/")));
+        file = await app.vault.create(path, denote ? denoteJournalContent(date, id, new Date()) : journalFileContent(date, FLAVOUR.journalTemplate, id));
+      }
     }
-    if (!(file instanceof TFile)) throw new Error(`${path} is not a file`);
+    if (!(file instanceof TFile)) throw new Error(`${day} is not a file`);
     await app.workspace.getLeaf(false).openFile(file);
   } catch (e) {
     new Notice(`Couldn't open the journal: ${(e as Error).message}`);

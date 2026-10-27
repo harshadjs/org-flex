@@ -2,7 +2,7 @@
 
 import { TFolder } from "obsidian";
 import type OrgFlexPlugin from "../main";
-import { noteFileContent, notePath, titleProblem } from "../org/new-note";
+import { titleProblem } from "../org/new-note";
 import { NewNoteModal } from "../ui/modals";
 import type { Feature } from "./feature";
 
@@ -19,11 +19,10 @@ function newNote(plugin: OrgFlexPlugin, folder?: TFolder) {
 async function createNote(plugin: OrgFlexPlugin, folder: string, raw: string): Promise<string | null> {
   const problem = titleProblem(raw);
   if (problem) return problem;
-  const title = raw.trim();
-  const path = notePath(folder, title);
+  const { path, content } = plugin.newNote(folder, raw.trim());
   if (plugin.app.vault.getAbstractFileByPath(path)) return `${path} already exists.`;
   try {
-    const file = await plugin.app.vault.create(path, noteFileContent(title, crypto.randomUUID()));
+    const file = await plugin.app.vault.create(path, content);
     await plugin.openNewNote(plugin.app.workspace.getLeaf(false), file);
     return null;
   } catch (e) {

@@ -118,9 +118,10 @@ describe("journal", () => {
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("the base flavour has only TODO and DONE, and the UUID journal header", () => {
+  test("the base flavour has only TODO and DONE, the UUID journal header and org-roam links", () => {
     expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO"], ["DONE"]]);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
+    expect(FLAVOUR.links).toBe("id");
   });
 
   test("journalEntries keeps dated files under the folder, newest first", () => {

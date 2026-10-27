@@ -54,9 +54,10 @@ export function linkCompletions(context: CompletionContext): CompletionResult | 
   const before = context.matchBefore(/\[\[[^\[\]]*/);
   if (!before) return null;
   const typed = before.text.slice(2);
-  const isId = /^id:/i.test(typed);
-  const from = before.from + 2 + (isId ? 3 : 0);
-  const items = isId ? host.idCompletions() : host.linkCompletions();
+  const scheme = /^(id|denote):/i.exec(typed);
+  const isId = scheme !== null;
+  const from = before.from + 2 + (scheme ? scheme[0].length : 0);
+  const items = scheme ? host.idCompletions(scheme[1].toLowerCase() as "id" | "denote") : host.linkCompletions();
   // ACT-9: still the selected words, untouched: an ID link keeps them as its text
   const pending = context.state.field(linkWordsField, false);
   const words = pending && pending.from === before.from && pending.words === typed ? linkDescription(typed) : null;
@@ -76,7 +77,7 @@ export function linkCompletions(context: CompletionContext): CompletionResult | 
       type: "create",
       // any option in a section sorts after those without one: this one is always last
       section: CREATE_SECTION,
-      apply: (view, c, f, t) => insertLink(linkBody({ target: `id:${createNote(title)}`, description: linkDescription(title) }))(view, c, f, t),
+      apply: (view, c, f, t) => insertLink(linkBody({ target: createNote(title), description: linkDescription(title) }))(view, c, f, t),
     });
   }
   return {
@@ -99,7 +100,7 @@ export function insertLinkWithCompletion(view: EditorView, spec: TransactionSpec
 /** ACT-9: the ID entries (notes and headings) whose title is exactly `words`, ignoring case and spaces around them. */
 export function exactIdMatches(items: Completion[], words: string): Completion[] {
   const want = words.trim().toLowerCase();
-  return want ? items.filter((i) => i.target.startsWith("id:") && i.label.trim().toLowerCase() === want) : [];
+  return want ? items.filter((i) => /^(id|denote):/.test(i.target) && i.label.trim().toLowerCase() === want) : [];
 }
 
 /**
