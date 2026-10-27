@@ -1,6 +1,6 @@
 // Attachments (§10d): attach images and audio, or record a voice note.
 
-import { Notice, TFolder, type App } from "obsidian";
+import { Notice, type App } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import type { OrgFlexView } from "../view";
 import { insertFileLinks, pastedFiles, pastedImageExtension, recordingExtension, stampedMediaName, type MediaKind } from "../org/edit";
@@ -66,12 +66,12 @@ function savedName(view: OrgFlexView, name: string): { name: string; id: string 
 /** A file the plugin names itself (ATT-6), from what it is, when and its extension. */
 type MediaToName = { kind: MediaKind; date: Date; ext: string };
 
-/** ATT-6: the flavour's name for a recording or pasted image, given the names already in the folder it goes to. */
-async function mediaName(app: App, notePath: string, media: MediaToName): Promise<string> {
-  const probe = await app.fileManager.getAvailablePathForAttachment(stampedMediaName(media.kind, media.date, media.ext), notePath);
-  const folder = probe.includes("/") ? probe.slice(0, probe.lastIndexOf("/")) : "";
-  const dir = folder ? app.vault.getAbstractFileByPath(folder) : app.vault.getRoot();
-  const taken = new Set(dir instanceof TFolder ? dir.children.map((c) => c.name) : []);
+/**
+ * ATT-6: the flavour's name for a recording or pasted image, given the names
+ * of every file in the vault, so the count goes on wherever the earlier ones are.
+ */
+function mediaName(app: App, media: MediaToName): string {
+  const taken = new Set(app.vault.getFiles().map((f) => f.name));
   return FLAVOUR.mediaName(media.kind, media.date, media.ext, taken);
 }
 
@@ -87,7 +87,7 @@ async function saveAttachments(view: OrgFlexView, files: { name: string | MediaT
   for (const f of files) {
     try {
       // named one at a time, so a second paste counts the first
-      const saved = savedName(view, typeof f.name === "string" ? f.name : await mediaName(app, note.path, f.name));
+      const saved = savedName(view, typeof f.name === "string" ? f.name : mediaName(app, f.name));
       const path = await app.fileManager.getAvailablePathForAttachment(saved.name, note.path);
       const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
       if (parent && !app.vault.getAbstractFileByPath(parent)) await app.vault.createFolder(parent);

@@ -552,7 +552,7 @@ const COUNTED_SLUG: Record<MediaKind, string> = { recording: "voice-note", image
 /**
  * ATT-6: `YYMM-voice-note-CC.<ext>` or `YYMM-pasted-image-CC.<ext>`, CC
  * counting that month's files of the kind: one more than the highest count
- * among `taken` (the names in the folder), any extension, `YYMM-voice-note`
+ * among `taken` (the vault's file names), any extension, `YYMM-voice-note`
  * alone counting as 1. Two digits, more past 99.
  */
 export function countedMediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string {
