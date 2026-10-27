@@ -37,7 +37,7 @@ async function fileCapture(plugin: OrgFlexPlugin, path: string, choice: CaptureC
       const slash = path.lastIndexOf("/");
       if (slash > 0) await plugin.ensureFolder(path.slice(0, slash));
       const name = path.slice(slash + 1).replace(/\.org$/, "");
-      file = await app.vault.create(path, noteFileContent(name, crypto.randomUUID()));
+      file = await app.vault.create(path, noteFileContent(name, plugin.newOrgId()));
     }
     if (!(file instanceof TFile)) return `${path} is not a file.`;
     // an open inbox takes it as an edit, so nothing typed there is lost
