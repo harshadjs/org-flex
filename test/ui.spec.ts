@@ -771,6 +771,29 @@ test("audio links play inline while the cursor is elsewhere, with a loop button;
   expect(view.dom.querySelectorAll("audio.org-audio").length).toBe(0);
 });
 
+test("a long press on an image or an audio player opens its file, once; a short tap on the player doesn't", async () => {
+  const { view, opened } = mount("Memo [[file:../a/rec.m4a]] and [[file:pic.png]]\nend", [], 49);
+  const press = async (el: Element) => {
+    touch(el, "touchstart", 10, 10);
+    await new Promise((r) => setTimeout(r, 550));
+    return touch(el, "touchend", 10, 10);
+  };
+  const player = view.dom.querySelector(".org-audio-player")!;
+  const img = view.dom.querySelector("img.org-image")!;
+  tap(player);
+  expect(opened.links).toEqual([]);
+  expect((await press(player)).defaultPrevented).toBe(true);
+  expect(opened.links).toEqual(["file:../a/rec.m4a"]);
+  // the touch that ends the press doesn't open the image a second time, as a tap would
+  expect((await press(img)).defaultPrevented).toBe(true);
+  expect(opened.links).toEqual(["file:../a/rec.m4a", "file:pic.png"]);
+  // the phone's long-press menu doesn't show
+  const menu = new Event("contextmenu", { bubbles: true, cancelable: true });
+  img.dispatchEvent(menu);
+  expect(menu.defaultPrevented).toBe(true);
+  expect(view.hasFocus).toBe(false);
+});
+
 test("denote links to images and audio show inline, by the file their identifier names; links to notes stay links", () => {
   const files: Record<string, string> = { "2610c": "attachments/2610c--beach.jpg", "2610d": "attachments/2610d--memo.m4a", "2610a": "notes/2610a--trip.org" };
   const path = (target: string) => files[target.replace(/^denote:/, "").split("::")[0]] ?? null;
