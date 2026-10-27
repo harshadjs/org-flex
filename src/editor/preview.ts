@@ -35,6 +35,8 @@ class ImageWidget extends WidgetType {
     img.src = this.src;
     img.alt = this.target;
     img.setAttribute("data-org-link", this.target);
+    // a long press would otherwise start dragging the image and cancel the touch
+    img.draggable = false;
     // LP-13: a long press opens the file too, instead of the phone's image menu
     onLongPress(img, () => view.state.facet(orgHost)?.openLink(this.target, view));
     return img;
