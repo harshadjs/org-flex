@@ -6,6 +6,7 @@ import { App, FuzzySuggestModal, Modal, Platform, prepareFuzzySearch, setIcon, S
 import { findNodes, NodeChoice } from "../org/node-find";
 import { TitleCompletion } from "../org/vault-index";
 import { addDays, dateFieldValue, parseDateField } from "../org/capture";
+import { recorderType, RECORDING_AUDIO, RECORDING_BITRATE } from "../org/edit";
 import { calendarMonth, journalDateString, JournalEntry, journalEntryLabel, localeWeekStart } from "../org/journal";
 
 function pad2(n: number): string {
@@ -304,14 +305,6 @@ export class CaptureModal extends Modal {
   }
 }
 
-/** ATT-4: the recorder's MIME type: MP4 (AAC) where it records that, as on iOS, else WebM (Opus), else the default. */
-function recorderType(): string | undefined {
-  for (const type of ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
-  }
-  return undefined;
-}
-
 /** ATT-4: record from the microphone with a running time; Stop saves, Cancel or closing throws it away. */
 export class RecorderModal extends Modal {
   private recorder: MediaRecorder | null = null;
@@ -342,14 +335,14 @@ export class RecorderModal extends Modal {
 
   private async start(status: HTMLElement, time: HTMLElement, stop: HTMLButtonElement) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { ...RECORDING_AUDIO } });
       if (!this.contentEl.isConnected) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
       this.stream = stream;
-      const type = recorderType();
-      const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const type = recorderType((t) => MediaRecorder.isTypeSupported(t));
+      const recorder = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: RECORDING_BITRATE });
       const chunks: Blob[] = [];
       recorder.addEventListener("dataavailable", (e) => { if (e.data.size) chunks.push(e.data); });
       recorder.addEventListener("stop", () => {

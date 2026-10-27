@@ -3,7 +3,7 @@ import { EditorSelection, EditorState, TransactionSpec } from "@codemirror/state
 import { history, undo } from "@codemirror/commands";
 import { codeFolding, foldEffect } from "@codemirror/language";
 import {
-  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension, pastedFiles, pastedName,
+  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension, recorderType, RECORDING_AUDIO, RECORDING_BITRATE, pastedFiles, pastedName,
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
 import { dropSlots, itemExtent, listDepths, moveItem, parseItem } from "../src/org/lists";
@@ -499,5 +499,19 @@ describe("attachments", () => {
     expect(recordingExtension("audio/mp4")).toBe("m4a");
     expect(recordingExtension("audio/ogg; codecs=opus")).toBe("ogg");
     expect(recordingExtension("")).toBe("webm");
+    expect(recordingExtension("audio/mp4;codecs=mp4a.40.2")).toBe("m4a");
+    expect(recordingExtension("audio/mp4; codecs=opus")).toBe("mp4");
+  });
+
+  test("the recorder asks for AAC first, Opus in MP4 last, and an unprocessed microphone", () => {
+    const can = (...types: string[]) => (t: string) => types.includes(t);
+    // Android: records Opus in a bare audio/mp4, so WebM wins unless AAC is offered
+    expect(recorderType(can("audio/mp4", "audio/webm;codecs=opus", "audio/webm"))).toBe("audio/webm;codecs=opus");
+    expect(recorderType(can("audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus"))).toBe("audio/mp4;codecs=mp4a.40.2");
+    // iOS: only MP4
+    expect(recorderType(can("audio/mp4"))).toBe("audio/mp4");
+    expect(recorderType(can())).toBeUndefined();
+    expect(RECORDING_AUDIO).toMatchObject({ echoCancellation: false, noiseSuppression: false, autoGainControl: false });
+    expect(RECORDING_BITRATE).toBe(128000);
   });
 });
