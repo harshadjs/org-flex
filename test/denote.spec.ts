@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
-  denoteDate, denoteFileName, DenoteFiles, denoteFrontMatter, denoteIdOf, parseDenoteLink, slugKeyword, slugTitle, timestampId,
+  denoteDate, denoteFileName, DenoteFiles, denoteFrontMatter, denoteIdOf, denoteLabel, parseDenoteLink, slugKeyword, slugTitle, timestampId,
 } from "../src/org/denote";
 import { classifyLink } from "../src/org/syntax";
 import { backlinksTo, mentionLink, noteLinkTarget, readNote, searchOffset, titleCompletions } from "../src/org/vault-index";
@@ -24,6 +24,16 @@ describe("Denote", () => {
     for (const plain of ["index.org", "README.org", "2610-last-plan.org", "Rec-30--voice-note.m4a", "PXL_2026_1.webp", "2026-10-03.org", "Some Note.org"]) {
       expect(denoteIdOf(plain)).toBeNull();
     }
+  });
+
+  test("a file with a Denote name reads as its title in lists, or its identifier without one", () => {
+    expect(denoteLabel("attachments/@@2610o--pxl-20261021-010451957.webp")).toBe("pxl 20261021 010451957");
+    expect(denoteLabel("topics/@@2609dy--hikes__outdoor.org")).toBe("hikes");
+    expect(denoteLabel("20261026T210500--my-note__a_b.org")).toBe("my note");
+    expect(denoteLabel("--title@@2610e__k.org")).toBe("title");
+    expect(denoteLabel("@@2610d.m4a")).toBe("2610d");
+    expect(denoteLabel("@@2610d__voice.m4a")).toBe("2610d");
+    expect(denoteLabel("index.org")).toBeNull();
   });
 
   test("denote links name an identifier and a search", () => {

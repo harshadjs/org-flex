@@ -18,7 +18,7 @@ import {
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { linkDescription } from "./org/vault-index";
-import { denoteIdOf } from "./org/denote";
+import { denoteIdOf, denoteLabel } from "./org/denote";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
 import { readingMode } from "./editor/reading";
 import { revealZoomEffects, toggleZoom, zoomToHeadingAt } from "./editor/zoom";
@@ -147,11 +147,13 @@ export class OrgFlexView extends TextFileView {
         const hasId = new Set(Array.from(index.notes.values())
           .filter((n) => scheme === "denote" ? n.denoteId !== null : n.ids.some((i) => i.heading === undefined)).map((n) => n.path));
         const files = app.vault.getFiles().filter((f) => !hasId.has(f.path)).map((f) => {
-          const name = f.extension === "org" || f.extension === "md" ? f.basename : f.name;
-          // DEN-7: a file with a Denote name is linked by its identifier
+          const plain = f.extension === "org" || f.extension === "md";
+          const name = plain ? f.basename : f.name;
+          // DEN-7: a file with a Denote name is linked by its identifier and shown by its title
           const id = scheme === "denote" ? denoteIdOf(f.path) : null;
+          const label = id !== null ? `${denoteLabel(f.path)}${plain ? "" : `.${f.extension}`}` : name;
           return {
-            label: name,
+            label,
             detail: f.parent && f.parent.path !== "/" ? f.parent.path : undefined,
             target: id !== null && this.plugin.denote.path(id) === f.path ? `denote:${id}` : name,
             type: "file",
@@ -162,7 +164,9 @@ export class OrgFlexView extends TextFileView {
       createNote: (title) => this.plugin.createNoteFromLink(title),
       title: () => (this.file && this.plugin.index.notes.get(this.file.path)?.title) || this.file?.basename || "",
       idCompletions: (scheme) => scheme === "denote"
-        ? this.plugin.denote.entries().map(({ id, path }) => ({ label: id, detail: path, target: id, type: "constant" }))
+        ? this.plugin.denote.entries().map(({ id, path }) => ({
+          label: id, detail: this.plugin.index.notes.get(path)?.title || denoteLabel(path) || path, target: id, type: "constant",
+        }))
         : this.plugin.index.ids().map(({ id, path }) => ({ label: id, detail: path, target: id, type: "constant" })),
     };
   }
