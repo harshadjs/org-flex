@@ -63,6 +63,7 @@ export function linkCompletions(context: CompletionContext): CompletionResult | 
   const words = pending && pending.from === before.from && pending.words === typed ? linkDescription(typed) : null;
   const options: CmCompletion[] = items.map((item) => ({
     label: item.label,
+    ...(item.displayLabel ? { displayLabel: item.displayLabel } : {}),
     detail: item.detail,
     type: item.type,
     apply: insertLink(linkBody(words && item.description !== undefined ? { ...item, description: words } : item)),

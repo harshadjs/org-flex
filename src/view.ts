@@ -17,7 +17,7 @@ import {
   assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
-import { linkDescription } from "./org/vault-index";
+import { attachmentCompletion, linkDescription } from "./org/vault-index";
 import { denoteIdOf, denoteLabel } from "./org/denote";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
 import { readingMode } from "./editor/reading";
@@ -151,6 +151,7 @@ export class OrgFlexView extends TextFileView {
           const name = plain ? f.basename : f.name;
           // DEN-7: a file with a Denote name is linked by its identifier and shown by its title
           const id = scheme === "denote" ? denoteIdOf(f.path) : null;
+          if (!plain && id === null) return attachmentCompletion(this.file?.path ?? "", f.path);
           const label = id !== null ? `${denoteLabel(f.path)}${plain ? "" : `.${f.extension}`}` : name;
           return {
             label,

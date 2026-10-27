@@ -35,6 +35,8 @@ export interface Completion {
   /** inserted as the link's description when present */
   description?: string;
   type?: string;
+  /** shown instead of the label, which is still what's matched (LP-9's attachment marker) */
+  displayLabel?: string;
 }
 
 /** What the editor needs from Obsidian. */
@@ -173,4 +175,53 @@ export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () =
   });
   // a long press on a phone would otherwise open the context menu
   if (onLong) el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+/**
+ * LP-13: a finger held still on `el` for LONG_PRESS_MS runs `action`; the
+ * touch that ends it then does nothing else (no tap, click or link opening
+ * below it), and the phone's own long-press menu doesn't show. Short taps
+ * and drags are left alone, so a player's controls and its slider still work.
+ */
+export function onLongPress(el: HTMLElement, action: () => void) {
+  let start: { x: number; y: number } | null = null;
+  let timer: number | null = null;
+  let fired = false;
+  const stop = () => {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = null;
+  };
+  el.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    fired = false;
+    stop();
+    if (!t || e.touches.length > 1) return;
+    start = { x: t.clientX, y: t.clientY };
+    timer = window.setTimeout(() => {
+      timer = null;
+      fired = true;
+      navigator.vibrate?.(15);
+      action();
+    }, LONG_PRESS_MS);
+  }, { passive: true });
+  el.addEventListener("touchmove", (e) => {
+    const t = e.touches[0];
+    if (start && t && (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10)) stop();
+  }, { passive: true });
+  const end = (e: Event) => {
+    stop();
+    start = null;
+    if (!fired) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  el.addEventListener("touchend", end);
+  el.addEventListener("touchcancel", () => stop());
+  el.addEventListener("click", (e) => {
+    if (!fired) return;
+    fired = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
 }

@@ -6,7 +6,7 @@
 import { EditorState, Range, RangeSetBuilder, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { isAudioTarget, isImageTarget, parseHeading, parseInline, InlineNode } from "../org/syntax";
-import { docInfo, onTap, orgConfig, orgHost, selectionTouches, structureOf } from "./state";
+import { docInfo, onLongPress, onTap, orgConfig, orgHost, selectionTouches, structureOf } from "./state";
 
 const hidden = Decoration.replace({});
 const marks = new Map<string, Decoration>();
@@ -29,12 +29,14 @@ class ImageWidget extends WidgetType {
   eq(other: ImageWidget) {
     return other.src === this.src;
   }
-  toDOM() {
+  toDOM(view: EditorView) {
     const img = document.createElement("img");
     img.className = "org-image";
     img.src = this.src;
     img.alt = this.target;
     img.setAttribute("data-org-link", this.target);
+    // LP-13: a long press opens the file too, instead of the phone's image menu
+    onLongPress(img, () => view.state.facet(orgHost)?.openLink(this.target, view));
     return img;
   }
   ignoreEvent() {
@@ -70,6 +72,8 @@ class AudioWidget extends WidgetType {
       loop.setAttribute("aria-pressed", String(audio.loop));
       loop.classList.toggle("is-active", audio.loop);
     });
+    // LP-13: a long press on the player opens the file
+    onLongPress(wrap, () => view.state.facet(orgHost)?.openLink(this.target, view));
     return wrap;
   }
   ignoreEvent() {
