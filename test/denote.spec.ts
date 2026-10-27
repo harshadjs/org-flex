@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
-  denoteDate, denoteFileName, DenoteFiles, denoteFrontMatter, denoteIdOf, denoteLabel, parseDenoteLink, slugKeyword, slugTitle, timestampId,
+  denoteDate, denoteFileName, DenoteFiles, denoteFrontMatter, denoteIdOf, denoteLabel, denoteTabTitle, parseDenoteLink, slugKeyword, slugTitle, timestampId,
 } from "../src/org/denote";
 import { classifyLink } from "../src/org/syntax";
 import { backlinksTo, mentionLink, noteLinkTarget, readNote, searchOffset, titleCompletions } from "../src/org/vault-index";
@@ -34,6 +34,15 @@ describe("Denote", () => {
     expect(denoteLabel("@@2610d.m4a")).toBe("2610d");
     expect(denoteLabel("@@2610d__voice.m4a")).toBe("2610d");
     expect(denoteLabel("index.org")).toBeNull();
+  });
+
+  test("a Denote tab shows the note's title, else the title in the name", () => {
+    expect(denoteTabTitle("notes/@@2610d--goa-trip__travel.org", "Goa trip")).toBe("Goa trip");
+    // the index falls back to the file name when there's no #+title
+    expect(denoteTabTitle("notes/@@2610d--goa-trip__travel.org", "@@2610d--goa-trip__travel")).toBe("goa trip");
+    expect(denoteTabTitle("attachments/@@2610o--pxl-20261021.webp")).toBe("pxl 20261021");
+    expect(denoteTabTitle("@@2610d.m4a")).toBe("2610d");
+    expect(denoteTabTitle("tasks.org", "Tasks")).toBeNull();
   });
 
   test("denote links name an identifier and a search", () => {
