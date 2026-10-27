@@ -29,6 +29,18 @@ export function denoteIdOf(path: string): string | null {
   return m[1];
 }
 
+/**
+ * DEN-7: how a file with a Denote name reads in a list: its title with the
+ * slug's `-` as spaces (`@@2610o--pxl-20261021.webp` → `pxl 20261021`), or
+ * its identifier when it has no title. Null when the name isn't Denote's.
+ */
+export function denoteLabel(path: string): string | null {
+  const id = denoteIdOf(path);
+  if (id === null) return null;
+  const title = /--(.+?)(?=__|==|@@|$)/.exec(stem(path).replace(`@@${id}`, ""));
+  return title ? title[1].replace(/-/g, " ") : id;
+}
+
 /** DEN-1: the parts of a `denote:` link target, or null for any other link. */
 export function parseDenoteLink(target: string): { id: string; search: string } | null {
   const m = /^denote:([^:]+?)(?:::(.*))?$/i.exec(target.trim());
