@@ -58,7 +58,7 @@ export function journalEntries(paths: string[], folder: string): JournalEntry[] 
   const entries: JournalEntry[] = [];
   for (const path of paths) {
     if (!path.startsWith(prefix)) continue;
-    const m = /(?:^|\/)(?:[0-9A-Za-z]+--)?(\d{4}-\d{2}-\d{2})(?:__[^/]*)?\.org$/.exec(path);
+    const m = /(?:^|\/)(?:(?:@@)?[0-9A-Za-z]+--)?(\d{4}-\d{2}-\d{2})(?:__[^/]*)?\.org$/.exec(path);
     if (m) entries.push({ path, date: m[1] });
   }
   return entries.sort((a, b) => b.date.localeCompare(a.date) || a.path.localeCompare(b.path));

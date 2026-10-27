@@ -35,22 +35,34 @@ export function parseDenoteLink(target: string): { id: string; search: string } 
   return m ? { id: m[1].trim(), search: m[2] ?? "" } : null;
 }
 
-/** DEN-3: a title as Denote writes it in a file name: lowercase, words joined by `-`. */
+/** the punctuation Denote drops from titles and keywords (`denote-sluggify-title`) */
+const PUNCTUATION = /[\][{}!@#$%^&*()+'"?,.\\|;:~`‘’“”/=]/g;
+
+/**
+ * DEN-3: a title as Denote writes it in a file name (`denote-sluggify-title`):
+ * punctuation dropped, spaces and `_` as `-`, one `-` at a time, lowercase.
+ */
 export function slugTitle(title: string): string {
-  return title.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+  return title.replace(PUNCTUATION, "").replace(/[_\s]+/g, "-").replace(/-{2,}/g, "-").replace(/^-|-$/g, "").toLowerCase();
 }
 
-/** DEN-3: a keyword as Denote writes it: lowercase letters and digits only. */
+/** DEN-3: a keyword as Denote writes it (`denote-sluggify-keyword`): punctuation, spaces, `_` and `-` dropped, lowercase. */
 export function slugKeyword(keyword: string): string {
-  return keyword.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]+/gu, "");
+  return keyword.replace(PUNCTUATION, "").replace(/[_\s-]+/g, "").toLowerCase();
 }
 
-/** DEN-3: `ID--title__key_words.ext`, leaving out a part that is empty. */
+/** Denote's own identifier form, the only one it writes without `@@`. */
+const DATE_ID = /^\d{8}T\d{6}$/;
+
+/**
+ * DEN-3: `ID--title__key_words.ext`, leaving out a part that is empty. As
+ * Denote does, an identifier that isn't a date (`2610a`) gets `@@` before it:
+ * `@@2610a--title.ext`.
+ */
 export function denoteFileName(id: string, title: string, keywords: string[], ext: string): string {
   const slug = slugTitle(title);
   const keys = keywords.map(slugKeyword).filter(Boolean);
-  return `${id}${slug ? `--${slug}` : ""}${keys.length ? `__${keys.join("_")}` : ""}${ext ? `.${ext}` : ""}`;
+  return `${DATE_ID.test(id) ? "" : "@@"}${id}${slug ? `--${slug}` : ""}${keys.length ? `__${keys.join("_")}` : ""}${ext ? `.${ext}` : ""}`;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

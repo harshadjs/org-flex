@@ -14,6 +14,8 @@ describe("Denote", () => {
   test("Denote file names give their identifier; other names don't", () => {
     expect(denoteIdOf("notes/20261026T210500--my-note__a_b.org")).toBe("20261026T210500");
     expect(denoteIdOf("2610a--trip.org")).toBe("2610a");
+    expect(denoteIdOf("@@2610a--trip.org")).toBe("2610a");
+    expect(denoteIdOf("@@2610d.m4a")).toBe("2610d");
     expect(denoteIdOf("attachments/2610c--beach.jpg")).toBe("2610c");
     expect(denoteIdOf("journal/2026/10/261003--2026-10-03__journal.org")).toBe("261003");
     expect(denoteIdOf("2610q__keyword.png")).toBe("2610q");
@@ -34,11 +36,15 @@ describe("Denote", () => {
   });
 
   test("Denote names, front matter and timestamp identifiers", () => {
-    expect(slugTitle("  Café: plans, 2026!  ")).toBe("cafe-plans-2026");
-    expect(slugKeyword("Org-Mode")).toBe("orgmode");
-    expect(denoteFileName("2610a", "Trip to Goa", ["Travel", "family"], "org")).toBe("2610a--trip-to-goa__travel_family.org");
-    expect(denoteFileName("2610c", "Pasted image 20261026", [], "png")).toBe("2610c--pasted-image-20261026.png");
-    expect(denoteFileName("2610d", "", [], "m4a")).toBe("2610d.m4a");
+    // as denote-sluggify-title: punctuation dropped, not turned into "-"; accents kept
+    expect(slugTitle("  Café: plans, 2026!  ")).toBe("café-plans-2026");
+    expect(slugTitle("Tom's notes_on  Dr. Who")).toBe("toms-notes-on-dr-who");
+    expect(slugKeyword("Org-Mode_x y")).toBe("orgmodexy");
+    expect(denoteFileName("2610a", "Trip to Goa", ["Travel", "family"], "org")).toBe("@@2610a--trip-to-goa__travel_family.org");
+    expect(denoteFileName("2610c", "Pasted image 20261026", [], "png")).toBe("@@2610c--pasted-image-20261026.png");
+    expect(denoteFileName("2610d", "", [], "m4a")).toBe("@@2610d.m4a");
+    // Denote's own date identifiers are written without @@
+    expect(denoteFileName("20261026T210509", "Trip", [], "org")).toBe("20261026T210509--trip.org");
     const at = new Date(2026, 9, 26, 21, 5, 9);
     expect(denoteDate(at)).toBe("[2026-10-26 Mon 21:05]");
     expect(denoteFrontMatter("Trip to Goa", at, ["travel"], "2610a")).toBe(
@@ -93,14 +99,14 @@ describe("Denote", () => {
   });
 
   test("Denote notes and journal days are named by identifier, and days found by date", () => {
-    expect(notePath("notes", " Trip to Goa ", "2610a")).toBe("notes/2610a--trip-to-goa.org");
+    expect(notePath("notes", " Trip to Goa ", "2610a")).toBe("notes/@@2610a--trip-to-goa.org");
     const d = new Date(2026, 9, 3, 8, 30);
-    expect(journalPathForDate("journal", d, "261003")).toBe("journal/2026/10/261003--2026-10-03__journal.org");
+    expect(journalPathForDate("journal", d, "261003")).toBe("journal/2026/10/@@261003--2026-10-03__journal.org");
     expect(denoteJournalContent(d, "261003", d)).toBe(
       "#+title:      2026-10-03\n#+date:       [2026-10-03 Sat 08:30]\n#+filetags:   :journal:\n#+identifier: 261003\n\n");
-    expect(journalEntries(["journal/2026/10/261003--2026-10-03__journal.org", "journal/2026/10/2026-10-02.org", "notes/2610a--x.org"], "journal"))
+    expect(journalEntries(["journal/2026/10/@@261003--2026-10-03__journal.org", "journal/2026/10/2026-10-02.org", "notes/2610a--x.org"], "journal"))
       .toEqual([
-        { path: "journal/2026/10/261003--2026-10-03__journal.org", date: "2026-10-03" },
+        { path: "journal/2026/10/@@261003--2026-10-03__journal.org", date: "2026-10-03" },
         { path: "journal/2026/10/2026-10-02.org", date: "2026-10-02" },
       ]);
   });
