@@ -11,7 +11,7 @@ import { srcHighlight } from "../src/editor/src-highlight";
 import { applyVisibility, orgFolding } from "../src/editor/folding";
 import { checklists } from "../src/editor/checklists";
 import { frontMatterPanel } from "../src/editor/front-matter-panel";
-import { backlinksSection, setBacklinks } from "../src/editor/backlinks";
+import { backlinksSection, renderBacklinks, setBacklinks } from "../src/editor/backlinks";
 import { shortcutBar } from "../src/editor/shortcut-bar";
 import { CompletionContext, completionStatus, currentCompletions } from "@codemirror/autocomplete";
 import { exactIdMatches, insertLinkWithCompletion, linkButton, linkCompletions, orgCompletion } from "../src/editor/completion";
@@ -290,4 +290,21 @@ test("after the link button's words are edited, picking an entry uses its title"
   (option.apply as (v: EditorView, c: typeof option, from: number, to: number) => void)(view, option, result.from, 13);
   expect(view.state.doc.toString()).toBe("Read [[id:n1][Notes]]");
   view.destroy();
+});
+
+test("under a media file only the linked section shows, and tapping a line opens it", () => {
+  const opened: [string, number][] = [];
+  const toggled: string[] = [];
+  const data = {
+    backlinks: [{ path: "j.org", title: "2026-10-27", lines: [{ line: 3, text: "[[file:a.jpg]]" }] }],
+    mentions: null, linkedOpen: true, mentionsOpen: false, linkedOnly: true,
+  };
+  const root = renderBacklinks(data, { open: (p, l) => opened.push([p, l]), link() {}, toggle: (s) => toggled.push(s) }, () => {});
+  document.body.appendChild(root);
+  expect(Array.from(root.querySelectorAll(".org-backlinks-header")).map((h) => h.textContent)).toEqual(["Linked mentions1"]);
+  root.querySelector<HTMLElement>(".org-backlinks-line")!.click();
+  root.querySelector<HTMLElement>(".org-backlinks-header")!.click();
+  expect(opened).toEqual([["j.org", 3]]);
+  expect(toggled).toEqual(["linked"]);
+  root.remove();
 });

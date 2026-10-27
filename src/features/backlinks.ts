@@ -1,10 +1,12 @@
-// Backlinks (§5a): linked and unlinked mentions at the end of every note.
+// Backlinks (§5a): linked and unlinked mentions at the end of every note,
+// and the notes linking to a media file below it in its own view (BL-7).
 
-import { Notice, TFile } from "obsidian";
+import { FileView, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type { StateField } from "@codemirror/state";
 import type { OrgFlexView } from "../view";
-import { mentionLink, Mention } from "../org/vault-index";
-import { BacklinksData, backlinksSection, setBacklinks } from "../editor/backlinks";
+import type OrgFlexPlugin from "../main";
+import { isMediaFile, mentionLink, Mention } from "../org/vault-index";
+import { BacklinksData, backlinksSection, renderBacklinks, setBacklinks } from "../editor/backlinks";
 import type { Feature } from "./feature";
 
 interface ViewState {
@@ -51,6 +53,49 @@ function refresh(view: OrgFlexView) {
   editor.dispatch({ effects: setBacklinks.of(data) });
 }
 
+const MEDIA_PANEL = "org-media-backlinks";
+/** BL-7: whether each tab's list under a media file is open; open at first */
+const mediaOpen = new WeakMap<WorkspaceLeaf, boolean>();
+
+/**
+ * BL-7: under each image, audio, video or PDF open in a tab, the notes with
+ * a `[[file:…]]` link to it, as BL-1 lists them. Redrawn only when it changed.
+ */
+function refreshMedia(plugin: OrgFlexPlugin) {
+  plugin.app.workspace.iterateAllLeaves((leaf) => {
+    const view = leaf.view;
+    if (!(view instanceof FileView)) return;
+    const old = view.contentEl.querySelector(`:scope > .${MEDIA_PANEL}`);
+    const file = view.file;
+    // BL-6: turned off, no list under media files either
+    if (!file || !isMediaFile(file.path) || !plugin.settings.showBacklinks) {
+      old?.remove();
+      return;
+    }
+    const data: BacklinksData = {
+      backlinks: plugin.index.fileBacklinks(file.path),
+      mentions: null,
+      linkedOpen: mediaOpen.get(leaf) ?? true,
+      mentionsOpen: false,
+      linkedOnly: true,
+    };
+    const key = file.path + JSON.stringify(data);
+    if (old instanceof HTMLElement && old.dataset.key === key) return;
+    const panel = renderBacklinks(data, {
+      open: (path, line) => void plugin.openAt(leaf, path, { line }),
+      link: () => {},
+      toggle: () => {
+        mediaOpen.set(leaf, !(mediaOpen.get(leaf) ?? true));
+        refreshMedia(plugin);
+      },
+    }, setIcon);
+    panel.classList.add(MEDIA_PANEL);
+    panel.dataset.key = key;
+    if (old) old.replaceWith(panel);
+    else view.contentEl.appendChild(panel);
+  });
+}
+
 /** BL-3: turn a mention in another file into a link, if that file hasn't changed since. */
 async function linkMention(view: OrgFlexView, mention: Mention) {
   const { app } = view;
@@ -75,9 +120,19 @@ export const backlinks: Feature = {
   id: "backlinks",
   section: "5a. Index and backlinks",
   load(plugin) {
-    plugin.register(plugin.index.onChange(() => plugin.forEachView(refresh)));
+    plugin.register(plugin.index.onChange(() => {
+      plugin.forEachView(refresh);
+      refreshMedia(plugin);
+    }));
+    const media = () => refreshMedia(plugin);
+    plugin.registerEvent(plugin.app.workspace.on("layout-change", media));
+    plugin.registerEvent(plugin.app.workspace.on("file-open", media));
+    plugin.register(() => document.querySelectorAll(`.${MEDIA_PANEL}`).forEach((el) => el.remove()));
   },
   editor: (view) => stateOf(view).field,
   opened: refresh,
-  settingsChanged: refresh,
+  settingsChanged(view) {
+    refresh(view);
+    refreshMedia(view.plugin);
+  },
 };
