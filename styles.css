@@ -924,3 +924,11 @@ input.org-icon-invalid {
 .org-flex-view .org-reading .org-planning-date:active {
   background: var(--background-modifier-active-hover);
 }
+
+/* LP-13: a long press opens the file, so the phone's own callout and selection stay away */
+.org-flex-view .org-image,
+.org-flex-view .org-audio-player {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

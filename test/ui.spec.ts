@@ -787,10 +787,26 @@ test("a long press on an image or an audio player opens its file, once; a short 
   // the touch that ends the press doesn't open the image a second time, as a tap would
   expect((await press(img)).defaultPrevented).toBe(true);
   expect(opened.links).toEqual(["file:../a/rec.m4a", "file:pic.png"]);
-  // the phone's long-press menu doesn't show
-  const menu = new Event("contextmenu", { bubbles: true, cancelable: true });
-  img.dispatchEvent(menu);
-  expect(menu.defaultPrevented).toBe(true);
+  expect((img as HTMLImageElement).draggable).toBe(false);
+  // the phone's long-press event, which can come first and cancel the touch, opens it once, without its menu
+  const menu = () => {
+    const e = new Event("contextmenu", { bubbles: true, cancelable: true });
+    img.dispatchEvent(e);
+    return e;
+  };
+  touch(img, "touchstart", 10, 10);
+  expect(menu().defaultPrevented).toBe(true);
+  img.dispatchEvent(new Event("touchcancel", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 550));
+  expect(opened.links).toEqual(["file:../a/rec.m4a", "file:pic.png", "file:pic.png"]);
+  touch(img, "touchstart", 10, 10);
+  menu();
+  await new Promise((r) => setTimeout(r, 550));
+  expect(touch(img, "touchend", 10, 10).defaultPrevented).toBe(true);
+  expect(opened.links.length).toBe(4);
+  // a right-click opens it too
+  menu();
+  expect(opened.links.length).toBe(5);
   expect(view.hasFocus).toBe(false);
 });
 

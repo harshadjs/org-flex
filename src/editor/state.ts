@@ -178,50 +178,65 @@ export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () =
 }
 
 /**
- * LP-13: a finger held still on `el` for LONG_PRESS_MS runs `action`; the
- * touch that ends it then does nothing else (no tap, click or link opening
- * below it), and the phone's own long-press menu doesn't show. Short taps
- * and drags are left alone, so a player's controls and its slider still work.
+ * LP-13: a finger held still on `el` for LONG_PRESS_MS runs `action`, and so
+ * does the phone's own long-press event (`contextmenu`, which Android sends
+ * when it would show its image menu or start a drag, often cancelling the
+ * touch first) or a right-click. It runs once per press; the touch that ends
+ * it then does nothing else (no tap, click or link opening below it). Short
+ * taps and drags are left alone, so a player's controls and slider still work.
  */
 export function onLongPress(el: HTMLElement, action: () => void) {
   let start: { x: number; y: number } | null = null;
   let timer: number | null = null;
+  let touching = false;
   let fired = false;
   const stop = () => {
     if (timer !== null) window.clearTimeout(timer);
     timer = null;
+  };
+  const fire = () => {
+    stop();
+    if (fired) return;
+    fired = true;
+    navigator.vibrate?.(15);
+    action();
   };
   el.addEventListener("touchstart", (e) => {
     const t = e.touches[0];
     fired = false;
     stop();
     if (!t || e.touches.length > 1) return;
+    touching = true;
     start = { x: t.clientX, y: t.clientY };
-    timer = window.setTimeout(() => {
-      timer = null;
-      fired = true;
-      navigator.vibrate?.(15);
-      action();
-    }, LONG_PRESS_MS);
+    timer = window.setTimeout(fire, LONG_PRESS_MS);
   }, { passive: true });
   el.addEventListener("touchmove", (e) => {
     const t = e.touches[0];
     if (start && t && (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10)) stop();
   }, { passive: true });
-  const end = (e: Event) => {
+  el.addEventListener("touchend", (e) => {
     stop();
+    touching = false;
     start = null;
     if (!fired) return;
     e.preventDefault();
     e.stopPropagation();
-  };
-  el.addEventListener("touchend", end);
-  el.addEventListener("touchcancel", () => stop());
+  });
+  el.addEventListener("touchcancel", () => {
+    stop();
+    touching = false;
+    start = null;
+  });
   el.addEventListener("click", (e) => {
     if (!fired) return;
     fired = false;
     e.preventDefault();
     e.stopPropagation();
   }, true);
-  el.addEventListener("contextmenu", (e) => e.preventDefault());
+  el.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (touching) fire();
+    else action();
+  });
 }
