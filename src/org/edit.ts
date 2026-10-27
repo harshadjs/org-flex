@@ -561,9 +561,39 @@ export function pastedName(name: string, mime: string, date: Date): string {
   return `Pasted image ${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.${ext}`;
 }
 
+/**
+ * ATT-4: the formats a recorder is asked for, best first. AAC in MP4 is what
+ * other apps expect of an `.m4a`; a bare `audio/mp4` comes after WebM because
+ * Android records Opus in it, which most players can't open.
+ */
+const RECORDER_TYPES = ["audio/mp4;codecs=mp4a.40.2", "audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4", "audio/webm"];
+
+/** ATT-4: the first format the device can record, or undefined for its default. */
+export function recorderType(supported: (type: string) => boolean): string | undefined {
+  return RECORDER_TYPES.find(supported);
+}
+
+/**
+ * ATT-4: the microphone as a voice memo wants it: echo cancellation, noise
+ * suppression and automatic gain are for calls and make a memo sound thin and
+ * pumping (on Android they switch the microphone to its call mode).
+ */
+export const RECORDING_AUDIO = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+  channelCount: 1,
+  sampleRate: 48000,
+} as const;
+
+/** ATT-4: the recording's bitrate, as a phone's own recorder makes them. */
+export const RECORDING_BITRATE = 128000;
+
 /** ATT-4: the file extension for a recorder's MIME type (`audio/webm;codecs=opus` → `webm`). */
 export function recordingExtension(mime: string): string {
-  const type = mime.split(";")[0].trim().toLowerCase();
+  const [type, ...params] = mime.toLowerCase().split(";").map((s) => s.trim());
+  // Opus in MP4 isn't what an .m4a holds: name it .mp4 so players don't take it for AAC
+  if (type === "audio/mp4" && params.some((p) => /^codecs=.*opus/.test(p))) return "mp4";
   if (type === "audio/mp4" || type === "audio/x-m4a" || type === "audio/aac") return "m4a";
   if (type === "audio/ogg") return "ogg";
   if (type === "audio/wav" || type === "audio/x-wav") return "wav";
