@@ -24,7 +24,7 @@ afterEach(() => {
 
 interface Opened { links: string[]; icons: Map<HTMLElement, string> }
 
-function mount(doc: string, extensions: Extension = [], cursor = doc.length, config: Partial<typeof DEFAULT_CONFIG> = {}) {
+function mount(doc: string, extensions: Extension = [], cursor = doc.length, config: Partial<typeof DEFAULT_CONFIG> = {}, hostParts: Partial<OrgHost> = {}) {
   const opened: Opened = { links: [], icons: new Map() };
   const host: OrgHost = {
     setIcon: (el, icon) => void opened.icons.set(el, icon),
@@ -32,6 +32,7 @@ function mount(doc: string, extensions: Extension = [], cursor = doc.length, con
     imageSrc: () => null,
     linkCompletions: () => [],
     idCompletions: () => [],
+    ...hostParts,
   };
   const parent = document.body.appendChild(document.createElement("div"));
   const view = new EditorView({
@@ -768,4 +769,19 @@ test("audio links play inline while the cursor is elsewhere, with a loop button;
   expect(view.hasFocus).toBe(false);
   view.dispatch({ selection: { anchor: 8 } });
   expect(view.dom.querySelectorAll("audio.org-audio").length).toBe(0);
+});
+
+test("denote links to images and audio show inline, by the file their identifier names; links to notes stay links", () => {
+  const files: Record<string, string> = { "2610c": "attachments/2610c--beach.jpg", "2610d": "attachments/2610d--memo.m4a", "2610a": "notes/2610a--trip.org" };
+  const path = (target: string) => files[target.replace(/^denote:/, "").split("::")[0]] ?? null;
+  const { view } = mount("[[denote:2610c]] [[denote:2610d]] [[denote:2610a][Trip]] [[denote:2610z]]\nend", [], undefined, {}, {
+    mediaPath: path,
+    imageSrc: (target) => path(target) && `app://${path(target)}`,
+  });
+  expect(view.dom.querySelector<HTMLImageElement>("img.org-image")!.getAttribute("src")).toBe("app://attachments/2610c--beach.jpg");
+  expect(view.dom.querySelector<HTMLAudioElement>("audio.org-audio")!.getAttribute("src")).toBe("app://attachments/2610d--memo.m4a");
+  expect(view.dom.querySelectorAll("img.org-image, audio.org-audio").length).toBe(2);
+  expect(view.dom.textContent).toContain("Trip");
+  // an identifier no file has is a link, not a broken image
+  expect(view.dom.querySelector('[data-org-link="denote:2610z"]')).not.toBeNull();
 });

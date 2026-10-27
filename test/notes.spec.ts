@@ -118,9 +118,19 @@ describe("journal", () => {
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("this flavour's keywords are TODO NEXT DOING WAITING then DONE CANCELLED, with the UUID journal header", () => {
+  test("this flavour has TODO NEXT DOING WAITING then DONE CANCELLED, and Denote links with YYMM and letter identifiers", () => {
     expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "NEXT", "DOING", "WAITING"], ["DONE", "CANCELLED"]]);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
+    expect(FLAVOUR.links).toBe("denote");
+    const oct = new Date(2026, 9, 3, 9, 0);
+    expect(FLAVOUR.denoteId(oct, new Set())).toBe("2610a");
+    expect(FLAVOUR.denoteId(oct, new Set(["2610a", "2610b", "2609k", "261003"]))).toBe("2610c");
+    // after z come two letters; the highest in use counts, not the first gap
+    expect(FLAVOUR.denoteId(oct, new Set(["2610z"]))).toBe("2610aa");
+    expect(FLAVOUR.denoteId(oct, new Set(["2610a", "2610az"]))).toBe("2610ba");
+    expect(FLAVOUR.denoteId(oct, new Set(["2610zz"]))).toBe("2610aaa");
+    expect(FLAVOUR.denoteId(new Date(2027, 0, 1), new Set(["2610c"]))).toBe("2701a");
+    expect(FLAVOUR.journalId(oct, new Set())).toBe("261003");
   });
 
   test("journalEntries keeps dated files under the folder, newest first", () => {

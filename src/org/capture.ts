@@ -3,7 +3,7 @@
 // single org-capture template.
 
 import { orgDateString } from "./edit";
-import { linkDescription, NoteRecord } from "./vault-index";
+import { LinkScheme, linkDescription, NoteRecord, noteTarget } from "./vault-index";
 
 /** CAP-2: the inbox setting as a vault path: slashes trimmed, `.org` added when missing. */
 export function capturePath(setting: string): string {
@@ -58,10 +58,10 @@ export function addDays(date: Date, days: number): Date {
  * first line to type the heading on, then a link back to the note, by its
  * file-level ID (`[[id:…][Title]]`), else by its file name.
  */
-export function noteCaptureText(note: NoteRecord): string {
-  const fileId = note.ids.find((i) => i.offset === 0 && i.heading === undefined)?.id;
+export function noteCaptureText(note: NoteRecord, scheme: LinkScheme = "id"): string {
+  const target = noteTarget(note, scheme);
   const title = linkDescription(note.title) || note.name;
-  const link = fileId !== undefined ? `[[id:${fileId}][${title}]]` : title === note.name ? `[[${note.name}]]` : `[[${note.name}][${title}]]`;
+  const link = target !== null ? `[[${target}][${title}]]` : title === note.name ? `[[${note.name}]]` : `[[${note.name}][${title}]]`;
   return `\n${link}`;
 }
 

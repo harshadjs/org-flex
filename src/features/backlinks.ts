@@ -63,7 +63,7 @@ async function linkMention(view: OrgFlexView, mention: Mention) {
       stale = true;
       return text;
     }
-    return text.slice(0, mention.from) + mentionLink(note, mention.words) + text.slice(mention.to);
+    return text.slice(0, mention.from) + mentionLink(note, mention.words, view.plugin.scheme()) + text.slice(mention.to);
   });
   if (stale) {
     new Notice(`${mention.title} changed since it was indexed; nothing was linked.`);

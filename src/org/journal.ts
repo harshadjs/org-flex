@@ -1,5 +1,7 @@
 // Daily journal (§10): one file per day at <folder>/YYYY/MM/YYYY-MM-DD.org,
-// started from a template.
+// started from a template; with Denote, <folder>/YYYY/MM/ID--YYYY-MM-DD__journal.org.
+
+import { denoteFileName, denoteFrontMatter } from "./denote";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -21,10 +23,18 @@ export function cleanFolder(folder: string): string {
   return folder.trim().replace(/^\/+|\/+$/g, "");
 }
 
-export function journalPathForDate(folder: string, date: Date): string {
+/** JRN-1: the day's file; DEN-6: with a Denote identifier, `ID--YYYY-MM-DD__journal.org`. */
+export function journalPathForDate(folder: string, date: Date, denoteId?: string): string {
   const root = cleanFolder(folder);
-  const path = `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${journalDateString(date)}.org`;
+  const day = journalDateString(date);
+  const name = denoteId === undefined ? `${day}.org` : denoteFileName(denoteId, day, ["journal"], "org");
+  const path = `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${name}`;
   return root ? `${root}/${path}` : path;
+}
+
+/** DEN-6: a new Denote journal file: the day as title, keyword `journal`, dated `now`. */
+export function denoteJournalContent(date: Date, id: string, now: Date): string {
+  return denoteFrontMatter(journalDateString(date), now, ["journal"], id);
 }
 
 /** JRN-2: the base flavour's journal header: a new UUID as `:ID:`, the date as title. */
@@ -41,14 +51,14 @@ export interface JournalEntry {
   date: string;
 }
 
-/** JRN-3: files named YYYY-MM-DD.org at any depth under `folder`, newest first. */
+/** JRN-3: files named YYYY-MM-DD.org (DEN-6: or ID--YYYY-MM-DD__keywords.org) at any depth under `folder`, newest first. */
 export function journalEntries(paths: string[], folder: string): JournalEntry[] {
   const root = cleanFolder(folder);
   const prefix = root ? `${root}/` : "";
   const entries: JournalEntry[] = [];
   for (const path of paths) {
     if (!path.startsWith(prefix)) continue;
-    const m = /(?:^|\/)(\d{4}-\d{2}-\d{2})\.org$/.exec(path);
+    const m = /(?:^|\/)(?:[0-9A-Za-z]+--)?(\d{4}-\d{2}-\d{2})(?:__[^/]*)?\.org$/.exec(path);
     if (m) entries.push({ path, date: m[1] });
   }
   return entries.sort((a, b) => b.date.localeCompare(a.date) || a.path.localeCompare(b.path));

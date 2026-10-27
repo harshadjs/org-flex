@@ -471,13 +471,13 @@ test("tapping a keyword in reading mode toggles open and done, never to none", (
 describe("attachments", () => {
   test("insertFileLinks puts file links at the cursor, spaced from a word, cursor after", () => {
     let s0 = at("see|");
-    let s = apply(s0, insertFileLinks(s0, ["a.jpg", "../m/b c.m4a"])!);
+    let s = apply(s0, insertFileLinks(s0, ["file:a.jpg", "file:../m/b c.m4a"])!);
     expect(s.doc.toString()).toBe("see [[file:a.jpg]] [[file:../m/b c.m4a]]");
     expect(s.selection.main.head).toBe(s.doc.length);
     s0 = at("|");
-    expect(apply(s0, insertFileLinks(s0, ["a.jpg"])!).doc.toString()).toBe("[[file:a.jpg]]");
+    expect(apply(s0, insertFileLinks(s0, ["file:a.jpg"])!).doc.toString()).toBe("[[file:a.jpg]]");
     s0 = at("x |y");
-    expect(apply(s0, insertFileLinks(s0, ["a.jpg"])!).doc.toString()).toBe("x [[file:a.jpg]]y");
+    expect(apply(s0, insertFileLinks(s0, ["file:a.jpg"])!).doc.toString()).toBe("x [[file:a.jpg]]y");
     expect(insertFileLinks(s0, [])).toBeNull();
   });
 

@@ -121,13 +121,28 @@ test("picking a title after [[ inserts an ID link with the title as description"
   expect(pick("[[im|", "img.png")).toEqual({ text: "[[img.png]]", cursor: 11 });
 });
 
+test("after [[denote: the list offers Denote identifiers, after [[id: org IDs", () => {
+  const host = {
+    setIcon() {}, openLink() {}, imageSrc: () => null, linkCompletions: () => [],
+    idCompletions: (scheme?: "id" | "denote") => scheme === "denote" ? [{ label: "2610a", target: "2610a" }] : [{ label: "5f0c-uuid", target: "5f0c-uuid" }],
+  };
+  const labels = (doc: string) => {
+    const view = new EditorView({ parent: document.body, state: EditorState.create({ doc, extensions: [orgHost.of(host)] }) });
+    const result = linkCompletions(new CompletionContext(view.state, doc.length, true))!;
+    view.destroy();
+    return { from: result.from, labels: result.options.map((o) => o.label) };
+  };
+  expect(labels("[[denote:26")).toEqual({ from: 9, labels: ["2610a"] });
+  expect(labels("[[id:5f")).toEqual({ from: 5, labels: ["5f0c-uuid"] });
+});
+
 test("a title nobody has yet can be picked to create the note, linked by its new ID", () => {
   const created: string[] = [];
   const host = {
     setIcon() {}, openLink() {}, imageSrc: () => null,
     idCompletions: () => [{ label: "5f0c-uuid", target: "5f0c-uuid" }],
     linkCompletions: () => [{ label: "Org roam", target: "id:5f0c-uuid", description: "Org roam", type: "note" }],
-    createNote: (title: string) => { created.push(title); return "new-uuid"; },
+    createNote: (title: string) => { created.push(title); return "id:new-uuid"; },
   };
   const query = (doc: string) => {
     const view = new EditorView({ parent: document.body, state: EditorState.create({ doc, extensions: [orgHost.of(host)] }) });
@@ -156,7 +171,7 @@ test("the create entry comes after every match and follows the typing", async ()
   const host = {
     setIcon() {}, openLink() {}, imageSrc: () => null, idCompletions: () => [],
     linkCompletions: () => [{ label: "Org roam", target: "id:5f0c-uuid", description: "Org roam", type: "note" }],
-    createNote: () => "new-uuid",
+    createNote: () => "id:new-uuid",
   };
   const view = new EditorView({
     parent: document.body,
@@ -208,7 +223,7 @@ test("the link button links selected words to the one note or heading with that 
       { label: "notes", target: "id:n2", description: "notes", type: "note" },
       { label: "Packing", target: "Packing", type: "file" },
     ],
-    createNote: () => "new-uuid",
+    createNote: () => "id:new-uuid",
   };
   expect(exactIdMatches(host.linkCompletions(), " trip plans ").map((m) => m.target)).toEqual(["id:trip"]);
   expect(exactIdMatches(host.linkCompletions(), "Packing")).toEqual([]);

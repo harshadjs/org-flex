@@ -87,10 +87,10 @@ test("titleCompletions lists notes and headings by title, never by ID", () => {
   expect(roam.ids[1]).toEqual({ id: "77aa-uuid", offset: roam.text.indexOf("* TODO"), heading: "Read the manual" });
   const top = readNote("top.org", "* First\n:PROPERTIES:\n:ID: f1\n:END:\n");
   expect(titleCompletions([roam, top])).toEqual([
-    { label: "Org roam", detail: "notes", id: "5f0c-uuid" },
-    { label: "Read the manual", detail: "Org roam", id: "77aa-uuid" },
+    { label: "Org roam", detail: "notes", id: "5f0c-uuid", target: "id:5f0c-uuid" },
+    { label: "Read the manual", detail: "Org roam", id: "77aa-uuid", target: "id:77aa-uuid" },
     // a heading on the first line is still a heading, not the file
-    { label: "First", detail: "top", id: "f1" },
+    { label: "First", detail: "top", id: "f1", target: "id:f1" },
   ]);
   expect(linkDescription("A [b] title")).toBe("A b title");
 });

@@ -18,6 +18,7 @@ import {
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { linkDescription } from "./org/vault-index";
+import { denoteIdOf } from "./org/denote";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
 import { readingMode } from "./editor/reading";
 import { revealZoomEffects, toggleZoom, zoomToHeadingAt } from "./editor/zoom";
@@ -132,23 +133,27 @@ export class OrgFlexView extends TextFileView {
       setIcon,
       openLink: (target) => void this.plugin.openLink(target, this.file?.path ?? "", this.leaf),
       imageSrc: (target) => {
-        const file = this.plugin.resolveFile(target, this.file?.path ?? "");
+        const file = this.plugin.linkFile(target, this.file?.path ?? "");
         return file ? app.vault.getResourcePath(file) : null;
       },
+      mediaPath: (target) => this.plugin.linkFile(target, this.file?.path ?? "")?.path ?? null,
       linkCompletions: () => {
         const index = this.plugin.index;
-        const titled = index.titles().map(({ label, detail, id }) => ({
-          label, detail, target: `id:${id}`, description: linkDescription(label), type: "note",
+        const scheme = this.plugin.scheme();
+        const titled = index.titles(scheme).map(({ label, detail, target }) => ({
+          label, detail, target, description: linkDescription(label), type: "note",
         }));
         // org files with a file-level ID are already listed by title
         const hasId = new Set(Array.from(index.notes.values())
-          .filter((n) => n.ids.some((i) => i.heading === undefined)).map((n) => n.path));
+          .filter((n) => scheme === "denote" ? n.denoteId !== null : n.ids.some((i) => i.heading === undefined)).map((n) => n.path));
         const files = app.vault.getFiles().filter((f) => !hasId.has(f.path)).map((f) => {
           const name = f.extension === "org" || f.extension === "md" ? f.basename : f.name;
+          // DEN-7: a file with a Denote name is linked by its identifier
+          const id = scheme === "denote" ? denoteIdOf(f.path) : null;
           return {
             label: name,
             detail: f.parent && f.parent.path !== "/" ? f.parent.path : undefined,
-            target: name,
+            target: id !== null && this.plugin.denote.path(id) === f.path ? `denote:${id}` : name,
             type: "file",
           };
         });
@@ -156,7 +161,9 @@ export class OrgFlexView extends TextFileView {
       },
       createNote: (title) => this.plugin.createNoteFromLink(title),
       title: () => (this.file && this.plugin.index.notes.get(this.file.path)?.title) || this.file?.basename || "",
-      idCompletions: () => this.plugin.index.ids().map(({ id, path }) => ({ label: id, detail: path, target: id, type: "constant" })),
+      idCompletions: (scheme) => scheme === "denote"
+        ? this.plugin.denote.entries().map(({ id, path }) => ({ label: id, detail: path, target: id, type: "constant" }))
+        : this.plugin.index.ids().map(({ id, path }) => ({ label: id, detail: path, target: id, type: "constant" })),
     };
   }
 
@@ -297,10 +304,17 @@ export class OrgFlexView extends TextFileView {
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;
       case "wiki-link": linkButton(view); break;
-      case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
+      case "heading-id": this.run(this.headingId(state)); break;
       // PLAT-8: the rest belong to features
       default: buttonFeature(id)?.buttons?.[id]?.(this.plugin, this);
     }
+  }
+
+  /** ACT-10: an `:ID:` with a new UUID; DEN-7: with Denote, a `CUSTOM_ID` as Denote makes them (`h:` and a UUID). */
+  private headingId(state: EditorState) {
+    return this.plugin.scheme() === "denote"
+      ? assignId(state, `h:${crypto.randomUUID()}`, undefined, "CUSTOM_ID")
+      : assignId(state, crypto.randomUUID());
   }
 
   private run(spec: Parameters<EditorView["dispatch"]>[0] | null) {
@@ -321,9 +335,9 @@ export class OrgFlexView extends TextFileView {
       case "checkbox": this.run(toggleCheckbox(state)); break;
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;
-      case "id-link": insertLinkWithCompletion(editor, insertIdLink(state)); break;
+      case "id-link": insertLinkWithCompletion(editor, insertIdLink(state, this.plugin.scheme())); break;
       case "wiki-link": linkButton(editor); break;
-      case "heading-id": this.run(assignId(state, crypto.randomUUID())); break;
+      case "heading-id": this.run(this.headingId(state)); break;
     }
   }
 

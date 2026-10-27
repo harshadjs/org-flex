@@ -347,12 +347,12 @@ export function continueList(state: EditorState): TransactionSpec | null {
 // ---------------------------------------------------------------------------
 // Links
 
-/** ACT-8: `[[id:]]` in place of the selection, the cursor after `id:`. */
-export function insertIdLink(state: EditorState): TransactionSpec {
+/** ACT-8: `[[id:]]` (DEN-7: `[[denote:]]`) in place of the selection, the cursor after the colon. */
+export function insertIdLink(state: EditorState, scheme: "id" | "denote" = "id"): TransactionSpec {
   const { from, to } = state.selection.main;
   return {
-    changes: { from, to, insert: "[[id:]]" },
-    selection: EditorSelection.cursor(from + 5),
+    changes: { from, to, insert: `[[${scheme}:]]` },
+    selection: EditorSelection.cursor(from + 3 + scheme.length),
     userEvent: "input",
   };
 }
@@ -376,11 +376,11 @@ export function insertWikiLink(state: EditorState): TransactionSpec {
 
 const PROPERTIES_RE = /^([ \t]*):PROPERTIES:[ \t]*$/i;
 const END_RE = /^[ \t]*:END:[ \t]*$/i;
-const ID_RE = /^[ \t]*:ID:(?:[ \t]+(.*?))?[ \t]*$/i;
+const idRe = (key: string) => new RegExp(`^[ \\t]*:${key}:(?:[ \\t]+(.*?))?[ \\t]*$`, "i");
 
 /** org-id's layout: the value starts in column 11 */
-function idLine(indent: string, id: string): string {
-  return `${indent}:ID:       ${id}`;
+function idLine(indent: string, id: string, key = "ID"): string {
+  return `${indent}${`:${key}: `.padEnd(11)}${id}`;
 }
 
 /**
@@ -390,9 +390,12 @@ function idLine(indent: string, id: string): string {
  * and its planning line) or the file's (on the first line), which is made
  * when missing. Null when there already is an ID.
  */
-export function assignId(state: EditorState, id: string, pos = state.selection.main.head): TransactionSpec | null {
+export function assignId(state: EditorState, id: string, pos = state.selection.main.head, key: "ID" | "CUSTOM_ID" = "ID"): TransactionSpec | null {
   const doc = state.doc;
   const heading = enclosingHeading(doc, pos);
+  // DEN-7: a Denote file is named by its identifier; only headings get a CUSTOM_ID
+  if (key === "CUSTOM_ID" && heading === null) return null;
+  const ID_RE = idRe(key);
   // the drawer goes after line `after` (1-based; 0 is the top of the file)
   const after = heading === null ? 0
     : heading < doc.lines && isPlanningLine(doc.line(heading + 1).text) ? heading + 1 : heading;
@@ -409,13 +412,13 @@ export function assignId(state: EditorState, id: string, pos = state.selection.m
           if (!prop) continue;
           if (prop[1]) return null;
           const l = doc.line(m);
-          return { changes: { from: l.from, to: l.to, insert: idLine(/^[ \t]*/.exec(l.text)![0], id) }, userEvent: "input" };
+          return { changes: { from: l.from, to: l.to, insert: idLine(/^[ \t]*/.exec(l.text)![0], id, key) }, userEvent: "input" };
         }
-        return { changes: { from: first.to, insert: "\n" + idLine(open[1], id) }, userEvent: "input" };
+        return { changes: { from: first.to, insert: "\n" + idLine(open[1], id, key) }, userEvent: "input" };
       }
     }
   }
-  const drawer = `:PROPERTIES:\n${idLine("", id)}\n:END:`;
+  const drawer = `:PROPERTIES:\n${idLine("", id, key)}\n:END:`;
   if (after === 0) return { changes: { from: 0, insert: drawer + "\n" }, userEvent: "input" };
   return { changes: { from: doc.line(after).to, insert: "\n" + drawer }, userEvent: "input" };
 }
@@ -519,15 +522,15 @@ export type { BoxState };
 // Attachments
 
 /**
- * ATT-3: `[[file:<path>]]` links in place of the selection, separated by
+ * ATT-3: `[[<target>]]` links (`file:<path>`, DEN-8: `denote:<ID>`) in place of the selection, separated by
  * spaces, with a space before them when they would touch a word, and the
  * cursor after them.
  */
-export function insertFileLinks(state: EditorState, paths: string[]): TransactionSpec | null {
-  if (!paths.length) return null;
+export function insertFileLinks(state: EditorState, targets: string[]): TransactionSpec | null {
+  if (!targets.length) return null;
   const { from, to } = state.selection.main;
   const before = from > state.doc.lineAt(from).from ? state.sliceDoc(from - 1, from) : "";
-  const links = paths.map((p) => `[[file:${p}]]`).join(" ");
+  const links = targets.map((t) => `[[${t}]]`).join(" ");
   const insert = (before && !/\s/.test(before) ? " " : "") + links;
   return { changes: { from, to, insert }, selection: EditorSelection.cursor(from + insert.length), userEvent: "input" };
 }

@@ -60,6 +60,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 
 **Notes and links**
 - **org-roam style links:** `[[` lists notes and headings by title and inserts `[[id:<uuid>][Title]]`; selected text becomes an ID link when a note has that title. A new title creates the note.
+- **Denote, when your fork chooses it:** set `links: "denote"` in `src/flavour.ts` and notes, journal days and attachments get Denote names (`ID--title__keywords.ext`); `[[denote:ID]]` links open notes and `::#custom-id` headings, and show images and audio inline.
 - **Go to node:** find any note or heading by title, or create it.
 - **Backlinks:** linked and unlinked mentions at the end of every note, with a button to turn a mention into a link.
 - **Front matter panel:** the property drawer and `#+` lines at the top show as a title and properties.

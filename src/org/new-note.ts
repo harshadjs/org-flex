@@ -1,5 +1,8 @@
 // New org notes (§10a): the title is the file name and the #+title; the
-// :ID: is a fresh UUID, as org-roam makes it.
+// :ID: is a fresh UUID, as org-roam makes it. With Denote (DEN-5) the file is
+// named ID--title.org and starts with Denote's front matter.
+
+import { denoteFileName } from "./denote";
 
 const FORBIDDEN = /[\\/:*?"<>|#^\[\]]/;
 
@@ -13,10 +16,10 @@ export function titleProblem(raw: string): string | null {
   return null;
 }
 
-/** NOTE-3: `<folder>/<title>.org`, with the title trimmed. */
-export function notePath(folder: string, raw: string): string {
+/** NOTE-3: `<folder>/<title>.org`, with the title trimmed; DEN-5: `<folder>/ID--title.org` with a Denote identifier. */
+export function notePath(folder: string, raw: string, denoteId?: string): string {
   const dir = folder.replace(/^\/+|\/+$/g, "");
-  const name = `${raw.trim()}.org`;
+  const name = denoteId === undefined ? `${raw.trim()}.org` : denoteFileName(denoteId, raw.trim(), [], "org");
   return dir ? `${dir}/${name}` : name;
 }
 

@@ -42,7 +42,7 @@ describe("go to node", () => {
     const i = label.toLowerCase().indexOf(q.trim().toLowerCase());
     return i < 0 ? null : -i;
   };
-  const ids = (q: string) => findNodes(nodes, q, contains(q)).map((c) => (c.kind === "node" ? c.node.id : `+${c.title}`));
+  const ids = (q: string) => findNodes(nodes.map((n) => ({ ...n, target: `id:${n.id}` })), q, contains(q)).map((c) => (c.kind === "node" ? c.node.id : `+${c.title}`));
 
   test("findNodes ranks matching nodes and ends with a create entry for a new title", () => {
     expect(ids("")).toEqual(["1", "2", "3"]);
