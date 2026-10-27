@@ -140,6 +140,14 @@ export default class OrgFlexPlugin extends Plugin {
   /** identifiers handed out this session, before their files show up */
   private givenIds = new Set<string>();
 
+  /** IDX-3: a new org ID from the flavour, never one the vault has or one already given out. */
+  newOrgId(): string {
+    const taken = new Set([...this.index.ids().map((i) => i.id), ...this.givenIds]);
+    const id = FLAVOUR.orgId(Math.floor((performance.timeOrigin + performance.now()) * 1000), taken);
+    this.givenIds.add(id);
+    return id;
+  }
+
   /** DEN-5, DEN-6: a new Denote identifier, never one a file has or one already given out. */
   newDenoteId(date: Date, journal = false): string {
     const taken = new Set([...this.denote.ids(), ...this.givenIds]);
@@ -324,7 +332,7 @@ export default class OrgFlexPlugin extends Plugin {
 
   /**
    * NOTE-3, NOTE-5, DEN-5: a new note's path in `folder` and its contents:
-   * `<title>.org` with a UUID `:ID:`, or with Denote `ID--title.org` and Denote's front matter.
+   * `<title>.org` with a new `:ID:` (IDX-3), or with Denote `ID--title.org` and Denote's front matter.
    */
   newNote(folder: string, title: string): { path: string; content: string; target: string } {
     if (this.scheme() === "denote") {
@@ -332,7 +340,7 @@ export default class OrgFlexPlugin extends Plugin {
       const id = this.newDenoteId(now);
       return { path: notePath(folder, title, id), content: denoteFrontMatter(title, now, [], id), target: `denote:${id}` };
     }
-    const id = crypto.randomUUID();
+    const id = this.newOrgId();
     return { path: notePath(folder, title), content: noteFileContent(title, id), target: `id:${id}` };
   }
 

@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { microsecondId } from "../src/org/ids";
 import { backlinksTo, linkDescription, mentionLink, noteLinkTarget, readNote, titleCompletions, unlinkedMentionsOf, VaultIndex } from "../src/org/vault-index";
 
 const pkm = readNote("topics/pkm.org", [
@@ -123,4 +124,9 @@ test("VaultIndex finds IDs and follows file changes", async () => {
   await new Promise((r) => setTimeout(r, 5));
   // changes are batched into one notification
   expect(notified).toBe(1);
+});
+
+test("a microsecond ID is the time as digits, one more while taken", () => {
+  expect(microsecondId(1793101200123456.7, new Set())).toBe("1793101200123456");
+  expect(microsecondId(1793101200123456, new Set(["1793101200123456", "1793101200123457"]))).toBe("1793101200123458");
 });

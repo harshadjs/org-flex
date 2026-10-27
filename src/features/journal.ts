@@ -18,7 +18,7 @@ async function openJournal(plugin: OrgFlexPlugin, date: Date) {
     const existing = denote ? journalEntries(orgPaths(plugin), folder).find((e) => e.date === day)?.path : journalPathForDate(folder, date);
     let file = existing ? app.vault.getAbstractFileByPath(existing) : null;
     if (!file) {
-      const id = denote ? plugin.newDenoteId(date, true) : crypto.randomUUID();
+      const id = denote ? plugin.newDenoteId(date, true) : plugin.newOrgId();
       const path = journalPathForDate(folder, date, denote ? id : undefined);
       file = app.vault.getAbstractFileByPath(path);
       if (!file) {

@@ -314,11 +314,11 @@ export class OrgFlexView extends TextFileView {
     }
   }
 
-  /** ACT-10: an `:ID:` with a new UUID; DEN-7: with Denote, a `CUSTOM_ID` as Denote makes them (`h:` and a UUID). */
+  /** ACT-10: an `:ID:` with a new ID (IDX-3); DEN-7: with Denote, a `CUSTOM_ID` as Denote makes them (`h:` and a UUID). */
   private headingId(state: EditorState) {
     return this.plugin.scheme() === "denote"
       ? assignId(state, `h:${crypto.randomUUID()}`, undefined, "CUSTOM_ID")
-      : assignId(state, crypto.randomUUID());
+      : assignId(state, this.plugin.newOrgId());
   }
 
   private run(spec: Parameters<EditorView["dispatch"]>[0] | null) {
