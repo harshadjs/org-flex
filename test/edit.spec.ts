@@ -3,7 +3,7 @@ import { EditorSelection, EditorState, TransactionSpec } from "@codemirror/state
 import { history, undo } from "@codemirror/commands";
 import { codeFolding, foldEffect } from "@codemirror/language";
 import {
-  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension, recorderType, RECORDING_AUDIO, RECORDING_BITRATE, pastedFiles, pastedName,
+  assignId, continueList, toggleKeyword, insertBlock, insertHeading, cycleTaskState, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink, insertWikiLink, insertFileLinks, recordingName, recordingExtension, recorderType, RECORDING_AUDIO, RECORDING_BITRATE, pastedFiles, pastedName, countedMediaName, stampedMediaName,
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
 import { dropSlots, itemExtent, listDepths, moveItem, parseItem } from "../src/org/lists";
@@ -491,6 +491,20 @@ describe("attachments", () => {
     expect(pastedFiles([png], "")).toEqual([png]);
     expect(pastedFiles([png], "some copied text")).toEqual([]);
     expect(pastedFiles([], "")).toEqual([]);
+  });
+
+  test("recordings and pasted images can be named YYMM-voice-note-CC, counting that month's", () => {
+    const oct = new Date(2026, 9, 27, 9, 5, 7);
+    expect(stampedMediaName("recording", oct, "m4a")).toBe("Recording 20261027090507.m4a");
+    expect(stampedMediaName("image", oct, "png")).toBe("Pasted image 20261027090507.png");
+    expect(countedMediaName("recording", oct, "m4a", new Set())).toBe("2610-voice-note-01.m4a");
+    // any extension counts, a bare name counts as 1, other months and kinds don't
+    expect(countedMediaName("recording", oct, "m4a", new Set(["2610-voice-note.mp3"]))).toBe("2610-voice-note-02.m4a");
+    expect(countedMediaName("recording", oct, "m4a", new Set([
+      "2610-voice-note-01.m4a", "2610-voice-note-07.mp3", "2609-voice-note-12.m4a", "2610-pasted-image-20.png", "2610-voice-note-notes.org",
+    ]))).toBe("2610-voice-note-08.m4a");
+    expect(countedMediaName("recording", oct, "m4a", new Set(["2610-voice-note-99.m4a"]))).toBe("2610-voice-note-100.m4a");
+    expect(countedMediaName("image", new Date(2027, 0, 2), "jpg", new Set(["2701-pasted-image-01.png"]))).toBe("2701-pasted-image-02.jpg");
   });
 
   test("recordings are named by local time and typed by the recorder's format", () => {
