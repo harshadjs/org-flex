@@ -3,7 +3,7 @@
 import { Notice, type App } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import type { OrgFlexView } from "../view";
-import { insertFileLinks, pastedFiles, pastedImageExtension, recordingExtension, stampedMediaName, type MediaKind } from "../org/edit";
+import { insertFileLinks, pastedFiles, pastedImageExtension, recordingExtension, type MediaKind } from "../org/edit";
 import { FLAVOUR } from "../flavour";
 import { relativeLinkPath } from "../org/syntax";
 import { denoteFileName } from "../org/denote";
