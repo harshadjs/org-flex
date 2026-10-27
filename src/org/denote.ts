@@ -41,6 +41,17 @@ export function denoteLabel(path: string): string | null {
   return title ? title[1].replace(/-/g, " ") : id;
 }
 
+/**
+ * DEN-9: a tab's title for a file with a Denote name: the note's `#+title`
+ * when it has one, else the title in the name (`denoteLabel`). Null for other
+ * names, which keep their own.
+ */
+export function denoteTabTitle(path: string, noteTitle?: string): string | null {
+  const label = denoteLabel(path);
+  if (label === null) return null;
+  return noteTitle && noteTitle !== stem(path) ? noteTitle : label;
+}
+
 /** DEN-1: the parts of a `denote:` link target, or null for any other link. */
 export function parseDenoteLink(target: string): { id: string; search: string } | null {
   const m = /^denote:([^:]+?)(?:::(.*))?$/i.exec(target.trim());

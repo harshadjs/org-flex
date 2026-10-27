@@ -1,11 +1,11 @@
 // Org Flex: Org mode files in Obsidian, on the desktop and the phone.
 
-import { getIcon, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
+import { FileView, getIcon, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { ButtonDef, buttonIconName, CORE_BUTTONS, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
 import { LinkScheme, readNote, searchOffset, VaultIndex } from "./org/vault-index";
 import { freeNotePath, noteFileContent, noteFileName, notePath } from "./org/new-note";
-import { DenoteFiles, denoteFrontMatter } from "./org/denote";
+import { DenoteFiles, denoteFrontMatter, denoteTabTitle } from "./org/denote";
 import { OrgFlexView, VIEW_TYPE } from "./view";
 import { FLAVOUR } from "./flavour";
 import { orgConflictMessage } from "./conflicts";
@@ -35,14 +35,17 @@ export default class OrgFlexPlugin extends Plugin {
     this.claimOrgFiles();
 
     this.app.workspace.onLayoutReady(() => {
-      void this.index.build();
+      void this.index.build().then(() => this.refreshTitles());
+      if (this.scheme() === "denote") this.readableTitles();
       this.denote = new DenoteFiles(this.app.vault.getFiles().map((f) => f.path));
       const isOrg = (f: TAbstractFile): f is TFile => f instanceof TFile && f.extension === "org";
       this.registerEvent(this.app.vault.on("create", (f) => {
         if (f instanceof TFile) this.denote.add(f.path);
         if (isOrg(f)) void this.index.update(f.path);
       }));
-      this.registerEvent(this.app.vault.on("modify", (f) => { if (isOrg(f)) void this.index.update(f.path); }));
+      this.registerEvent(this.app.vault.on("modify", (f) => {
+        if (isOrg(f)) void this.index.update(f.path).then(() => this.refreshTitles(f.path));
+      }));
       this.registerEvent(this.app.vault.on("delete", (f) => {
         if (f instanceof TFile) this.denote.remove(f.path);
         if (isOrg(f)) this.index.remove(f.path);
@@ -100,6 +103,38 @@ export default class OrgFlexPlugin extends Plugin {
   /** DEN-1: how this copy links notes. */
   scheme(): LinkScheme {
     return FLAVOUR.links;
+  }
+
+  /**
+   * DEN-9: tabs show a Denote file by its title, not its `@@ID--slug` name,
+   * whatever view has it open (org, Markdown, image, audio, PDF).
+   */
+  private readableTitles() {
+    const patched = new WeakSet<FileView>();
+    const patch = () => {
+      this.app.workspace.iterateAllLeaves((leaf) => {
+        const view = leaf.view;
+        if (!(view instanceof FileView) || patched.has(view)) return;
+        patched.add(view);
+        const own = view.getDisplayText.bind(view);
+        view.getDisplayText = () => {
+          const path = view.file?.path;
+          return (path && denoteTabTitle(path, this.index.notes.get(path)?.title)) || own();
+        };
+        this.register(() => { view.getDisplayText = own; updateHeader(leaf); });
+        updateHeader(leaf);
+      });
+    };
+    patch();
+    this.registerEvent(this.app.workspace.on("layout-change", patch));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.refreshTitles()));
+  }
+
+  /** DEN-9: redraw the tab titles, of every tab or those showing `path`. */
+  refreshTitles(path?: string) {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view instanceof FileView && (!path || leaf.view.file?.path === path)) updateHeader(leaf);
+    });
   }
 
   /** identifiers handed out this session, before their files show up */
@@ -328,4 +363,9 @@ export default class OrgFlexPlugin extends Plugin {
       view.revealPosition(view.editor?.state.doc.length ?? 0, { focus: true });
     }
   }
+}
+
+/** not public API: redraws a tab's title from its view's `getDisplayText` */
+function updateHeader(leaf: WorkspaceLeaf) {
+  (leaf as unknown as { updateHeader?: () => void }).updateHeader?.();
 }
