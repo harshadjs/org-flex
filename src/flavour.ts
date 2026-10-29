@@ -37,10 +37,12 @@ export interface Flavour {
   journalId(date: Date, taken: ReadonlySet<string>): string;
   /** ATT-6: the name for a recording or pasted image made at `date`; `taken` is the names of the vault's files */
   mediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string;
+  /** ACT-15: a task marked done gets `CLOSED: [time]`, as Emacs's `org-log-done 'time` */
+  logDone: boolean;
 }
 
 export const FLAVOUR: Flavour = {
-  todoKeywords: ["TODO", "NEXT", "DOING", "WAITING"],
+  todoKeywords: ["TODO", "IN-PROGRESS", "WAITING"],
   doneKeywords: ["DONE", "CANCELLED"],
   defaultPriority: "B",
   hideStars: false,
@@ -52,4 +54,5 @@ export const FLAVOUR: Flavour = {
   denoteId: timestampId,
   journalId: timestampId,
   mediaName: countedMediaName,
+  logDone: true,
 };

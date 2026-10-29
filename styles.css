@@ -281,6 +281,32 @@
   color: var(--text-faint);
   font-size: 0.85em;
 }
+/* LP-14: the copy button sits at the top right of a src block */
+.org-flex-view .cm-line.org-block-begin {
+  position: relative;
+}
+.org-flex-view .org-block-copy {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 4px;
+  color: var(--text-faint);
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.org-flex-view .org-block-copy svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+.is-mobile .org-flex-view .org-block-copy {
+  padding: 6px 10px;
+}
+.is-mobile .org-flex-view .org-block-copy svg {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
 
 /* PARSE-4: source tokens use Obsidian's code colours */
 .org-flex-view .org-tok-keyword { color: var(--code-keyword); }
@@ -839,6 +865,35 @@ input.org-icon-invalid {
 }
 .org-tasks .org-tasks-error {
   color: var(--text-error);
+}
+.org-tasks .org-tasks-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  margin-right: var(--size-4-2);
+}
+.org-tasks .org-tasks-note {
+  color: var(--text-muted);
+  margin-left: var(--size-4-2);
+}
+.org-tasks .org-tasks-open {
+  cursor: pointer;
+}
+/* AG-2: a birthday has no checkbox; line it up with the tasks */
+.org-tasks .task-list-item.org-tasks-event {
+  list-style: none;
+  padding-left: calc(var(--checkbox-size) + var(--size-4-2));
+}
+
+/* AG-1: the agenda tab */
+.org-agenda {
+  padding: var(--size-4-3) var(--size-4-4);
+}
+.org-agenda .org-tasks-day:first-child {
+  margin-top: 0;
+}
+.is-mobile .org-agenda .task-list-item {
+  padding-top: var(--size-4-1);
+  padding-bottom: var(--size-4-1);
 }
 
 /* LP-10: the create entry's section needs no header; its detail says it all */

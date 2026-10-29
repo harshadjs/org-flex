@@ -58,6 +58,8 @@ export interface OrgHost {
   createNote?(title: string): string;
   /** ZOOM-2: the file's title, for the first breadcrumb */
   title?(): string;
+  /** a short message to the user (LP-14) */
+  notice?(message: string): void;
 }
 
 export const orgHost = Facet.define<OrgHost, OrgHost | null>({

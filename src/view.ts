@@ -92,6 +92,7 @@ export class OrgFlexView extends TextFileView {
     if (!this.reading) return [];
     return readingMode({
       keywords: () => this.plugin.keywords(),
+      taskLog: () => this.plugin.taskLog(),
       pickDate: (kind, pos) => this.pickDate(kind, pos),
     });
   }
@@ -131,6 +132,7 @@ export class OrgFlexView extends TextFileView {
     const app = this.app;
     return {
       setIcon,
+      notice: (message) => void new Notice(message),
       openLink: (target) => void this.plugin.openLink(target, this.file?.path ?? "", this.leaf),
       imageSrc: (target) => {
         const file = this.plugin.linkFile(target, this.file?.path ?? "");
@@ -302,7 +304,7 @@ export class OrgFlexView extends TextFileView {
       case "new-heading": this.run(insertHeading(state)); break;
       case "demote": this.run(increaseHeadingLevel(state)); break;
       case "promote": this.run(decreaseHeadingLevel(state)); break;
-      case "todo": this.run(cycleTaskState(state, keywords)); break;
+      case "todo": this.run(cycleTaskState(state, keywords, this.plugin.taskLog())); break;
       case "schedule": this.pickDate("SCHEDULED"); break;
       case "deadline": this.pickDate("DEADLINE"); break;
       case "checkbox": this.run(toggleCheckbox(state)); break;
@@ -336,7 +338,7 @@ export class OrgFlexView extends TextFileView {
       case "new-heading": this.run(insertHeading(state)); break;
       case "demote": this.run(increaseHeadingLevel(state)); break;
       case "promote": this.run(decreaseHeadingLevel(state)); break;
-      case "todo": this.run(cycleTaskState(state, this.plugin.keywords())); break;
+      case "todo": this.run(cycleTaskState(state, this.plugin.keywords(), this.plugin.taskLog())); break;
       case "checkbox": this.run(toggleCheckbox(state)); break;
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;

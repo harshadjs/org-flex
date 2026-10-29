@@ -5,6 +5,7 @@
 import { ChangeSpec, EditorSelection, EditorState, Text, TransactionSpec } from "@codemirror/state";
 import { foldedRanges } from "@codemirror/language";
 import { analyze, headingLevel, isPlanningLine, Keywords, parseHeading } from "./syntax";
+import { taskStateEdits, type TaskLog } from "./repeat";
 import { BoxState, itemExtent, itemLines, nextBullet, parseItem, recountSection, sectionAround, setItemState, shiftItem, toggledState } from "./lists";
 
 export function docLines(doc: Text): string[] {
@@ -111,8 +112,19 @@ export function toggleLeadingStars(state: EditorState): TransactionSpec | null {
 // ---------------------------------------------------------------------------
 // Task state
 
-/** ACT-3: none → first TODO keyword → first DONE keyword → none. */
-export function cycleTaskState(state: EditorState, keywords: Keywords): TransactionSpec | null {
+/** The task log used when a caller gives none: now, without `CLOSED:`. */
+const NO_LOG = (): TaskLog => ({ now: new Date(), logDone: false });
+
+function keywordChange(state: EditorState, n: number, next: string | null, keywords: Keywords, log: TaskLog): TransactionSpec {
+  const changes = taskStateEdits(state.doc.toString(), n - 1, next, keywords, log);
+  return { changes, userEvent: next === null ? "delete" : "input" };
+}
+
+/**
+ * ACT-3: none → first TODO keyword → first DONE keyword → none, marking done
+ * as Org does (repeating tasks, `CLOSED:`, ACT-14, ACT-15).
+ */
+export function cycleTaskState(state: EditorState, keywords: Keywords, log: TaskLog = NO_LOG()): TransactionSpec | null {
   const todo = keywords.todo[0] ?? "TODO";
   const done = keywords.done[0] ?? "DONE";
   const line = state.doc.lineAt(state.selection.main.head);
@@ -122,28 +134,22 @@ export function cycleTaskState(state: EditorState, keywords: Keywords): Transact
     return { changes: { from: line.from, to: line.from + indent, insert: `* ${todo} ` }, userEvent: "input" };
   }
   const kw = parts.keyword;
-  if (!kw) {
-    return { changes: { from: line.from + parts.stars.to, insert: `${todo} ` }, userEvent: "input" };
-  }
-  if (keywords.todo.includes(kw.text)) {
-    return { changes: { from: line.from + kw.from, to: line.from + kw.to, insert: done }, userEvent: "input" };
-  }
-  let to = kw.to;
-  while (to < line.text.length && (line.text[to] === " " || line.text[to] === "\t")) to++;
-  return { changes: { from: line.from + kw.from, to: line.from + to }, userEvent: "delete" };
+  const next = !kw ? todo : keywords.todo.includes(kw.text) ? done : null;
+  return keywordChange(state, line.number, next, keywords, log);
 }
 
 /**
  * RD-3: in reading mode, tapping a heading's keyword: an open keyword (any
- * TODO-type) → the first DONE keyword, a done one → the first TODO keyword.
- * Null when the line at `pos` is not a heading with a keyword.
+ * TODO-type) → the first DONE keyword, a done one → the first TODO keyword,
+ * logged as ACT-14 and ACT-15 say. Null when the line at `pos` is not a
+ * heading with a keyword.
  */
-export function toggleKeyword(state: EditorState, pos: number, keywords: Keywords): TransactionSpec | null {
+export function toggleKeyword(state: EditorState, pos: number, keywords: Keywords, log: TaskLog = NO_LOG()): TransactionSpec | null {
   const line = state.doc.lineAt(pos);
   const kw = parseHeading(line.text, keywords)?.keyword;
   if (!kw) return null;
   const next = kw.done ? (keywords.todo[0] ?? "TODO") : (keywords.done[0] ?? "DONE");
-  return { changes: { from: line.from + kw.from, to: line.from + kw.to, insert: next }, userEvent: "input" };
+  return keywordChange(state, line.number, next, keywords, log);
 }
 
 // ---------------------------------------------------------------------------

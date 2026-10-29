@@ -118,8 +118,9 @@ describe("journal", () => {
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("this flavour has TODO NEXT DOING WAITING then DONE CANCELLED, org-roam links, microsecond IDs and counted voice notes", () => {
-    expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "NEXT", "DOING", "WAITING"], ["DONE", "CANCELLED"]]);
+  test("this flavour has TODO IN-PROGRESS WAITING then DONE CANCELLED, org-roam links, microsecond IDs, counted voice notes and CLOSED logging", () => {
+    expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "IN-PROGRESS", "WAITING"], ["DONE", "CANCELLED"]]);
+    expect(FLAVOUR.logDone).toBe(true);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
     expect(FLAVOUR.links).toBe("id");
     expect(FLAVOUR.orgId(1793101200123456, new Set())).toBe("1793101200123456");
@@ -311,7 +312,7 @@ describe("settings", () => {
   test("bar buttons follow the saved order and ignore unknown and repeated ids", () => {
     expect(BUTTONS.map((b) => b.id)).toEqual([
       "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
-      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture", "attach", "record",
+      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture", "attach", "record", "agenda",
     ]);
     expect(barButtons(["todo", "stars", "undo", "todo"]).map((b) => b.id)).toEqual(["todo", "undo"]);
   });

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseTasks, taskBlockConfig, toggleTaskInText } from "../src/org/tasks";
 import { agenda, overdueLabel, parseQuery, QueryError, runQuery } from "../src/org/query";
+import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles } from "../src/org/agenda";
 
 const kw = { todo: ["TODO", "NEXT"], done: ["DONE", "CANCELLED"] };
 const ctx = { todoKeywords: kw.todo, doneKeywords: kw.done, defaultPriority: "B" };
@@ -86,7 +87,7 @@ describe("queries", () => {
     const q = parseQuery("it.todo ad.3");
     expect(q.agendaDays).toBe(3);
     const days = agenda(q, tasks, now, 3, ctx);
-    expect(days.map((d) => [d.date && d.date.getDate(), d.tasks.map((t) => t.title)])).toEqual([
+    expect(days.map((d) => [d.date && d.date.getDate(), d.items.map((i) => i.task.title)])).toEqual([
       [null, ["Write report"]],
       [10, ["Sub task"]],
       [11, ["Deep"]],
@@ -102,4 +103,41 @@ test("a task block needs filepath: and defaults its query", () => {
   expect(taskBlockConfig({ filepath: "t.org", query: "it.todo o.p" })).toEqual({ filepath: "t.org", query: "it.todo o.p" });
   expect(() => taskBlockConfig({ query: "it.todo" })).toThrow("filepath: is required");
   expect(() => taskBlockConfig(null)).toThrow("filepath: is required");
+});
+
+test("the agenda reads the top-level org files and shows the week: overdue, then each day with times first", () => {
+  expect(agendaFiles(["tasks.org", "notes/x.org", "people.org", "README.md", "Inbox.ORG"])).toEqual(["Inbox.ORG", "people.org", "tasks.org"]);
+  const kw2 = { todo: ["TODO", "IN-PROGRESS", "WAITING"], done: ["DONE", "CANCELLED"] };
+  const thu = new Date(2026, 9, 29, 9, 0);
+  const people = parseTasks([
+    "* [[id:1][Dani]]",
+    ":PROPERTIES:",
+    ":ID: 1",
+    ":END:",
+    "- Birthday: <1990-10-31 Wed +1y>",
+    "* Sam",
+    "Anniversary <2015-11-04 Wed +1y> and a call <2026-10-29 Thu 18:30>",
+  ].join("\n"), kw2).map((t) => ({ ...t, path: "people.org" }));
+  const todo = parseTasks([
+    "* TODO Pay rent",
+    "DEADLINE: <2026-10-01 Thu +1m>",
+    "* IN-PROGRESS Late report",
+    "SCHEDULED: <2026-10-27 Tue>",
+    "* DONE Old",
+    "SCHEDULED: <2026-10-29 Thu>",
+    "* WAITING Dentist",
+    "SCHEDULED: <2026-10-29 Thu 08:00>",
+  ].join("\n"), kw2).map((t) => ({ ...t, path: "tasks.org" }));
+  const days = agenda(parseQuery(AGENDA_QUERY), [...people, ...todo], thu, AGENDA_DAYS, { todoKeywords: kw2.todo, doneKeywords: kw2.done, defaultPriority: "B" });
+  const show = days.map((d) => [d.date?.getDate() ?? "overdue", d.items.map((i) => `${i.time ?? ""} ${i.task.title} ${i.kind} ${i.note}`.trim())]);
+  expect(show).toEqual([
+    ["overdue", ["Pay rent deadline", "Late report scheduled"]],
+    [29, ["08:00 Dentist scheduled", "18:30 Sam timestamp a call"]],
+    [30, []],
+    [31, ["[[id:1][Dani]] timestamp Birthday"]],
+    [1, ["Pay rent deadline"]],
+    [2, []],
+    [3, []],
+    [4, ["Sam timestamp Anniversary"]],
+  ]);
 });

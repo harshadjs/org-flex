@@ -22,6 +22,44 @@ function lineClass(cls: string): Decoration {
   return d;
 }
 
+/** LP-14: the text between a src block's `#+begin_src` and `#+end_src` lines, the block beginning on (0-based) line `begin`. */
+export function srcBlockBody(state: EditorState, begin: number): string | null {
+  const block = structureOf(state).blocks.find((b) => b.begin === begin);
+  if (!block) return null;
+  const lines: string[] = [];
+  for (let n = block.begin + 1; n < block.end; n++) lines.push(state.doc.line(n + 1).text);
+  return lines.join("\n");
+}
+
+/** LP-14: a copy button on a src block's first line. */
+class CopyWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM(view: EditorView) {
+    const button = document.createElement("span");
+    button.className = "org-block-copy clickable-icon";
+    button.setAttribute("aria-label", "Copy");
+    const host = view.state.facet(orgHost);
+    host?.setIcon(button, "copy");
+    onTap(button, () => {
+      const begin = view.state.doc.lineAt(view.posAtDOM(button)).number - 1;
+      const body = srcBlockBody(view.state, begin);
+      if (body === null) return;
+      const count = body ? body.split("\n").length : 0;
+      void navigator.clipboard?.writeText(body).then(
+        () => host?.notice?.(`Copied ${count} line${count === 1 ? "" : "s"}`),
+        () => host?.notice?.("Couldn't copy the block"),
+      );
+    });
+    return button;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+const copyButton = Decoration.widget({ widget: new CopyWidget(), side: 1 });
+
 class ImageWidget extends WidgetType {
   constructor(readonly src: string, readonly target: string) {
     super();
@@ -198,6 +236,7 @@ function buildDecorations(view: EditorView): DecorationSet {
           const prefix = /^[ \t]*#\+begin_/i.exec(text)![0].length;
           if (!selectionTouches(state, line.from, line.to)) out.push(hidden.range(line.from, line.from + prefix));
           out.push(mark("org-block-header").range(line.from + prefix, line.to));
+          if (block.name === "src") out.push(copyButton.range(line.to));
           break;
         }
         case "block-content": {

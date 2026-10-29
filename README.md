@@ -45,7 +45,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 
 
 **Editing**
-- **Live preview:** headings sized like Markdown headings, emphasis without its markers, links showing their description, styled quote and source blocks with syntax highlighting. The line with the cursor shows its raw text.
+- **Live preview:** headings sized like Markdown headings, emphasis without its markers, links showing their description, styled quote and source blocks with syntax highlighting and a copy button. The line with the cursor shows its raw text.
 - **Folding:** fold any heading, drawer or block; cycle *Fold all → Outline → Expand all*.
 - **Zoom:** show one heading and its subtree, with breadcrumbs back out. Long-press a heading's arrow to zoom in.
 - **Shortcut bar** above the phone keyboard: undo, redo, visibility, zoom, new heading, heading level, TODO state, schedule, deadline, checkbox, blocks, links, IDs and more. Choose the buttons, their order and their icons.
@@ -56,6 +56,8 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 - **Checklists:** tap to tick, `[n/m]` and `[n%]` counters, parent boxes that follow their children, Enter continues the list.
 - **Drag to reorder** list items by their grip, sideways to indent, children included.
 - **TODO keywords**, with scheduled and deadline dates from a date picker.
+- **Agenda:** a tab with overdue tasks and the coming week from your top-level org files, including repeating dates such as birthdays (`<… +1y>`).
+- **Repeating tasks** move on when marked done, as in Emacs, and `CLOSED:` can be logged.
 - **Task lists in Markdown notes:** an ` ```orgmode-tasks ` block lists an org file's tasks, filtered and sorted with Orgzly's search language, or as an agenda.
 
 **Notes and links**

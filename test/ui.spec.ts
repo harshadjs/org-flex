@@ -824,3 +824,21 @@ test("denote links to images and audio show inline, by the file their identifier
   // an identifier no file has is a link, not a broken image
   expect(view.dom.querySelector('[data-org-link="denote:2610z"]')).not.toBeNull();
 });
+
+test("a src block's copy button copies its body without moving the cursor; other blocks have none", async () => {
+  const notices: string[] = [];
+  const copied: string[] = [];
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t: string) => void copied.push(t) } });
+  const doc = "intro\n#+begin_src python\nx = 1\nprint(x)\n#+end_src\n#+begin_quote\nq\n#+end_quote\n";
+  const { view } = mount(doc, [], 0, {}, { notice: (m) => void notices.push(m) });
+  const buttons = view.dom.querySelectorAll(".org-block-copy");
+  expect(buttons.length).toBe(1);
+  expect(lineEl(view, 2).contains(buttons[0])).toBe(true);
+  expect(tap(buttons[0]).defaultPrevented).toBe(true);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(copied).toEqual(["x = 1\nprint(x)"]);
+  expect(notices).toEqual(["Copied 2 lines"]);
+  expect(view.state.selection.main.head).toBe(0);
+  expect(view.state.doc.toString()).toBe(doc);
+});
