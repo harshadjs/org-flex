@@ -8,6 +8,7 @@ import { freeNotePath, noteFileContent, noteFileName, notePath } from "./org/new
 import { DenoteFiles, denoteFrontMatter, denoteTabTitle } from "./org/denote";
 import { OrgFlexView, VIEW_TYPE } from "./view";
 import { FLAVOUR } from "./flavour";
+import type { TaskLog } from "./org/repeat";
 import { orgConflictMessage } from "./conflicts";
 import { buttonFeature, FEATURES } from "./features";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
@@ -98,6 +99,11 @@ export default class OrgFlexPlugin extends Plugin {
 
   keywords(): Keywords {
     return { todo: FLAVOUR.todoKeywords, done: FLAVOUR.doneKeywords };
+  }
+
+  /** ACT-14, ACT-15: how a task marked done now is logged. */
+  taskLog(): TaskLog {
+    return { now: new Date(), logDone: FLAVOUR.logDone };
   }
 
   /** DEN-1: how this copy links notes. */

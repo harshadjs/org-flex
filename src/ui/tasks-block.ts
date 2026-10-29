@@ -86,7 +86,7 @@ class TaskList extends MarkdownRenderChild {
   private async toggle(file: TFile, task: OrgTask) {
     const keywords = this.plugin.keywords();
     // TASK-3: vault.process, so edits made meanwhile aren't lost
-    await this.plugin.app.vault.process(file, (text) => toggleTaskInText(text, task, keywords) ?? text);
+    await this.plugin.app.vault.process(file, (text) => toggleTaskInText(text, task, keywords, this.plugin.taskLog()) ?? text);
   }
 }
 

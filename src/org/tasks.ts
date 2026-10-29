@@ -2,6 +2,7 @@
 // priority and planning dates.
 
 import { isPlanningLine, Keywords, parseHeading } from "./syntax";
+import { applyEdits, taskStateEdits, type TaskLog } from "./repeat";
 
 export interface OrgTask {
   /** 0-based line of the heading */
@@ -58,18 +59,14 @@ export function parseTasks(text: string, keywords: Keywords): OrgTask[] {
 
 /**
  * TASK-3: the file text with the task's keyword flipped: done → TODO,
- * anything else → DONE. Null if the heading is no longer where it was.
+ * anything else → DONE, logged as ACT-14 and ACT-15 say. Null if the heading is no longer where it was.
  */
-export function toggleTaskInText(text: string, task: OrgTask, keywords: Keywords): string | null {
+export function toggleTaskInText(text: string, task: OrgTask, keywords: Keywords, log: TaskLog = { now: new Date(), logDone: false }): string | null {
   const lines = text.split("\n");
   const parts = parseHeading(lines[task.line] ?? "", keywords);
   if (!parts || lines[task.line].slice(parts.title.from, parts.title.to) !== task.title) return null;
-  const line = lines[task.line];
   const next = task.done ? "TODO" : "DONE";
-  lines[task.line] = parts.keyword
-    ? line.slice(0, parts.keyword.from) + next + line.slice(parts.keyword.to)
-    : line.slice(0, parts.stars.to) + next + " " + line.slice(parts.stars.to);
-  return lines.join("\n");
+  return applyEdits(text, taskStateEdits(text, task.line, next, keywords, log));
 }
 
 /** TASK-1: the block's settings from its parsed YAML; `filepath:` is required. */

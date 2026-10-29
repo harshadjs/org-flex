@@ -6,10 +6,13 @@ import { EditorView } from "@codemirror/view";
 import { toggleKeyword } from "../org/edit";
 import type { PlanningKind } from "../org/edit";
 import { Keywords } from "../org/syntax";
+import type { TaskLog } from "../org/repeat";
 import { allowInReading } from "./state";
 
 export interface ReadingActions {
   keywords(): Keywords;
+  /** ACT-14, ACT-15: the time, and whether to write `CLOSED:` */
+  taskLog?(): TaskLog;
   /** open the date picker for the heading the planning line at `pos` belongs to */
   pickDate(kind: PlanningKind, pos: number): void;
 }
@@ -32,7 +35,7 @@ function taps(actions: ReadingActions): Extension {
       actions.pickDate(kind, pos);
       return;
     }
-    const spec = toggleKeyword(view.state, pos, actions.keywords());
+    const spec = toggleKeyword(view.state, pos, actions.keywords(), actions.taskLog?.());
     if (spec) view.dispatch(spec, { annotations: allowInReading.of(true) });
   };
   return EditorView.domEventHandlers({
