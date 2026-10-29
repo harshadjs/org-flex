@@ -301,7 +301,7 @@ describe("settings", () => {
   test("bar buttons follow the saved order and ignore unknown and repeated ids", () => {
     expect(BUTTONS.map((b) => b.id)).toEqual([
       "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
-      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture", "attach", "record",
+      "checkbox", "src-block", "quote-block", "wiki-link", "node-find", "heading-id", "journal", "journal-picker", "journal-calendar", "new-note", "capture", "attach", "record", "agenda",
     ]);
     expect(barButtons(["todo", "stars", "undo", "todo"]).map((b) => b.id)).toEqual(["todo", "undo"]);
   });

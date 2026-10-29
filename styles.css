@@ -866,6 +866,35 @@ input.org-icon-invalid {
 .org-tasks .org-tasks-error {
   color: var(--text-error);
 }
+.org-tasks .org-tasks-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  margin-right: var(--size-4-2);
+}
+.org-tasks .org-tasks-note {
+  color: var(--text-muted);
+  margin-left: var(--size-4-2);
+}
+.org-tasks .org-tasks-open {
+  cursor: pointer;
+}
+/* AG-2: a birthday has no checkbox; line it up with the tasks */
+.org-tasks .task-list-item.org-tasks-event {
+  list-style: none;
+  padding-left: calc(var(--checkbox-size) + var(--size-4-2));
+}
+
+/* AG-1: the agenda tab */
+.org-agenda {
+  padding: var(--size-4-3) var(--size-4-4);
+}
+.org-agenda .org-tasks-day:first-child {
+  margin-top: 0;
+}
+.is-mobile .org-agenda .task-list-item {
+  padding-top: var(--size-4-1);
+  padding-bottom: var(--size-4-1);
+}
 
 /* LP-10: the create entry's section needs no header; its detail says it all */
 .org-completion-section {

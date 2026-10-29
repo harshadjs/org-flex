@@ -6,6 +6,7 @@
 //   ad.N                                     agenda of N days
 //   and, or, space (and), parentheses
 
+import { occursOn, type Stamp } from "./repeat";
 import { OrgTask } from "./tasks";
 
 export class QueryError extends Error {}
@@ -249,27 +250,60 @@ export function runQuery(query: Query, tasks: OrgTask[], now: Date, ctx: SortCon
   return sortTasks(tasks.filter((t) => matches(query.filter, t, now)), query.sort, ctx);
 }
 
+export interface AgendaItem {
+  task: OrgTask;
+  /** why it is on this day: its SCHEDULED or DEADLINE date, or a timestamp in its body (AG-2) */
+  kind: "scheduled" | "deadline" | "timestamp";
+  /** `HH:MM` when the date has a time */
+  time: string | null;
+  /** for a timestamp, the text before it on its line (`Birthday`) */
+  note: string;
+}
+
 export interface AgendaDay {
   /** null for the overdue group */
   date: Date | null;
-  tasks: OrgTask[];
+  items: AgendaItem[];
 }
 
+const hhmm = (s: Stamp) => (s.timed ? `${String(s.date.getHours()).padStart(2, "0")}:${String(s.date.getMinutes()).padStart(2, "0")}` : null);
+
 /**
- * TASK-5: tasks grouped by day for `days` days from today; open tasks
- * scheduled or due before today go into a first, overdue group.
+ * TASK-5, AG-2: the matching tasks by day for `days` days from today. A task
+ * is on each day its SCHEDULED or DEADLINE date falls on, and each active
+ * timestamp in its heading or body falls on, repeaters (`+1y`) included.
+ * Open tasks scheduled or due before today come first, in an overdue group,
+ * once each. Within a day, items with a time come first, by time; the rest
+ * keep the tasks' order.
  */
 export function agenda(query: Query, tasks: OrgTask[], now: Date, days: number, ctx: SortContext): AgendaDay[] {
   const matching = runQuery(query, tasks, now, ctx);
   const today = startOfDay(now);
   const groups: AgendaDay[] = [];
-  const overdue = matching.filter((t) => !t.done && [t.scheduled, t.deadline].some((d) => d && startOfDay(d) < today));
-  if (overdue.length) groups.push({ date: null, tasks: overdue });
+  const overdue: AgendaItem[] = [];
+  for (const task of matching) {
+    if (task.done) continue;
+    const late = ([["deadline", task.deadlineStamp ?? task.deadline], ["scheduled", task.scheduledStamp ?? task.scheduled]] as const)
+      .find(([, s]) => s && startOfDay(s instanceof Date ? s : s.date) < today);
+    if (late) overdue.push({ task, kind: late[0], time: null, note: "" });
+  }
+  if (overdue.length) groups.push({ date: null, items: overdue });
   for (let i = 0; i < days; i++) {
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    const time = day.getTime();
-    const onDay = matching.filter((t) => [t.scheduled, t.deadline].some((d) => d && startOfDay(d) === time));
-    groups.push({ date: day, tasks: onDay });
+    const items: AgendaItem[] = [];
+    for (const task of matching) {
+      for (const kind of ["scheduled", "deadline"] as const) {
+        const stamp = task[`${kind}Stamp`];
+        const date = task[kind];
+        const on = stamp ? occursOn(stamp, day) : date !== null && startOfDay(date) === day.getTime();
+        if (on) items.push({ task, kind, time: stamp ? hhmm(stamp) : null, note: "" });
+      }
+      for (const s of task.stamps ?? []) {
+        if (occursOn(s.stamp, day)) items.push({ task, kind: "timestamp", time: hhmm(s.stamp), note: s.note });
+      }
+    }
+    const timed = items.filter((x) => x.time !== null).sort((a, b) => (a.time! < b.time! ? -1 : a.time! > b.time! ? 1 : 0));
+    groups.push({ date: day, items: [...timed, ...items.filter((x) => x.time === null)] });
   }
   return groups;
 }
