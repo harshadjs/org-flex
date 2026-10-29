@@ -281,6 +281,32 @@
   color: var(--text-faint);
   font-size: 0.85em;
 }
+/* LP-14: the copy button sits at the top right of a src block */
+.org-flex-view .cm-line.org-block-begin {
+  position: relative;
+}
+.org-flex-view .org-block-copy {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 4px;
+  color: var(--text-faint);
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.org-flex-view .org-block-copy svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+.is-mobile .org-flex-view .org-block-copy {
+  padding: 6px 10px;
+}
+.is-mobile .org-flex-view .org-block-copy svg {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
 
 /* PARSE-4: source tokens use Obsidian's code colours */
 .org-flex-view .org-tok-keyword { color: var(--code-keyword); }

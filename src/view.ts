@@ -132,6 +132,7 @@ export class OrgFlexView extends TextFileView {
     const app = this.app;
     return {
       setIcon,
+      notice: (message) => void new Notice(message),
       openLink: (target) => void this.plugin.openLink(target, this.file?.path ?? "", this.leaf),
       imageSrc: (target) => {
         const file = this.plugin.linkFile(target, this.file?.path ?? "");
