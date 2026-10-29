@@ -4,7 +4,12 @@ Edit [Org mode](https://orgmode.org) files in Obsidian, on the phone as comforta
 
 **Org Flex is meant to be forked.** No two people use Org the same way: one lives in org-roam, another in denote, a third in one big outline with `org-attach` folders and a custom agenda. Rather than one plugin with a setting for every Org option, Org Flex is a base you fork and turn into *your own* plugin, with a coding agent doing the work.
 
-<!-- Screenshots: add phone and desktop captures to docs/ and link them here. -->
+<p align="center">
+  <img src="docs/phone-outline.png" alt="A note with folded headings, a Python source block with a copy button and a quote block" width="30%">
+  <img src="docs/phone-checklist.png" alt="A checklist with a [1/4] counter, a TODO with a deadline and links to other notes" width="30%">
+  <img src="docs/phone-folded.png" alt="A short note with its headings folded and the shortcut bar's journal, capture and recording buttons" width="30%">
+</p>
+<p align="center"><em>On an Android phone: live preview, folding, checklists, links and the shortcut bar.</em></p>
 
 ## Your configuration is code, not settings
 
