@@ -1626,6 +1626,45 @@ input.org-icon-invalid {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
+/* TL-3: videos play in place, their name under them opens the file */
+.org-timeline .org-timeline-videos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+  max-width: 460px;
+  margin: var(--size-4-2) 0 var(--size-4-1) var(--size-4-6);
+}
+.org-timeline .org-timeline-video video {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 320px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-m);
+  background: #000;
+  border: 1px solid var(--background-modifier-border);
+}
+.org-timeline .org-timeline-video-name {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  margin-top: var(--size-4-1);
+  padding: 2px 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+  min-width: 0;
+}
+.org-timeline .org-timeline-video-name:hover {
+  color: var(--text-normal);
+}
+.is-mobile .org-timeline .org-timeline-videos {
+  margin-left: 0;
+}
+.is-mobile .org-timeline .org-timeline-video-name {
+  min-height: 32px;
+}
+
 .org-timeline .org-timeline-chips {
   display: flex;
   flex-wrap: wrap;

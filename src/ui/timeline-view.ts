@@ -5,7 +5,7 @@ import { ItemView, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
 import { journalEntries } from "../org/journal";
-import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../org/syntax";
+import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../org/syntax";
 import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags, untilEnd } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
@@ -18,7 +18,7 @@ const KIND_ICON: Record<TimelineKind, string> = { journal: "calendar-days", note
 /** TL-3: a file chip's icon for its kind */
 function fileIcon(ext: string): string {
   if (AUDIO_EXTENSIONS.includes(ext)) return "audio-lines";
-  if (["mp4", "m4v", "mov", "mkv"].includes(ext)) return "film";
+  if (VIDEO_EXTENSIONS.includes(ext)) return "film";
   if (ext === "pdf") return "file-text";
   return "paperclip";
 }
@@ -34,6 +34,8 @@ export class TimelineView extends ItemView {
   private listEl: HTMLElement | null = null;
   private countEl: HTMLElement | null = null;
   private tagsEl: HTMLElement | null = null;
+  /** TL-3: loads a video when it comes near the screen */
+  private videoObserver: IntersectionObserver | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
@@ -65,6 +67,23 @@ export class TimelineView extends ItemView {
   async onClose() {
     if (this.timer !== null) window.clearTimeout(this.timer);
     if (this.typing !== null) window.clearTimeout(this.typing);
+    this.videoObserver?.disconnect();
+  }
+
+  /** TL-3: give `video` its file once it is near the screen, so a long timeline doesn't fetch every video */
+  private lazyVideo(video: HTMLVideoElement) {
+    const load = (v: HTMLVideoElement) => {
+      if (v.dataset.src && !v.getAttribute("src")) v.src = v.dataset.src;
+    };
+    if (typeof IntersectionObserver !== "function") return load(video);
+    this.videoObserver ??= new IntersectionObserver((seen) => {
+      for (const e of seen) {
+        if (!e.isIntersecting) continue;
+        load(e.target as HTMLVideoElement);
+        this.videoObserver?.unobserve(e.target);
+      }
+    }, { rootMargin: "600px 0px" });
+    this.videoObserver.observe(video);
   }
 
   private refreshSoon() {
@@ -300,9 +319,10 @@ export class TimelineView extends ItemView {
     if (entry.attachments.length) this.renderAttachments(item, entry.attachments);
   }
 
-  /** TL-3: images as rounded thumbnails, any other file as a chip with its kind's icon */
+  /** TL-3: images as rounded thumbnails, videos as players with their name under them, any other file as a chip with its kind's icon */
   private renderAttachments(parent: HTMLElement, paths: string[]) {
     const images = parent.createDiv({ cls: "org-timeline-thumbs" });
+    const videos = parent.createDiv({ cls: "org-timeline-videos" });
     const chips = parent.createDiv({ cls: "org-timeline-chips" });
     for (const path of paths) {
       const file = this.app.vault.getAbstractFileByPath(path);
@@ -311,6 +331,15 @@ export class TimelineView extends ItemView {
       let item: HTMLElement;
       if (IMAGE_EXTENSIONS.includes(ext)) {
         item = images.createEl("img", { cls: "org-timeline-thumb", attr: { src: this.app.vault.getResourcePath(file), alt: file.name, title: file.name, loading: "lazy" } });
+      } else if (VIDEO_EXTENSIONS.includes(ext)) {
+        // `#t=0.1` makes a phone draw the first frame instead of a black box
+        const box = videos.createDiv({ cls: "org-timeline-video" });
+        const video = box.createEl("video", { attr: { controls: "", preload: "metadata", playsinline: "" } });
+        video.dataset.src = `${this.app.vault.getResourcePath(file)}#t=0.1`;
+        this.lazyVideo(video);
+        item = box.createDiv({ cls: "org-timeline-video-name", attr: { title: file.name } });
+        setIcon(item.createSpan({ cls: "org-timeline-chip-icon" }), "film");
+        item.createSpan({ cls: "org-timeline-chip-name", text: file.name });
       } else {
         item = chips.createDiv({ cls: "org-timeline-chip", attr: { title: file.name } });
         setIcon(item.createSpan({ cls: "org-timeline-chip-icon" }), fileIcon(ext));
@@ -319,6 +348,7 @@ export class TimelineView extends ItemView {
       onTap(item, () => void this.app.workspace.getLeaf(false).openFile(file));
     }
     if (!images.childElementCount) images.remove();
+    if (!videos.childElementCount) videos.remove();
     if (!chips.childElementCount) chips.remove();
   }
 }

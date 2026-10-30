@@ -2,7 +2,7 @@
 // It answers "where is ID X" and "who links to this note" without reading
 // files, and finds unlinked mentions in the text it keeps.
 
-import { analyze, AUDIO_EXTENSIONS, findLinks, IMAGE_EXTENSIONS, Keywords, parseHeading, parseProperty, relativeLinkPath, resolveRelative } from "./syntax";
+import { analyze, AUDIO_EXTENSIONS, findLinks, IMAGE_EXTENSIONS, Keywords, parseHeading, parseProperty, relativeLinkPath, resolveRelative, VIDEO_EXTENSIONS } from "./syntax";
 import { denoteIdOf } from "./denote";
 
 /** DEN-1: how notes are linked: by `:ID:` (org-roam) or by the identifier in Denote file names. */
@@ -163,7 +163,7 @@ export function backlinksTo(note: NoteRecord, notes: Iterable<NoteRecord>): Back
 }
 
 /** BL-7: the files whose backlinks show in their own view: images, audio, video and PDFs. */
-const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS, "mp4", "m4v", "mov", "mkv", "pdf"]);
+const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS, "pdf"]);
 
 export function isMediaFile(path: string): boolean {
   const base = path.slice(path.lastIndexOf("/") + 1);
