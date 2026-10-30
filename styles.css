@@ -1284,6 +1284,81 @@ input.org-icon-invalid {
   height: 40px;
 }
 
+/* TL-7: "Until", with the system's date picker invisible over it, and an × once a date is set */
+.org-timeline .org-timeline-until {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  padding: var(--size-4-1) var(--size-4-3) var(--size-4-1) var(--size-4-2);
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.org-timeline .org-timeline-until.is-active {
+  padding-right: 2px;
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.org-timeline .org-timeline-until input[type="date"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+.org-timeline .org-timeline-until input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  cursor: pointer;
+}
+.org-timeline button.org-timeline-until-clear {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.org-timeline button.org-timeline-until-clear:hover {
+  background: var(--background-modifier-hover);
+}
+.org-timeline button.org-timeline-until-clear.is-hidden {
+  display: none;
+}
+.org-timeline button.org-timeline-until-clear svg {
+  width: 14px;
+  height: 14px;
+}
+.is-mobile .org-timeline .org-timeline-until {
+  padding: var(--size-4-2) var(--size-4-3);
+}
+.is-mobile .org-timeline .org-timeline-until.is-active {
+  padding: 2px 2px 2px var(--size-4-3);
+}
+.is-mobile .org-timeline button.org-timeline-until-clear {
+  width: 32px;
+  height: 32px;
+}
+
 /* TL-6: the tags of what shows, one scrolling line of chips */
 .org-timeline .org-timeline-tag-strip {
   display: flex;

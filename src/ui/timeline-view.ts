@@ -1,4 +1,4 @@
-// TL-1..6: the timeline tab, every node in the index newest first, with the
+// TL-1..7: the timeline tab, every node in the index newest first, with the
 // attachments each one links to.
 
 import { ItemView, setIcon, TFile, WorkspaceLeaf } from "obsidian";
@@ -6,7 +6,7 @@ import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
 import { journalEntries } from "../org/journal";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../org/syntax";
-import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags } from "../org/timeline";
+import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags, untilEnd } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
 
@@ -133,6 +133,7 @@ export class TimelineView extends ItemView {
     toggle("Notes", KIND_ICON.note, () => this.filter.kinds.includes("note"), kind("note"));
     toggle("Headings", KIND_ICON.heading, () => this.filter.kinds.includes("heading"), kind("heading"));
     toggle("With attachments", "paperclip", () => this.filter.attachments, () => (this.filter = { ...this.filter, attachments: !this.filter.attachments }));
+    this.untilChip(chips);
     this.countEl = chips.createDiv({ cls: "org-timeline-shown" });
     this.tagsEl = bar.createDiv({ cls: "org-timeline-tag-strip" });
     this.listEl = page.createDiv({ cls: "org-timeline-list" });
@@ -156,6 +157,43 @@ export class TimelineView extends ItemView {
     } catch {
       // the filter just isn't kept
     }
+  }
+
+  /** TL-7: "Until" or "Until Oct 29", the system's date picker laid over it, and an × once a date is set */
+  private untilChip(parent: HTMLElement) {
+    const chip = parent.createDiv({ cls: "org-timeline-toggle org-timeline-until" });
+    setIcon(chip.createSpan({ cls: "org-timeline-toggle-icon" }), "calendar-search");
+    const label = chip.createSpan({ text: "Until" });
+    const input = chip.createEl("input", { attr: { type: "date", "aria-label": "Show entries until" } });
+    const clear = chip.createEl("button", { cls: "org-timeline-until-clear", attr: { "aria-label": "Any date" } });
+    setIcon(clear, "x");
+    const show = () => {
+      const end = untilEnd(this.filter.until);
+      input.value = this.filter.until;
+      const day = end && new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
+      const year = day && day.getFullYear() !== new Date().getFullYear() ? { year: "numeric" as const } : {};
+      label.setText(day ? `Until ${day.toLocaleDateString(undefined, { month: "short", day: "numeric", ...year })}` : "Until");
+      chip.toggleClass("is-active", !!day);
+      clear.toggleClass("is-hidden", !day);
+    };
+    const set = (until: string) => {
+      this.filter = { ...this.filter, until };
+      show();
+      this.save();
+      this.draw();
+      this.contentEl.scrollTop = 0;
+    };
+    input.addEventListener("change", () => set(input.value));
+    // a desktop browser opens its picker only from its own button, which is hidden
+    input.addEventListener("click", () => {
+      try {
+        input.showPicker?.();
+      } catch {
+        // the field still takes typing
+      }
+    });
+    clear.addEventListener("click", () => set(""));
+    show();
   }
 
   /** TL-6: add `tag` to the filter, or take it out */
