@@ -39,19 +39,19 @@ describe("timeline", () => {
         "* Later, no ID", "[[file:../../../attachments/2610-pasted-image-02.png]]",
         "[[file:../../../attachments/notes.txt]]",
       ].join("\n")),
-      readNote("notes/2610-garden.org", ":PROPERTIES:\n:ID: 20261029T080000\n:END:\n[[file:../attachments/2610-pasted-image-01.png]]\n[[file:../attachments/2610-pasted-image-03.png]]"),
+      readNote("notes/2610-garden.org", ":PROPERTIES:\n:ID: 20261029T080000\n:END:\n[[file:../attachments/2610-pasted-image-01.png]]\n[[file:../attachments/2610-pasted-image-03.png]]\n[[file:../attachments/2610-walk.ogv]]"),
       readNote("notes/no-id.org", "[[file:../attachments/2609-pasted-image-09.png]]"),
     ];
     const files = ["attachments/2610-voice-note-01.webm", "attachments/2610-pasted-image-01.png", "attachments/2610-pasted-image-02.png",
-      "attachments/2610-pasted-image-03.png", "attachments/2609-pasted-image-09.png", "attachments/2611-unused.pdf", "attachments/notes.txt", "notes/2610-garden.org"];
+      "attachments/2610-pasted-image-03.png", "attachments/2609-pasted-image-09.png", "attachments/2611-unused.pdf", "attachments/notes.txt", "notes/2610-garden.org", "attachments/2610-walk.ogv", "attachments/2608-clip.mov"];
     const { days, unlinked } = buildTimeline(notes, files, created);
     const under = Object.fromEntries(days.flatMap((d) => d.entries).map((e) => [e.title, e.attachments]));
     expect(under).toEqual({
-      "2610-garden": ["attachments/2610-pasted-image-03.png"],
+      "2610-garden": ["attachments/2610-pasted-image-03.png", "attachments/2610-walk.ogv"],
       Garden: ["attachments/2610-pasted-image-01.png"],
       "2026-10-28": ["attachments/2610-pasted-image-02.png", "attachments/2610-voice-note-01.webm"],
     });
-    expect(unlinked).toEqual(["attachments/2611-unused.pdf", "attachments/2609-pasted-image-09.png"]);
+    expect(unlinked).toEqual(["attachments/2611-unused.pdf", "attachments/2609-pasted-image-09.png", "attachments/2608-clip.mov"]);
   });
 });
 

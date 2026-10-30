@@ -415,6 +415,8 @@ export function* walkInline(nodes: InlineNode[]): Generator<InlineNode> {
 
 export const IMAGE_EXTENSIONS = ["apng", "avif", "gif", "jpeg", "jpg", "png", "svg", "webp"];
 export const AUDIO_EXTENSIONS = ["3gp", "aac", "flac", "m4a", "mp3", "oga", "ogg", "opus", "wav", "webm"];
+/** TL-3: video files (`.webm` is audio: the recorder's voice notes, REC-1) */
+export const VIDEO_EXTENSIONS = ["m4v", "mkv", "mov", "mp4", "ogv"];
 
 function extension(target: string): string {
   const clean = target.replace(/^file:/, "").split(/[?#]/)[0].split("::")[0];
