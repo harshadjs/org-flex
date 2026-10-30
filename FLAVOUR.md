@@ -18,6 +18,8 @@ This branch (`harshad`) is the plugin author's own copy, kept on top of the base
 - **Backlinks:** a *Show backlinks* setting turns the section at the end of notes on or off per vault and device (BL-6, 2026-10-24).
 - **Getting it onto devices:** `npm run deploy` on the desktop; on the phone, copy `main.js`, `manifest.json` and `styles.css` by hand. No releases or tags are made from this branch.
 
+- **Timeline** (2026-10-29): every file and heading ID newest first, journal days included, with attachments nested under the earliest node that links them (TL-1..4). Emacs has the same as `C-c n t`. Turn on the `timeline` bar button to use it from the phone.
+
 ## Wishes
 Raised in the 2026-10-29 interview and not built yet:
 - `org-crypt` (`:crypt:` subtrees) and `org-transclusion` are set up in Emacs but used nowhere in the vault. If they are used later: show encrypted entries folded and read-only, and transclusions inline and read-only.
