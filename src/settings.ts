@@ -4,7 +4,7 @@
 
 export type ButtonId =
   | "undo" | "redo" | "visibility" | "zoom" | "new-heading" | "demote" | "promote" | "todo" | "schedule" | "deadline"
-  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture" | "attach" | "record" | "agenda";
+  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture" | "attach" | "record" | "agenda" | "timeline";
 
 export interface ButtonDef {
   id: ButtonId;
@@ -45,6 +45,7 @@ export const BUTTONS: ButtonDef[] = [
   { id: "attach", name: "Attach file", icon: "paperclip", enabled: false, refocus: false },
   { id: "record", name: "Record voice note", icon: "mic", enabled: false, refocus: false },
   { id: "agenda", name: "Open agenda", icon: "calendar-range", enabled: false, refocus: false },
+  { id: "timeline", name: "Open timeline", icon: "history", enabled: false, refocus: false },
 ];
 
 /** PLAT-8: the buttons the core runs (`OrgFlexView.runButton`); the others belong to features. */
