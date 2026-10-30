@@ -84,6 +84,7 @@ const SHIPPED_COMMAND_IDS = [
   "org-insert-wiki-link", "org-zoom", "org-toggle-reading", "org-roam-node-find", "org-assign-id",
   "open-todays-journal", "browse-journal-entries", "open-journal-calendar", "new-org-note", "org-capture",
   "org-agenda",
+  "org-timeline",
 ];
 
 /** Ids whose feature this copy dropped; they may never be registered again, for anything. */
