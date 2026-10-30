@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseTasks, taskBlockConfig, toggleTaskInText } from "../src/org/tasks";
 import { agenda, overdueLabel, parseQuery, QueryError, runQuery } from "../src/org/query";
-import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles } from "../src/org/agenda";
+import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles, dayOffset, relativeDay } from "../src/org/agenda";
 
 const kw = { todo: ["TODO", "NEXT"], done: ["DONE", "CANCELLED"] };
 const ctx = { todoKeywords: kw.todo, doneKeywords: kw.done, defaultPriority: "B" };
@@ -140,4 +140,16 @@ test("the agenda reads the top-level org files and shows the week: overdue, then
     [3, []],
     [4, ["Sam timestamp Anniversary"]],
   ]);
+});
+
+test("agenda days are counted by the calendar and named relative to today", () => {
+  const today = new Date(2026, 9, 30, 23, 59);
+  expect(dayOffset(new Date(2026, 9, 30, 0, 0), today)).toBe(0);
+  expect(dayOffset(new Date(2026, 9, 31, 0, 1), today)).toBe(1);
+  expect(dayOffset(new Date(2026, 9, 27), today)).toBe(-3);
+  // across the end of summer time (25 October 2026 in Europe) and a month end
+  expect(dayOffset(new Date(2026, 10, 2), new Date(2026, 9, 24))).toBe(9);
+  expect([0, 1, -3].map((n) => relativeDay(n, "en"))).toEqual(["today", "tomorrow", "3 days ago"]);
+  expect(relativeDay(1, "de")).toBe("morgen");
+  expect(relativeDay(0, "not a locale!")).toBe("today");
 });
