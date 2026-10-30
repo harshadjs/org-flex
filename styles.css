@@ -1284,6 +1284,102 @@ input.org-icon-invalid {
   height: 40px;
 }
 
+/* TL-6: the tags of what shows, one scrolling line of chips */
+.org-timeline .org-timeline-tag-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  margin: 0 calc(-1 * var(--size-4-1));
+  padding: 0 var(--size-4-1);
+}
+.org-timeline .org-timeline-tag-strip::-webkit-scrollbar {
+  display: none;
+}
+.org-timeline .org-timeline-tag-strip.is-empty {
+  display: none;
+}
+.org-timeline .org-timeline-tag-strip-icon {
+  display: flex;
+  flex: none;
+  color: var(--text-faint);
+  margin-right: var(--size-4-1);
+}
+.org-timeline .org-timeline-tag-strip-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.org-timeline button.org-timeline-tag-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: auto;
+  padding: 2px var(--size-4-2);
+  border-radius: 999px;
+  border: none;
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.org-timeline button.org-timeline-tag-chip.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.org-timeline .org-timeline-tag-count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.org-timeline .org-timeline-tag-x {
+  display: flex;
+}
+.org-timeline .org-timeline-tag-x svg {
+  width: 12px;
+  height: 12px;
+}
+.is-mobile .org-timeline button.org-timeline-tag-chip {
+  padding: var(--size-4-1) var(--size-4-3);
+}
+
+/* TL-6: an entry's tags, under its title; inherited ones fainter */
+.org-timeline .org-timeline-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+  margin: 2px 0 var(--size-4-1) var(--size-4-6);
+}
+.org-timeline .org-timeline-tag {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: hsla(var(--interactive-accent-hsl), 0.12);
+  color: var(--text-accent);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.6;
+  cursor: pointer;
+}
+.org-timeline .org-timeline-tag.is-inherited {
+  background: transparent;
+  border: 1px dashed var(--background-modifier-border);
+  color: var(--text-faint);
+}
+.org-timeline .org-timeline-tag.is-active {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+.is-mobile .org-timeline .org-timeline-tags {
+  margin-left: 0;
+}
+.is-mobile .org-timeline .org-timeline-tag {
+  padding: 2px var(--size-4-2);
+}
+
 /* TL-2: the month's name stays at the top while its days scroll by */
 .org-timeline .org-timeline-month-header {
   position: sticky;

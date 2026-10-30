@@ -1,4 +1,4 @@
-// TL-1..4: the timeline tab, every node in the index newest first, with the
+// TL-1..6: the timeline tab, every node in the index newest first, with the
 // attachments each one links to.
 
 import { ItemView, setIcon, TFile, WorkspaceLeaf } from "obsidian";
@@ -6,7 +6,7 @@ import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
 import { journalEntries } from "../org/journal";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../org/syntax";
-import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind } from "../org/timeline";
+import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
 
@@ -33,6 +33,7 @@ export class TimelineView extends ItemView {
   private filter: TimelineFilter;
   private listEl: HTMLElement | null = null;
   private countEl: HTMLElement | null = null;
+  private tagsEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
@@ -96,7 +97,7 @@ export class TimelineView extends ItemView {
     const bar = page.createDiv({ cls: "org-timeline-filters" });
     const search = bar.createDiv({ cls: "org-timeline-search" });
     setIcon(search.createSpan({ cls: "org-timeline-search-icon" }), "search");
-    const input = search.createEl("input", { attr: { type: "search", placeholder: "Filter by title or file", enterkeyhint: "search" } });
+    const input = search.createEl("input", { attr: { type: "search", placeholder: "Filter by title, tag or file", enterkeyhint: "search" } });
     input.value = this.filter.text;
     input.addEventListener("input", () => {
       this.filter = { ...this.filter, text: input.value };
@@ -132,7 +133,8 @@ export class TimelineView extends ItemView {
     toggle("Notes", KIND_ICON.note, () => this.filter.kinds.includes("note"), kind("note"));
     toggle("Headings", KIND_ICON.heading, () => this.filter.kinds.includes("heading"), kind("heading"));
     toggle("With attachments", "paperclip", () => this.filter.attachments, () => (this.filter = { ...this.filter, attachments: !this.filter.attachments }));
-    this.countEl = bar.createDiv({ cls: "org-timeline-shown" });
+    this.countEl = chips.createDiv({ cls: "org-timeline-shown" });
+    this.tagsEl = bar.createDiv({ cls: "org-timeline-tag-strip" });
     this.listEl = page.createDiv({ cls: "org-timeline-list" });
   }
 
@@ -156,6 +158,34 @@ export class TimelineView extends ItemView {
     }
   }
 
+  /** TL-6: add `tag` to the filter, or take it out */
+  private toggleTag(tag: string) {
+    const tags = this.filter.tags.includes(tag) ? this.filter.tags.filter((t) => t !== tag) : [...this.filter.tags, tag];
+    this.filter = { ...this.filter, tags };
+    this.save();
+    this.draw();
+  }
+
+  /** TL-6: the tags of what shows, chosen ones first, each a chip that toggles it */
+  private drawTags(shown: Timeline) {
+    const strip = this.tagsEl!;
+    const scroll = strip.scrollLeft;
+    strip.empty();
+    const tags = timelineTags(shown, this.filter.tags);
+    strip.toggleClass("is-empty", !tags.length);
+    setIcon(strip.createSpan({ cls: "org-timeline-tag-strip-icon" }), "tags");
+    for (const { tag, count } of tags) {
+      const on = this.filter.tags.includes(tag);
+      const chip = strip.createEl("button", { cls: "org-timeline-tag-chip", attr: { "aria-pressed": String(on) } });
+      chip.toggleClass("is-active", on);
+      chip.createSpan({ cls: "org-timeline-tag-name", text: tag });
+      if (on) setIcon(chip.createSpan({ cls: "org-timeline-tag-x" }), "x");
+      else chip.createSpan({ cls: "org-timeline-tag-count", text: String(count) });
+      chip.addEventListener("click", () => this.toggleTag(tag));
+    }
+    strip.scrollLeft = scroll;
+  }
+
   /** TL-5: draw the timeline as the filter leaves it */
   private draw() {
     const el = this.contentEl;
@@ -165,6 +195,7 @@ export class TimelineView extends ItemView {
     const total = this.full.days.reduce((n, d) => n + d.entries.length, 0);
     const { days, unlinked } = filterTimeline(this.full, this.filter);
     const shown = days.reduce((n, d) => n + d.entries.length, 0);
+    this.drawTags({ days, unlinked });
     this.countEl!.setText(shown === total ? `${total} ${total === 1 ? "entry" : "entries"}` : `${shown} of ${total} entries`);
     if (!days.length && !unlinked.length) {
       list.createDiv({ cls: "org-timeline-empty", text: total ? "Nothing matches the filter." : "No notes with an ID yet." });
@@ -218,6 +249,16 @@ export class TimelineView extends ItemView {
     if (entry.note) meta.createSpan({ cls: "org-timeline-note", text: entry.note });
     if (!meta.childElementCount) meta.remove();
     onTap(head, () => void this.plugin.openAt(this.app.workspace.getLeaf(false), entry.path, { line: entry.line, top: true }));
+    if (entry.tags.length || entry.inherited.length) {
+      // TL-6: its own tags, then the inherited ones fainter; a tap filters by it
+      const row = item.createDiv({ cls: "org-timeline-tags" });
+      for (const [tag, inherited] of [...entry.tags.map((t) => [t, false] as const), ...entry.inherited.map((t) => [t, true] as const)]) {
+        const pill = row.createSpan({ cls: "org-timeline-tag", text: tag, attr: { title: inherited ? `${tag} (inherited)` : tag } });
+        pill.toggleClass("is-inherited", inherited);
+        pill.toggleClass("is-active", this.filter.tags.includes(tag));
+        onTap(pill, () => this.toggleTag(tag));
+      }
+    }
     if (entry.attachments.length) this.renderAttachments(item, entry.attachments);
   }
 

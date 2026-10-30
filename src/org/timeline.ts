@@ -1,7 +1,7 @@
 // The timeline (§11b): every org-roam node by the time its ID was made,
 // newest first, with the attachments each one links to.
 
-import { analyze } from "./syntax";
+import { analyze, NO_KEYWORDS, parseHeading } from "./syntax";
 import { isMediaFile, type NoteRecord } from "./vault-index";
 
 /**
@@ -33,6 +33,10 @@ export interface TimelineEntry {
   /** the note's title, for a heading */
   note?: string;
   time: Date;
+  /** TL-6: its own tags: a heading's, or a note's `#+filetags` */
+  tags: string[];
+  /** TL-6: a heading's tags from the headings above it and `#+filetags`, as Org inherits them */
+  inherited: string[];
   /** TL-3: vault paths of the media files first linked from here */
   attachments: string[];
 }
@@ -56,27 +60,54 @@ interface Span {
   level: number;
 }
 
+/** TL-6: a note's `#+filetags`, read before its first heading */
+function fileTags(lines: string[], kinds: { kind: string }[]): string[] {
+  const tags: string[] = [];
+  for (let n = 0; n < lines.length && kinds[n].kind !== "heading"; n++) {
+    const m = /^[ \t]*#\+filetags:[ \t]*(.*)$/i.exec(lines[n]);
+    if (m) tags.push(...m[1].split(/[:\s]+/).filter(Boolean));
+  }
+  return [...new Set(tags)];
+}
+
 function spans(note: NoteRecord, time: (id: string) => Date, journal: boolean): Span[] {
   const lines = note.text.split("\n");
   const kinds = analyze(lines).lines;
   const lineAt = (offset: number) => note.text.slice(0, offset).split("\n").length - 1;
   const headingLines = kinds.map((l, n) => (l.kind === "heading" ? n : -1)).filter((n) => n >= 0);
   const levelOf = (n: number) => /^\*+/.exec(lines[n])![0].length;
+  const tagsOf = (n: number) => parseHeading(lines[n], NO_KEYWORDS)?.tags?.tags ?? [];
+  const filetags = fileTags(lines, kinds);
+  /** TL-6: the tags of the headings above line `n`, outermost first, after `#+filetags` */
+  const above = (n: number) => {
+    const found: string[][] = [];
+    let level = levelOf(n);
+    for (let i = headingLines.length - 1; i >= 0 && level > 1; i--) {
+      const h = headingLines[i];
+      if (h >= n || levelOf(h) >= level) continue;
+      level = levelOf(h);
+      found.unshift(tagsOf(h));
+    }
+    return [...filetags, ...found.flat()];
+  };
   const seen = new Set<string>();
   const result: Span[] = [];
   for (const { id, offset, heading } of note.ids) {
     if (seen.has(id)) continue;
     seen.add(id);
-    const entry: TimelineEntry = heading === undefined
-      ? { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: time(id), attachments: [] }
-      : { id, kind: "heading", path: note.path, line: lineAt(offset), title: heading, note: note.title, time: time(id), attachments: [] };
+    let entry: TimelineEntry;
     if (heading === undefined) {
+      entry = { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: time(id), tags: filetags, inherited: [], attachments: [] };
       result.push({ entry, from: 0, to: lines.length, level: 0 });
       continue;
     }
-    const level = levelOf(entry.line);
-    const next = headingLines.find((n) => n > entry.line && levelOf(n) <= level);
-    result.push({ entry, from: entry.line, to: next ?? lines.length, level });
+    const line = lineAt(offset);
+    const tags = [...new Set(tagsOf(line))];
+    const inherited = [...new Set(above(line))].filter((t) => !tags.includes(t));
+    entry = { id, kind: "heading", path: note.path, line, title: heading, note: note.title, time: time(id), tags, inherited, attachments: [] };
+    const level = levelOf(line);
+    const next = headingLines.find((n) => n > line && levelOf(n) <= level);
+    result.push({ entry, from: line, to: next ?? lines.length, level });
   }
   return result;
 }
@@ -134,19 +165,22 @@ export interface TimelineFilter {
   kinds: TimelineKind[];
   /** only entries with attachments */
   attachments: boolean;
-  /** words that must all appear in the title, note title or an attachment's name, ignoring case */
+  /** words that must all appear in the title, note title, a tag or an attachment's name, ignoring case */
   text: string;
+  /** TL-6: tags an entry must all carry, its own or inherited */
+  tags: string[];
 }
 
 export const ALL_KINDS: TimelineKind[] = ["journal", "note", "heading"];
 
-export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "" };
+export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "", tags: [] };
 
 /** TL-5: the filter as saved, with anything missing or unknown set back to showing everything. */
 export function cleanFilter(saved: unknown): TimelineFilter {
   const s = (saved ?? {}) as Partial<TimelineFilter>;
   const kinds = Array.isArray(s.kinds) ? ALL_KINDS.filter((k) => s.kinds!.includes(k)) : ALL_KINDS;
-  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "" };
+  const tags = Array.isArray(s.tags) ? [...new Set(s.tags.filter((t): t is string => typeof t === "string" && t !== ""))] : [];
+  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "", tags };
 }
 
 /** TL-5: the timeline with only what `filter` keeps; days left empty go, and so do unlinked files when only entries are wanted. */
@@ -159,9 +193,24 @@ export function filterTimeline(timeline: Timeline, filter: TimelineFilter): Time
     const entries = day.entries.filter((e) =>
       filter.kinds.includes(e.kind)
       && (!filter.attachments || e.attachments.length > 0)
-      && matches([e.title, e.note ?? "", ...e.attachments.map(base)].join("\n").toLowerCase()));
+      && filter.tags.every((t) => e.tags.includes(t) || e.inherited.includes(t))
+      && matches([e.title, e.note ?? "", ...e.tags, ...e.inherited, ...e.attachments.map(base)].join("\n").toLowerCase()));
     if (entries.length) days.push({ date: day.date, entries });
   }
-  const unlinked = filter.attachments || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
+  const unlinked = filter.attachments || filter.tags.length || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
   return { days, unlinked };
+}
+
+/**
+ * TL-6: the tags on `timeline`'s entries (own or inherited) with how many
+ * entries carry each, most first then by name; `selected` tags come first,
+ * in their order, even when none carries them.
+ */
+export function timelineTags(timeline: Timeline, selected: string[] = []): { tag: string; count: number }[] {
+  const counts = new Map<string, number>(selected.map((t) => [t, 0]));
+  for (const day of timeline.days) {
+    for (const e of day.entries) for (const t of new Set([...e.tags, ...e.inherited])) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  const rest = [...counts].filter(([t]) => !selected.includes(t)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return [...selected.map((t) => ({ tag: t, count: counts.get(t)! })), ...rest.map(([tag, count]) => ({ tag, count }))];
 }
