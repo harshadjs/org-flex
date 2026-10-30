@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { microsecondId, timestampId } from "../src/org/ids";
+import { microsecondId, tsId } from "../src/org/ids";
 import { attachmentCompletion, backlinksTo, fileBacklinksTo, isMediaFile, linkDescription, mentionLink, noteLinkTarget, readNote, titleCompletions, unlinkedMentionsOf, VaultIndex } from "../src/org/vault-index";
 
 const pkm = readNote("topics/pkm.org", [
@@ -133,9 +133,9 @@ test("a microsecond ID is the time as digits, one more while taken", () => {
 
 test("a timestamp ID is the local time to the microsecond, as org-id's ts method writes it, one more while taken", () => {
   const us = new Date(2026, 9, 29, 14, 30, 12).getTime() * 1000 + 123456;
-  expect(timestampId(us + 0.7, new Set())).toBe("20261029T143012.123456");
-  expect(timestampId(us, new Set(["20261029T143012.123456"]))).toBe("20261029T143012.123457");
-  expect(timestampId(new Date(2026, 0, 2, 3, 4, 5).getTime() * 1000 + 7, new Set())).toBe("20260102T030405.000007");
+  expect(tsId(us + 0.7, new Set())).toBe("20261029T143012.123456");
+  expect(tsId(us, new Set(["20261029T143012.123456"]))).toBe("20261029T143012.123457");
+  expect(tsId(new Date(2026, 0, 2, 3, 4, 5).getTime() * 1000 + 7, new Set())).toBe("20260102T030405.000007");
 });
 
 test("notes with file links to a media file are its backlinks, one entry per note with each line", () => {
