@@ -124,7 +124,7 @@ export function renderAgenda(el: HTMLElement, days: AgendaDay[], actions: TaskLi
 }
 
 /** `[[id:x][Name]]` as `Name`, `[[target]]` as `target`. */
-function linkText(title: string): string {
+export function linkText(title: string): string {
   return title.replace(/\[\[([^\]]*)\](?:\[([^\]]*)\])?\]/g, (_, target: string, desc?: string) => desc ?? target);
 }
 
