@@ -60,6 +60,8 @@ export interface OrgHost {
   title?(): string;
   /** a short message to the user (LP-14) */
   notice?(message: string): void;
+  /** ACT-16: ask for a moment and re-date the ID of the node at `pos` */
+  pickIdTime?(pos: number): void;
 }
 
 export const orgHost = Facet.define<OrgHost, OrgHost | null>({

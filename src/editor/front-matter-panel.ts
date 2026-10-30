@@ -5,7 +5,7 @@
 import { EditorSelection, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import { displayValue, FrontMatter, propertyIcon, simplifyValue } from "../org/front-matter";
-import { docInfo, onTap, orgConfig, orgHost } from "./state";
+import { docInfo, onLongPress, onTap, orgConfig, orgHost } from "./state";
 
 export const revealFrontMatter = StateEffect.define<boolean>();
 export const toggleProperties = StateEffect.define<null>();
@@ -130,6 +130,8 @@ class PanelWidget extends WidgetType {
         value.textContent = "Empty";
       }
       el.addEventListener("click", editLine(row.line));
+      // ACT-16: holding the ID row sets the ID's time
+      if (row.key.toLowerCase() === "id" && host?.pickIdTime) onLongPress(el, () => host.pickIdTime!(view.state.doc.line(row.line + 1).from));
     }
     return root;
   }

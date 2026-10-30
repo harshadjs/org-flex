@@ -481,6 +481,28 @@ function barView(doc = "* a\ntext") {
   return { view, ran, button };
 }
 
+test("holding the ID button runs its long action instead of its tap; buttons without one just tap", async () => {
+  const ran: string[] = [];
+  const bar = shortcutBar({
+    buttons: BUTTONS.filter((b) => b.enabled),
+    icon: (d) => d.icon,
+    setIcon() {},
+    run: (id) => void ran.push(id),
+    long: (id) => (id === "heading-id" ? () => void ran.push("long heading-id") : undefined),
+  });
+  const { view } = mount("* a\ntext", bar, 0);
+  const button = (id: string) => view.dom.querySelector(`[data-button="${id}"]`) as HTMLElement;
+  const press = async (el: Element) => {
+    touch(el, "touchstart", 10, 10);
+    await new Promise((r) => setTimeout(r, 550));
+    return touch(el, "touchend", 10, 10);
+  };
+  expect((await press(button("heading-id"))).defaultPrevented).toBe(true);
+  tap(button("heading-id"));
+  await press(button("demote"));
+  expect(ran).toEqual(["long heading-id", "heading-id", "demote"]);
+});
+
 test("the shortcut bar is a panel at the bottom of the editor", () => {
   const { view } = barView();
   const bar = view.dom.querySelector(".org-shortcut-bar")!;

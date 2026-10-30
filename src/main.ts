@@ -1,5 +1,6 @@
 // Org Flex: Org mode files in Obsidian, on the desktop and the phone.
 
+import { Transaction } from "@codemirror/state";
 import { FileView, getIcon, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { ButtonDef, buttonIconName, CORE_BUTTONS, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
@@ -10,6 +11,9 @@ import { OrgFlexView, VIEW_TYPE } from "./view";
 import { FLAVOUR } from "./flavour";
 import type { TaskLog } from "./org/repeat";
 import { orgConflictMessage } from "./conflicts";
+import { datedId, idChanges, rewriteId } from "./org/redate";
+import { idTime } from "./org/timeline";
+import { IdTimeModal } from "./ui/modals";
 import { buttonFeature, FEATURES } from "./features";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
 
@@ -154,6 +158,77 @@ export default class OrgFlexPlugin extends Plugin {
     return id;
   }
 
+  /** ACT-16: a `ts` style ID at `date`, never one the vault has or one already given out. */
+  datedOrgId(date: Date): string {
+    const taken = new Set([...this.index.ids().map((i) => i.id), ...this.givenIds]);
+    const id = datedId(date, taken);
+    this.givenIds.add(id);
+    return id;
+  }
+
+  /** ACT-16: how many links to `id` the vault's org files hold, and in how many files */
+  idLinks(id: string): { links: number; files: number } {
+    let links = 0;
+    let files = 0;
+    for (const note of this.index.notes.values()) {
+      const n = idChanges(note.text, id, id).links;
+      links += n;
+      if (n) files++;
+    }
+    return { links, files };
+  }
+
+  /**
+   * ACT-16: ask for a moment, then re-date the node `old`: its `:ID:` and every
+   * link to it become a `ts` style ID at that moment. `title` names the node in
+   * the dialog's heading.
+   */
+  pickIdTime(old: string, title: string) {
+    const { links, files } = this.idLinks(old);
+    const detail = links
+      ? `${links} ${links === 1 ? "link" : "links"} in ${files} ${files === 1 ? "note" : "notes"} will follow.`
+      : "Nothing links to it yet.";
+    new IdTimeModal(this.app, `Set the time of ${title}`, idTime(old) ?? new Date(), detail, (date) => void this.redateId(old, date)).open();
+  }
+
+  /**
+   * ACT-16: re-date the node `old` to `date` everywhere: an open org view edits
+   * its text (outside undo), every other org file naming it is rewritten on disk.
+   */
+  async redateId(old: string, date: Date): Promise<string> {
+    const next = this.datedOrgId(date);
+    const open = new Map<string, OrgFlexView>();
+    this.forEachView((v) => {
+      if (v.file && v.editor) open.set(v.file.path, v);
+    });
+    const paths = new Set([...this.index.notes.values()].filter((n) => n.text.includes(old)).map((n) => n.path));
+    for (const path of open.keys()) if (open.get(path)!.editor!.state.doc.toString().includes(old)) paths.add(path);
+    let links = 0;
+    let files = 0;
+    for (const path of paths) {
+      const view = open.get(path);
+      let n = 0;
+      if (view?.editor) {
+        const found = idChanges(view.editor.state.doc.toString(), old, next);
+        // not undoable: undoing one note would leave the others' links pointing nowhere
+        if (found.changes.length) view.editor.dispatch({ changes: found.changes, annotations: Transaction.addToHistory.of(false) });
+        n = found.links;
+      } else {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) continue;
+        await this.app.vault.process(file, (text) => {
+          const out = rewriteId(text, old, next);
+          n = out?.links ?? 0;
+          return out?.text ?? text;
+        });
+      }
+      links += n;
+      if (n) files++;
+    }
+    new Notice(links ? `ID is now ${next}; ${links} ${links === 1 ? "link" : "links"} in ${files} ${files === 1 ? "note" : "notes"} updated.` : `ID is now ${next}.`);
+    return next;
+  }
+
   /** DEN-5, DEN-6: a new Denote identifier, never one a file has or one already given out. */
   newDenoteId(date: Date, journal = false): string {
     const taken = new Set([...this.denote.ids(), ...this.givenIds]);
@@ -214,6 +289,7 @@ export default class OrgFlexPlugin extends Plugin {
     inView("org-zoom", "Zoom into heading / zoom out", (v) => v.toggleZoom());
     inView("org-toggle-reading", "Toggle reading mode", (v) => v.toggleReading());
     inView("org-assign-id", "Assign ID to heading (:ID:)", (v) => v.command("heading-id"));
+    inView("org-set-id-time", "Set ID time…", (v) => v.pickIdTime());
   }
 
   // -------------------------------------------------------------------------

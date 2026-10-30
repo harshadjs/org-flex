@@ -2,7 +2,7 @@
 // transaction to dispatch, or null when it doesn't apply. They never touch a
 // view, so they can be tested with a bare EditorState.
 
-import { ChangeSpec, EditorSelection, EditorState, Text, TransactionSpec } from "@codemirror/state";
+import { ChangeSpec, EditorSelection, EditorState, Line, Text, TransactionSpec } from "@codemirror/state";
 import { foldedRanges } from "@codemirror/language";
 import { analyze, headingLevel, isPlanningLine, Keywords, parseHeading } from "./syntax";
 import { taskStateEdits, type TaskLog } from "./repeat";
@@ -390,6 +390,43 @@ function idLine(indent: string, id: string, key = "ID"): string {
 }
 
 /**
+ * ACT-10, ACT-16: where the ID of the heading enclosing `pos` (or of the
+ * file, above the first heading) lives: the line its drawer goes after
+ * (1-based; 0 is the top of the file), the drawer when there is a closed one,
+ * and the ID property in it when there is one.
+ */
+function idSlot(state: EditorState, pos: number, key: "ID" | "CUSTOM_ID") {
+  const doc = state.doc;
+  const heading = enclosingHeading(doc, pos);
+  const after = heading === null ? 0
+    : heading < doc.lines && isPlanningLine(doc.line(heading + 1).text) ? heading + 1 : heading;
+  const first = after + 1 <= doc.lines ? doc.line(after + 1) : null;
+  const open = first ? PROPERTIES_RE.exec(first.text) : null;
+  let drawer: { first: Line; indent: string; end: number } | null = null;
+  let prop: { line: Line; value: string } | null = null;
+  if (first && open) {
+    for (let n = first.number + 1; n <= doc.lines; n++) {
+      const line = doc.line(n);
+      if (headingLevel(line.text)) break;
+      if (END_RE.test(line.text)) {
+        drawer = { first, indent: open[1], end: n };
+        for (let m = first.number + 1; m < n && !prop; m++) {
+          const found = idRe(key).exec(doc.line(m).text);
+          if (found) prop = { line: doc.line(m), value: found[1] ?? "" };
+        }
+        break;
+      }
+    }
+  }
+  return { heading, after, drawer, prop };
+}
+
+/** ACT-16: the `:ID:` of the heading enclosing `pos`, or of the file above the first heading; null when it has none. */
+export function idAt(state: EditorState, pos = state.selection.main.head): string | null {
+  return idSlot(state, pos, "ID").prop?.value || null;
+}
+
+/**
  * ACT-10: give the heading enclosing `pos` an `:ID:`, as org-roam's
  * `org-id-get-create` does. Before the first heading, the file gets one.
  * The ID goes into the heading's property drawer (straight after the heading
@@ -398,35 +435,18 @@ function idLine(indent: string, id: string, key = "ID"): string {
  */
 export function assignId(state: EditorState, id: string, pos = state.selection.main.head, key: "ID" | "CUSTOM_ID" = "ID"): TransactionSpec | null {
   const doc = state.doc;
-  const heading = enclosingHeading(doc, pos);
+  const { heading, after, drawer, prop } = idSlot(state, pos, key);
   // DEN-7: a Denote file is named by its identifier; only headings get a CUSTOM_ID
   if (key === "CUSTOM_ID" && heading === null) return null;
-  const ID_RE = idRe(key);
-  // the drawer goes after line `after` (1-based; 0 is the top of the file)
-  const after = heading === null ? 0
-    : heading < doc.lines && isPlanningLine(doc.line(heading + 1).text) ? heading + 1 : heading;
-  const first = after + 1 <= doc.lines ? doc.line(after + 1) : null;
-  const open = first ? PROPERTIES_RE.exec(first.text) : null;
-  if (first && open) {
-    for (let n = first.number + 1; n <= doc.lines; n++) {
-      const line = doc.line(n);
-      if (headingLevel(line.text)) break;
-      if (END_RE.test(line.text)) {
-        // a closed drawer: fill an empty :ID:, or add one at the top
-        for (let m = first.number + 1; m < n; m++) {
-          const prop = ID_RE.exec(doc.line(m).text);
-          if (!prop) continue;
-          if (prop[1]) return null;
-          const l = doc.line(m);
-          return { changes: { from: l.from, to: l.to, insert: idLine(/^[ \t]*/.exec(l.text)![0], id, key) }, userEvent: "input" };
-        }
-        return { changes: { from: first.to, insert: "\n" + idLine(open[1], id, key) }, userEvent: "input" };
-      }
-    }
+  if (prop?.value) return null;
+  if (prop) {
+    // fill an empty :ID:
+    return { changes: { from: prop.line.from, to: prop.line.to, insert: idLine(/^[ \t]*/.exec(prop.line.text)![0], id, key) }, userEvent: "input" };
   }
-  const drawer = `:PROPERTIES:\n${idLine("", id, key)}\n:END:`;
-  if (after === 0) return { changes: { from: 0, insert: drawer + "\n" }, userEvent: "input" };
-  return { changes: { from: doc.line(after).to, insert: "\n" + drawer }, userEvent: "input" };
+  if (drawer) return { changes: { from: drawer.first.to, insert: "\n" + idLine(drawer.indent, id, key) }, userEvent: "input" };
+  const fresh = `:PROPERTIES:\n${idLine("", id, key)}\n:END:`;
+  if (after === 0) return { changes: { from: 0, insert: fresh + "\n" }, userEvent: "input" };
+  return { changes: { from: doc.line(after).to, insert: "\n" + fresh }, userEvent: "input" };
 }
 
 // ---------------------------------------------------------------------------

@@ -305,7 +305,9 @@ export class TimelineView extends ItemView {
     if (t.getHours() || t.getMinutes() || t.getSeconds()) meta.createSpan({ cls: "org-timeline-time", text: `${p2(t.getHours())}:${p2(t.getMinutes())}` });
     if (entry.note) meta.createSpan({ cls: "org-timeline-note", text: entry.note });
     if (!meta.childElementCount) meta.remove();
-    onTap(head, () => void this.plugin.openAt(this.app.workspace.getLeaf(false), entry.path, { line: entry.line, top: true }));
+    onTap(head, () => void this.plugin.openAt(this.app.workspace.getLeaf(false), entry.path, { line: entry.line, top: true }),
+      // ACT-16: holding an entry sets its ID's time; the timeline redraws with the index
+      () => this.plugin.pickIdTime(entry.id, entry.kind === "journal" ? `the journal for ${entry.title}` : `“${entry.title}”`));
     if (entry.tags.length || entry.inherited.length) {
       // TL-6: its own tags, then the inherited ones fainter; a tap filters by it
       const row = item.createDiv({ cls: "org-timeline-tags" });
