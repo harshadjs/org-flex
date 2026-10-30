@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildTimeline, cleanFilter, filterTimeline, idTime, NO_FILTER } from "../src/org/timeline";
+import { buildTimeline, cleanFilter, filterTimeline, idTime, NO_FILTER, timelineTags } from "../src/org/timeline";
 import { readNote } from "../src/org/vault-index";
 
 const created = () => new Date(2020, 0, 1, 12, 0);
@@ -79,6 +79,41 @@ describe("timeline filters", () => {
 
   test("a saved filter is cleaned: unknown kinds dropped, anything missing shows everything", () => {
     expect(cleanFilter(null)).toEqual(NO_FILTER);
-    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "" });
+    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "", tags: [] });
+    expect(cleanFilter({ tags: ["book", 4, "", "book", "recipe"] }).tags).toEqual(["book", "recipe"]);
+  });
+
+  test("tags: a note's filetags, a heading's own, and those it inherits; the filter keeps entries carrying every chosen tag", () => {
+    const notes = [
+      readNote("notes/2610-food.org", [
+        ":PROPERTIES:", ":ID: 20261029T090000", ":END:", "#+title: Food", "#+filetags: :recipe:home:",
+        "* Breads :baking:", ":PROPERTIES:", ":ID: 20261029T100000", ":END:",
+        "** Sibling :other:",
+        "** TODO [#A] Roti :quick:home:", ":PROPERTIES:", ":ID: 20261029T110000", ":END:",
+        "* Soups", ":PROPERTIES:", ":ID: 20261029T120000", ":END:",
+      ].join("\n")),
+      readNote("notes/2610-plain.org", ":PROPERTIES:\n:ID: 20261028T090000\n:END:\n#+title: Plain\n"),
+    ];
+    const tl = buildTimeline(notes, ["attachments/x.png"], created);
+    const tags = Object.fromEntries(tl.days.flatMap((d) => d.entries.map((e) => [e.title, [e.tags, e.inherited]])));
+    expect(tags).toEqual({
+      Food: [["recipe", "home"], []],
+      Breads: [["baking"], ["recipe", "home"]],
+      Roti: [["quick", "home"], ["recipe", "baking"]],
+      Soups: [[], ["recipe", "home"]],
+      Plain: [[], []],
+    });
+    const titles = (f: Partial<typeof NO_FILTER>) => filterTimeline(tl, { ...NO_FILTER, ...f }).days.flatMap((d) => d.entries.map((e) => e.title));
+    expect(titles({ tags: ["baking"] })).toEqual(["Roti", "Breads"]);
+    expect(titles({ tags: ["baking", "quick"] })).toEqual(["Roti"]);
+    expect(titles({ tags: ["other"] })).toEqual([]);
+    expect(titles({ text: "recipe" })).toEqual(["Soups", "Roti", "Breads", "Food"]);
+    expect(filterTimeline(tl, { ...NO_FILTER, tags: ["home"] }).unlinked).toEqual([]);
+    expect(timelineTags(tl)).toEqual([
+      { tag: "home", count: 4 }, { tag: "recipe", count: 4 }, { tag: "baking", count: 2 }, { tag: "quick", count: 1 },
+    ]);
+    expect(timelineTags(filterTimeline(tl, { ...NO_FILTER, tags: ["quick"] }), ["quick", "gone"])).toEqual([
+      { tag: "quick", count: 1 }, { tag: "gone", count: 0 }, { tag: "baking", count: 1 }, { tag: "home", count: 1 }, { tag: "recipe", count: 1 },
+    ]);
   });
 });
