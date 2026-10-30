@@ -128,3 +128,40 @@ export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], crea
   const unlinked = files.filter((p) => isMediaFile(p) && !first.has(p)).sort((a, b) => name(b).localeCompare(name(a)) || a.localeCompare(b));
   return { days, unlinked };
 }
+
+/** TL-5: what the timeline shows */
+export interface TimelineFilter {
+  kinds: TimelineKind[];
+  /** only entries with attachments */
+  attachments: boolean;
+  /** words that must all appear in the title, note title or an attachment's name, ignoring case */
+  text: string;
+}
+
+export const ALL_KINDS: TimelineKind[] = ["journal", "note", "heading"];
+
+export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "" };
+
+/** TL-5: the filter as saved, with anything missing or unknown set back to showing everything. */
+export function cleanFilter(saved: unknown): TimelineFilter {
+  const s = (saved ?? {}) as Partial<TimelineFilter>;
+  const kinds = Array.isArray(s.kinds) ? ALL_KINDS.filter((k) => s.kinds!.includes(k)) : ALL_KINDS;
+  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "" };
+}
+
+/** TL-5: the timeline with only what `filter` keeps; days left empty go, and so do unlinked files when only entries are wanted. */
+export function filterTimeline(timeline: Timeline, filter: TimelineFilter): Timeline {
+  const words = filter.text.toLowerCase().split(/\s+/).filter(Boolean);
+  const base = (p: string) => p.slice(p.lastIndexOf("/") + 1).toLowerCase();
+  const matches = (hay: string) => words.every((w) => hay.includes(w));
+  const days: TimelineDay[] = [];
+  for (const day of timeline.days) {
+    const entries = day.entries.filter((e) =>
+      filter.kinds.includes(e.kind)
+      && (!filter.attachments || e.attachments.length > 0)
+      && matches([e.title, e.note ?? "", ...e.attachments.map(base)].join("\n").toLowerCase()));
+    if (entries.length) days.push({ date: day.date, entries });
+  }
+  const unlinked = filter.attachments || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
+  return { days, unlinked };
+}

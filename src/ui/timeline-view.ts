@@ -6,7 +6,7 @@ import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
 import { journalEntries } from "../org/journal";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS } from "../org/syntax";
-import { buildTimeline, type TimelineDay, type TimelineEntry, type TimelineKind } from "../org/timeline";
+import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
 
@@ -23,11 +23,20 @@ function fileIcon(ext: string): string {
   return "paperclip";
 }
 
+/** TL-5: where this device keeps the filter */
+const FILTER_KEY = "org-flex-timeline-filter";
+
 export class TimelineView extends ItemView {
   private timer: number | null = null;
+  private typing: number | null = null;
+  private full: Timeline = { days: [], unlinked: [] };
+  private filter: TimelineFilter;
+  private listEl: HTMLElement | null = null;
+  private countEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
+    this.filter = cleanFilter(this.app.loadLocalStorage(FILTER_KEY));
   }
 
   getViewType() {
@@ -54,6 +63,7 @@ export class TimelineView extends ItemView {
 
   async onClose() {
     if (this.timer !== null) window.clearTimeout(this.timer);
+    if (this.typing !== null) window.clearTimeout(this.typing);
   }
 
   private refreshSoon() {
@@ -64,20 +74,84 @@ export class TimelineView extends ItemView {
     }, 300);
   }
 
+  /** TL-2, TL-3: build the timeline again from the index, then draw it as filtered */
   render() {
     const vault = this.app.vault;
     const files = vault.getFiles();
     const paths = files.map((f) => f.path);
     const ctime = new Map(files.map((f) => [f.path, f.stat.ctime]));
     const journal = new Set(journalEntries([...this.plugin.index.notes.keys()], this.plugin.settings.journalFolder).map((e) => e.path));
-    const { days, unlinked } = buildTimeline(this.plugin.index.notes.values(), paths, (path) => new Date(ctime.get(path) ?? 0), journal);
+    this.full = buildTimeline(this.plugin.index.notes.values(), paths, (path) => new Date(ctime.get(path) ?? 0), journal);
+    this.ensureBar();
+    this.draw();
+  }
+
+  /** TL-5: the filter bar, made once so typing in it keeps its focus */
+  private ensureBar() {
+    if (this.listEl) return;
     const el = this.contentEl;
-    const scroll = el.scrollTop;
     el.empty();
     el.addClass("org-timeline");
     const page = el.createDiv({ cls: "org-timeline-page" });
+    const bar = page.createDiv({ cls: "org-timeline-filters" });
+    const search = bar.createDiv({ cls: "org-timeline-search" });
+    setIcon(search.createSpan({ cls: "org-timeline-search-icon" }), "search");
+    const input = search.createEl("input", { attr: { type: "search", placeholder: "Filter by title or file", enterkeyhint: "search" } });
+    input.value = this.filter.text;
+    input.addEventListener("input", () => {
+      this.filter = { ...this.filter, text: input.value };
+      if (this.typing !== null) window.clearTimeout(this.typing);
+      this.typing = window.setTimeout(() => {
+        this.typing = null;
+        this.save();
+        this.draw();
+      }, 150);
+    });
+    const chips = bar.createDiv({ cls: "org-timeline-toggles" });
+    const toggle = (label: string, icon: string, on: () => boolean, flip: () => void) => {
+      const chip = chips.createEl("button", { cls: "org-timeline-toggle" });
+      setIcon(chip.createSpan({ cls: "org-timeline-toggle-icon" }), icon);
+      chip.createSpan({ text: label });
+      const show = () => {
+        chip.toggleClass("is-active", on());
+        chip.setAttribute("aria-pressed", String(on()));
+      };
+      chip.addEventListener("click", () => {
+        flip();
+        show();
+        this.save();
+        this.draw();
+      });
+      show();
+    };
+    const kind = (k: TimelineKind) => () => {
+      const kinds = this.filter.kinds.includes(k) ? this.filter.kinds.filter((x) => x !== k) : ALL_KINDS.filter((x) => x === k || this.filter.kinds.includes(x));
+      this.filter = { ...this.filter, kinds };
+    };
+    toggle("Journal", KIND_ICON.journal, () => this.filter.kinds.includes("journal"), kind("journal"));
+    toggle("Notes", KIND_ICON.note, () => this.filter.kinds.includes("note"), kind("note"));
+    toggle("Headings", KIND_ICON.heading, () => this.filter.kinds.includes("heading"), kind("heading"));
+    toggle("With attachments", "paperclip", () => this.filter.attachments, () => (this.filter = { ...this.filter, attachments: !this.filter.attachments }));
+    this.countEl = bar.createDiv({ cls: "org-timeline-shown" });
+    this.listEl = page.createDiv({ cls: "org-timeline-list" });
+  }
+
+  private save() {
+    this.app.saveLocalStorage(FILTER_KEY, this.filter);
+  }
+
+  /** TL-5: draw the timeline as the filter leaves it */
+  private draw() {
+    const el = this.contentEl;
+    const scroll = el.scrollTop;
+    const list = this.listEl!;
+    list.empty();
+    const total = this.full.days.reduce((n, d) => n + d.entries.length, 0);
+    const { days, unlinked } = filterTimeline(this.full, this.filter);
+    const shown = days.reduce((n, d) => n + d.entries.length, 0);
+    this.countEl!.setText(shown === total ? `${total} ${total === 1 ? "entry" : "entries"}` : `${shown} of ${total} entries`);
     if (!days.length && !unlinked.length) {
-      page.createDiv({ cls: "org-timeline-empty", text: "No notes with an ID yet." });
+      list.createDiv({ cls: "org-timeline-empty", text: total ? "Nothing matches the filter." : "No notes with an ID yet." });
       return;
     }
     // TL-2: a section per month, its header sticky while its days scroll by
@@ -88,7 +162,7 @@ export class TimelineView extends ItemView {
       months[months.length - 1].days.push(day);
     }
     for (const month of months) {
-      const section = page.createDiv({ cls: "org-timeline-month" });
+      const section = list.createDiv({ cls: "org-timeline-month" });
       const header = section.createDiv({ cls: "org-timeline-month-header" });
       header.createSpan({ cls: "org-timeline-month-name", text: month.name });
       const count = month.days.reduce((n, d) => n + d.entries.length, 0);
@@ -96,7 +170,7 @@ export class TimelineView extends ItemView {
       for (const day of month.days) this.renderDay(section, day);
     }
     if (unlinked.length) {
-      const section = page.createDiv({ cls: "org-timeline-month org-timeline-unlinked" });
+      const section = list.createDiv({ cls: "org-timeline-month org-timeline-unlinked" });
       const header = section.createDiv({ cls: "org-timeline-month-header" });
       header.createSpan({ cls: "org-timeline-month-name", text: "Not linked" });
       header.createSpan({ cls: "org-timeline-count", text: `${unlinked.length} ${unlinked.length === 1 ? "file" : "files"}` });
