@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildTimeline, idTime } from "../src/org/timeline";
+import { buildTimeline, cleanFilter, filterTimeline, idTime, NO_FILTER } from "../src/org/timeline";
 import { readNote } from "../src/org/vault-index";
 
 const created = () => new Date(2020, 0, 1, 12, 0);
@@ -52,5 +52,33 @@ describe("timeline", () => {
       "2026-10-28": ["attachments/2610-pasted-image-02.png", "attachments/2610-voice-note-01.webm"],
     });
     expect(unlinked).toEqual(["attachments/2611-unused.pdf", "attachments/2609-pasted-image-09.png"]);
+  });
+});
+
+describe("timeline filters", () => {
+  const notes = [
+    readNote("journal/2026/10/2026-10-28.org", ":PROPERTIES:\n:ID: 20261028T080000\n:END:\n#+title: 2026-10-28\n[[file:../../../attachments/2610-voice-note-01.webm]]\n* Garden walk\n:PROPERTIES:\n:ID: 20261028T100000\n:END:\n"),
+    readNote("notes/2610-roti.org", ":PROPERTIES:\n:ID: 20261027T090000\n:END:\n#+title: Roti machine\n"),
+  ];
+  const files = ["attachments/2610-voice-note-01.webm", "attachments/2610-garden.png"];
+  const tl = buildTimeline(notes, files, created, new Set(["journal/2026/10/2026-10-28.org"]));
+  const titles = (t: ReturnType<typeof filterTimeline>) => t.days.flatMap((d) => d.entries.map((e) => e.title));
+
+  test("filters keep entries of the chosen kinds, with attachments, or matching the text; days left empty go", () => {
+    expect(titles(filterTimeline(tl, NO_FILTER))).toEqual(["Garden walk", "2026-10-28", "Roti machine"]);
+    expect(filterTimeline(tl, NO_FILTER).unlinked).toEqual(["attachments/2610-garden.png"]);
+    const notesOnly = filterTimeline(tl, { ...NO_FILTER, kinds: ["note"] });
+    expect([titles(notesOnly), notesOnly.days.length, notesOnly.unlinked]).toEqual([["Roti machine"], 1, []]);
+    expect(titles(filterTimeline(tl, { ...NO_FILTER, attachments: true }))).toEqual(["2026-10-28"]);
+    // every word, in the title, the note's title or an attachment's name, ignoring case
+    expect(titles(filterTimeline(tl, { ...NO_FILTER, text: "VOICE" }))).toEqual(["2026-10-28"]);
+    expect(titles(filterTimeline(tl, { ...NO_FILTER, text: "walk 2026" }))).toEqual(["Garden walk"]);
+    expect(filterTimeline(tl, { ...NO_FILTER, text: "garden" }).unlinked).toEqual(["attachments/2610-garden.png"]);
+    expect(filterTimeline(tl, { ...NO_FILTER, text: "nothing" })).toEqual({ days: [], unlinked: [] });
+  });
+
+  test("a saved filter is cleaned: unknown kinds dropped, anything missing shows everything", () => {
+    expect(cleanFilter(null)).toEqual(NO_FILTER);
+    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "" });
   });
 });
