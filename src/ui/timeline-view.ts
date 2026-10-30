@@ -36,7 +36,7 @@ export class TimelineView extends ItemView {
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
-    this.filter = cleanFilter(this.app.loadLocalStorage(FILTER_KEY));
+    this.filter = cleanFilter(this.loadFilter());
   }
 
   getViewType() {
@@ -136,8 +136,24 @@ export class TimelineView extends ItemView {
     this.listEl = page.createDiv({ cls: "org-timeline-list" });
   }
 
+  /** TL-5: `app.loadLocalStorage` is Obsidian 1.8.7's; older apps (minAppVersion) use the browser's, and a failure shows everything */
+  private loadFilter(): unknown {
+    try {
+      if (typeof this.app.loadLocalStorage === "function") return this.app.loadLocalStorage(FILTER_KEY);
+      const raw = window.localStorage.getItem(FILTER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
   private save() {
-    this.app.saveLocalStorage(FILTER_KEY, this.filter);
+    try {
+      if (typeof this.app.saveLocalStorage === "function") this.app.saveLocalStorage(FILTER_KEY, this.filter);
+      else window.localStorage.setItem(FILTER_KEY, JSON.stringify(this.filter));
+    } catch {
+      // the filter just isn't kept
+    }
   }
 
   /** TL-5: draw the timeline as the filter leaves it */
