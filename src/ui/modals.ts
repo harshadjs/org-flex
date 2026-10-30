@@ -1,4 +1,4 @@
-// Dialogs: the date picker for SCHEDULED/DEADLINE, the journal list, the
+// Dialogs: the date picker for SCHEDULED/DEADLINE, the ID time picker (ACT-16), the journal list, the
 // journal calendar, the new note dialog, the capture dialog and the voice
 // recorder.
 
@@ -79,6 +79,50 @@ export class DatePickerModal extends Modal {
   onClose() {
     this.contentEl.empty();
     this.onDone();
+  }
+}
+
+/**
+ * ACT-16: pick the moment an ID is dated at, to the second, from the ID's
+ * own time (or now); `detail` says what else changes. Set or Enter applies.
+ */
+export class IdTimeModal extends Modal {
+  constructor(app: App, private heading: string, private initial: Date, private detail: string, private onPick: (date: Date) => void) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    this.titleEl.setText(this.heading);
+    contentEl.addClass("org-date-picker", "org-id-time");
+    const d = this.initial;
+    const input = contentEl.createEl("input", { type: "datetime-local", cls: "org-date-input", attr: { step: "1" } });
+    input.value = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    if (this.detail) contentEl.createDiv({ cls: "org-id-time-detail", text: this.detail });
+    const read = (): Date | null => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(input.value);
+      return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0)) : null;
+    };
+    const apply = () => {
+      const value = read();
+      if (!value) return;
+      this.close();
+      this.onPick(value);
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        apply();
+      }
+    });
+    const buttons = contentEl.createDiv({ cls: "modal-button-container" });
+    buttons.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+    buttons.createEl("button", { text: "Set", cls: "mod-cta" }).addEventListener("click", apply);
+    if (!Platform.isMobile) window.setTimeout(() => input.focus(), 0);
+  }
+
+  onClose() {
+    this.contentEl.empty();
   }
 }
 

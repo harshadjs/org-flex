@@ -14,10 +14,10 @@ import { buttonFeature, FEATURES, hasFeature } from "./features";
 import { nextVisibility } from "./org/folding";
 import { appendEntry } from "./org/capture";
 import {
-  assignId, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
+  assignId, enclosingHeading, idAt, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
-import { attachmentCompletion, linkDescription } from "./org/vault-index";
+import { attachmentCompletion, headingTitle, linkDescription } from "./org/vault-index";
 import { denoteIdOf, denoteLabel } from "./org/denote";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
 import { readingMode } from "./editor/reading";
@@ -26,7 +26,7 @@ import { applyVisibility, visibilityField } from "./editor/folding";
 import { shortcutBar } from "./editor/shortcut-bar";
 import { insertLinkWithCompletion, linkButton } from "./editor/completion";
 import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard, VIEW_TYPE } from "./editor/setup";
-import { DatePickerModal } from "./ui/modals";
+import { DatePickerModal, IdTimeModal } from "./ui/modals";
 
 export { VIEW_TYPE };
 
@@ -133,6 +133,7 @@ export class OrgFlexView extends TextFileView {
     return {
       setIcon,
       notice: (message) => void new Notice(message),
+      pickIdTime: (pos) => this.pickIdTime(pos),
       openLink: (target) => void this.plugin.openLink(target, this.file?.path ?? "", this.leaf),
       imageSrc: (target) => {
         const file = this.plugin.linkFile(target, this.file?.path ?? "");
@@ -198,6 +199,8 @@ export class OrgFlexView extends TextFileView {
       icon: (def) => this.plugin.buttonIcon(def),
       setIcon,
       run: (id, view) => this.runButton(id, view),
+      // ACT-16: holding the ID button sets the ID's time
+      long: (id) => (id === "heading-id" ? () => this.pickIdTime() : undefined),
     });
   }
 
@@ -322,6 +325,32 @@ export class OrgFlexView extends TextFileView {
     return this.plugin.scheme() === "denote"
       ? assignId(state, `h:${crypto.randomUUID()}`, undefined, "CUSTOM_ID")
       : assignId(state, this.plugin.newOrgId());
+  }
+
+  /**
+   * ACT-16: re-date the ID of the heading at `pos` (the cursor), or of the
+   * file above the first heading; one without an ID gets one at the picked moment.
+   */
+  pickIdTime(pos?: number) {
+    const editor = this.editor;
+    if (!editor) return;
+    if (this.plugin.scheme() === "denote") {
+      new Notice("With Denote, IDs are made from the file name; there is no ID time to set.");
+      return;
+    }
+    pos ??= editor.state.selection.main.head;
+    const old = idAt(editor.state, pos);
+    const heading = enclosingHeading(editor.state.doc, pos);
+    const title = heading === null ? (this.plugin.index.notes.get(this.file?.path ?? "")?.title ?? this.file?.basename ?? "this note") : `“${headingTitle(editor.state.doc.line(heading).text, this.plugin.keywords())}”`;
+    if (old) {
+      this.plugin.pickIdTime(old, title);
+      return;
+    }
+    new IdTimeModal(this.app, `New ID for ${title}`, new Date(), "It has no ID yet; it gets one at this moment.", (date) => {
+      if (!this.editor) return;
+      const spec = assignId(this.editor.state, this.plugin.datedOrgId(date), pos);
+      if (spec) this.editor.dispatch(spec);
+    }).open();
   }
 
   private run(spec: Parameters<EditorView["dispatch"]>[0] | null) {

@@ -29,6 +29,8 @@ export interface BarOptions {
   icon(def: ButtonDef): string;
   setIcon(el: HTMLElement, icon: string): void;
   run(id: ButtonDef["id"], view: EditorView): void;
+  /** BAR-11: what holding a button does, for the buttons that have a long press */
+  long?(id: ButtonDef["id"]): (() => void) | undefined;
 }
 
 class Bar implements Panel {
@@ -50,7 +52,7 @@ class Bar implements Panel {
         const hadFocus = view.hasFocus;
         options.run(def.id, view);
         if (def.refocus === "always" || (def.refocus && hadFocus)) view.focus();
-      });
+      }, options.long?.(def.id));
       this.elements.set(def.id, button);
     }
     this.refresh();

@@ -85,6 +85,7 @@ const SHIPPED_COMMAND_IDS = [
   "open-todays-journal", "browse-journal-entries", "open-journal-calendar", "new-org-note", "org-capture",
   "org-agenda",
   "org-timeline",
+  "org-set-id-time",
 ];
 
 /** Ids whose feature this copy dropped; they may never be registered again, for anything. */
