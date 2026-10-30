@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildTimeline, cleanFilter, filterTimeline, idTime, NO_FILTER, timelineTags } from "../src/org/timeline";
+import { buildTimeline, cleanFilter, filterTimeline, idTime, NO_FILTER, timelineTags, untilEnd } from "../src/org/timeline";
 import { readNote } from "../src/org/vault-index";
 
 const created = () => new Date(2020, 0, 1, 12, 0);
@@ -79,8 +79,11 @@ describe("timeline filters", () => {
 
   test("a saved filter is cleaned: unknown kinds dropped, anything missing shows everything", () => {
     expect(cleanFilter(null)).toEqual(NO_FILTER);
-    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "", tags: [] });
+    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "", tags: [], until: "" });
     expect(cleanFilter({ tags: ["book", 4, "", "book", "recipe"] }).tags).toEqual(["book", "recipe"]);
+    expect(cleanFilter({ until: "2026-10-28" }).until).toBe("2026-10-28");
+    expect(cleanFilter({ until: "2026-02-30" }).until).toBe("");
+    expect(cleanFilter({ until: 20261028 }).until).toBe("");
   });
 
   test("tags: a note's filetags, a heading's own, and those it inherits; the filter keeps entries carrying every chosen tag", () => {
@@ -115,5 +118,23 @@ describe("timeline filters", () => {
     expect(timelineTags(filterTimeline(tl, { ...NO_FILTER, tags: ["quick"] }), ["quick", "gone"])).toEqual([
       { tag: "quick", count: 1 }, { tag: "gone", count: 0 }, { tag: "baking", count: 1 }, { tag: "home", count: 1 }, { tag: "recipe", count: 1 },
     ]);
+  });
+
+  test("until a date: entries on or before that day, to its end; unlinked files go", () => {
+    expect(untilEnd("2026-10-28")).toEqual(new Date(2026, 9, 29));
+    expect(untilEnd("2026-13-01")).toBeNull();
+    expect(untilEnd("")).toBeNull();
+    const notes = [
+      readNote("notes/a.org", ":PROPERTIES:\n:ID: 20261029T000000\n:END:\n#+title: Thursday midnight\n"),
+      readNote("notes/b.org", ":PROPERTIES:\n:ID: 20261028T235959.999999\n:END:\n#+title: Wednesday late\n"),
+      readNote("notes/c.org", ":PROPERTIES:\n:ID: 20261027T080000\n:END:\n#+title: Tuesday\n"),
+    ];
+    const tl = buildTimeline(notes, ["attachments/x.png"], created);
+    const until = (d: string) => filterTimeline(tl, { ...NO_FILTER, until: d });
+    expect(until("2026-10-28").days.flatMap((d) => d.entries.map((e) => e.title))).toEqual(["Wednesday late", "Tuesday"]);
+    expect(until("2026-10-28").unlinked).toEqual([]);
+    expect(until("2026-10-26").days).toEqual([]);
+    expect(until("").days.length).toBe(3);
+    expect(until("").unlinked).toEqual(["attachments/x.png"]);
   });
 });

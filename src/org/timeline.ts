@@ -169,18 +169,30 @@ export interface TimelineFilter {
   text: string;
   /** TL-6: tags an entry must all carry, its own or inherited */
   tags: string[];
+  /** TL-7: only entries on or before this day, `YYYY-MM-DD`; "" for any */
+  until: string;
 }
 
 export const ALL_KINDS: TimelineKind[] = ["journal", "note", "heading"];
 
-export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "", tags: [] };
+export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "", tags: [], until: "" };
 
 /** TL-5: the filter as saved, with anything missing or unknown set back to showing everything. */
 export function cleanFilter(saved: unknown): TimelineFilter {
   const s = (saved ?? {}) as Partial<TimelineFilter>;
   const kinds = Array.isArray(s.kinds) ? ALL_KINDS.filter((k) => s.kinds!.includes(k)) : ALL_KINDS;
   const tags = Array.isArray(s.tags) ? [...new Set(s.tags.filter((t): t is string => typeof t === "string" && t !== ""))] : [];
-  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "", tags };
+  const until = typeof s.until === "string" && untilEnd(s.until) ? s.until : "";
+  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "", tags, until };
+}
+
+/** TL-7: the moment after the `until` day ends, local time; null if it isn't a real `YYYY-MM-DD` day */
+export function untilEnd(until: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(until);
+  if (!m) return null;
+  const day = new Date(+m[1], +m[2] - 1, +m[3]);
+  if (day.getMonth() !== +m[2] - 1 || day.getDate() !== +m[3]) return null;
+  return new Date(+m[1], +m[2] - 1, +m[3] + 1);
 }
 
 /** TL-5: the timeline with only what `filter` keeps; days left empty go, and so do unlinked files when only entries are wanted. */
@@ -188,16 +200,18 @@ export function filterTimeline(timeline: Timeline, filter: TimelineFilter): Time
   const words = filter.text.toLowerCase().split(/\s+/).filter(Boolean);
   const base = (p: string) => p.slice(p.lastIndexOf("/") + 1).toLowerCase();
   const matches = (hay: string) => words.every((w) => hay.includes(w));
+  const end = untilEnd(filter.until);
   const days: TimelineDay[] = [];
   for (const day of timeline.days) {
     const entries = day.entries.filter((e) =>
       filter.kinds.includes(e.kind)
+      && (!end || e.time < end)
       && (!filter.attachments || e.attachments.length > 0)
       && filter.tags.every((t) => e.tags.includes(t) || e.inherited.includes(t))
       && matches([e.title, e.note ?? "", ...e.tags, ...e.inherited, ...e.attachments.map(base)].join("\n").toLowerCase()));
     if (entries.length) days.push({ date: day.date, entries });
   }
-  const unlinked = filter.attachments || filter.tags.length || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
+  const unlinked = filter.attachments || filter.tags.length || end || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
   return { days, unlinked };
 }
 
