@@ -13,14 +13,15 @@ describe("timeline", () => {
     expect(idTime("2610-some-note")).toBeNull();
   });
 
-  test("the timeline lists every ID newest first by its time, grouped by day, headings with their note's title", () => {
+  test("the timeline lists every ID newest first by its time, grouped by day, headings with their note's title, journal days marked", () => {
     const notes = [
       readNote("journal/2026/10/2026-10-28.org", ":PROPERTIES:\n:ID: 20261028T080000.000000\n:END:\n#+title: 2026-10-28\n* Walk\n:PROPERTIES:\n:ID: 20261028T190000.000000\n:END:\n"),
       readNote("notes/2610-roti.org", ":PROPERTIES:\n:ID: 20261029T090000.000000\n:END:\n#+title: Roti\n* TODO [[id:x][Fix]] C :home:\n:PROPERTIES:\n:ID: 20261028T080000.000001\n:END:\n"),
       readNote("notes/old.org", ":PROPERTIES:\n:ID: 0f3c9a1e-4b7d-4c2a-9a10-2b5e6d7f8a90\n:END:\n#+title: Old\n"),
       readNote("notes/plain.org", "* no IDs here\n"),
     ];
-    const { days } = buildTimeline(notes, [], created);
+    const { days } = buildTimeline(notes, [], created, new Set(["journal/2026/10/2026-10-28.org"]));
+    expect(days.flatMap((d) => d.entries.map((e) => e.kind))).toEqual(["note", "heading", "journal", "heading", "note"]);
     expect(days.map((d) => [d.date, d.entries.map((e) => [e.title, e.note, e.line])])).toEqual([
       [new Date(2026, 9, 29), [["Roti", undefined, 0]]],
       [new Date(2026, 9, 28), [["Walk", "2026-10-28", 4], ["2026-10-28", undefined, 0], ["Fix C", "Roti", 4]]],
