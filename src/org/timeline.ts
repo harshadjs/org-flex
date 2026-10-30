@@ -20,8 +20,12 @@ export function idTime(id: string): Date | null {
   return null;
 }
 
+/** TL-2: a journal day's file-level ID, another note's, or a heading's */
+export type TimelineKind = "journal" | "note" | "heading";
+
 export interface TimelineEntry {
   id: string;
+  kind: TimelineKind;
   path: string;
   /** 0-based line of the heading, or 0 for a file-level ID */
   line: number;
@@ -52,7 +56,7 @@ interface Span {
   level: number;
 }
 
-function spans(note: NoteRecord, time: (id: string) => Date): Span[] {
+function spans(note: NoteRecord, time: (id: string) => Date, journal: boolean): Span[] {
   const lines = note.text.split("\n");
   const kinds = analyze(lines).lines;
   const lineAt = (offset: number) => note.text.slice(0, offset).split("\n").length - 1;
@@ -64,8 +68,8 @@ function spans(note: NoteRecord, time: (id: string) => Date): Span[] {
     if (seen.has(id)) continue;
     seen.add(id);
     const entry: TimelineEntry = heading === undefined
-      ? { id, path: note.path, line: 0, title: note.title, time: time(id), attachments: [] }
-      : { id, path: note.path, line: lineAt(offset), title: heading, note: note.title, time: time(id), attachments: [] };
+      ? { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: time(id), attachments: [] }
+      : { id, kind: "heading", path: note.path, line: lineAt(offset), title: heading, note: note.title, time: time(id), attachments: [] };
     if (heading === undefined) {
       result.push({ entry, from: 0, to: lines.length, level: 0 });
       continue;
@@ -91,14 +95,14 @@ function dayKey(d: Date): string {
 /**
  * TL-2, TL-3: the timeline of `notes`. `files` are the vault's paths (the
  * media among them are the attachments); `created` gives a file's creation
- * time, for IDs that carry none.
+ * time, for IDs that carry none; `journal` holds the journal days' paths (JRN-3).
  */
-export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], created: (path: string) => Date): Timeline {
+export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], created: (path: string) => Date, journal: ReadonlySet<string> = new Set()): Timeline {
   const entries: TimelineEntry[] = [];
   const first = new Map<string, TimelineEntry>();
   const taken = new Set<string>();
   for (const note of notes) {
-    const nodes = spans(note, (id) => idTime(id) ?? created(note.path)).filter((s) => !taken.has(s.entry.id));
+    const nodes = spans(note, (id) => idTime(id) ?? created(note.path), journal.has(note.path)).filter((s) => !taken.has(s.entry.id));
     for (const s of nodes) {
       taken.add(s.entry.id);
       entries.push(s.entry);
