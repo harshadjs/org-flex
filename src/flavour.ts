@@ -8,7 +8,7 @@
 import type { VisibilityLevel } from "./org/folding";
 import { DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
 import { timestampId } from "./org/denote";
-import { microsecondId } from "./org/ids";
+import { tsId } from "./org/ids";
 import { countedMediaName, type MediaKind } from "./org/edit";
 import type { LinkScheme } from "./org/vault-index";
 
@@ -49,7 +49,7 @@ export const FLAVOUR: Flavour = {
   foldPropertyDrawers: true,
   defaultFoldLevel: "foldall",
   journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
-  orgId: microsecondId,
+  orgId: tsId,
   links: "id",
   denoteId: timestampId,
   journalId: timestampId,

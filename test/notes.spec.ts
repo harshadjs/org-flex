@@ -118,13 +118,14 @@ describe("journal", () => {
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("this flavour has TODO IN-PROGRESS WAITING then DONE CANCELLED, org-roam links, microsecond IDs, counted voice notes and CLOSED logging", () => {
+  test("this flavour has TODO IN-PROGRESS WAITING then DONE CANCELLED, org-roam links, timestamp IDs, counted voice notes and CLOSED logging", () => {
     expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "IN-PROGRESS", "WAITING"], ["DONE", "CANCELLED"]]);
     expect(FLAVOUR.logDone).toBe(true);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
     expect(FLAVOUR.links).toBe("id");
-    expect(FLAVOUR.orgId(1793101200123456, new Set())).toBe("1793101200123456");
-    expect(FLAVOUR.orgId(1793101200123456, new Set(["1793101200123456"]))).toBe("1793101200123457");
+    const us = new Date(2026, 9, 29, 14, 30, 12).getTime() * 1000 + 123456;
+    expect(FLAVOUR.orgId(us, new Set())).toBe("20261029T143012.123456");
+    expect(FLAVOUR.orgId(us, new Set(["20261029T143012.123456"]))).toBe("20261029T143012.123457");
     expect(FLAVOUR.mediaName("recording", new Date(2026, 9, 27), "m4a", new Set(["2610-voice-note-03.mp3"]))).toBe("2610-voice-note-04.m4a");
     expect(FLAVOUR.mediaName("image", new Date(2026, 9, 27), "png", new Set())).toBe("2610-pasted-image-01.png");
   });
