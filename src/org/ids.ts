@@ -22,7 +22,7 @@ export function microsecondId(now: number, taken: ReadonlySet<string>): string {
  * (`org-id-ts-format` `%Y%m%dT%H%M%S.%6N`: `20261029T143012.123456`), one
  * microsecond later while that one is taken.
  */
-export function timestampId(now: number, taken: ReadonlySet<string>): string {
+export function tsId(now: number, taken: ReadonlySet<string>): string {
   const p2 = (n: number) => String(n).padStart(2, "0");
   for (let us = Math.floor(now); ; us++) {
     const d = new Date(Math.floor(us / 1000));
