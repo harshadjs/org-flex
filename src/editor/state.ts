@@ -10,6 +10,8 @@ import { FrontMatter, parseFrontMatter } from "../org/front-matter";
 export interface OrgConfig {
   keywords: Keywords;
   hideStars: boolean;
+  /** TBL-3 */
+  hideEmphasisMarkers?: boolean;
   foldPropertyDrawers: boolean;
   frontMatterPanel: boolean;
 }

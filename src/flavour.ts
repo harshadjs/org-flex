@@ -21,6 +21,8 @@ export interface Flavour {
   defaultPriority: string;
   /** LP-7 */
   hideStars: boolean;
+  /** TBL-3: table widths leave out emphasis markers, as Emacs aligns with `org-hide-emphasis-markers` */
+  hideEmphasisMarkers: boolean;
   /** FOLD-4, FM-4 */
   foldPropertyDrawers: boolean;
   /** FOLD-5 */
@@ -46,6 +48,7 @@ export const FLAVOUR: Flavour = {
   doneKeywords: ["DONE"],
   defaultPriority: "B",
   hideStars: false,
+  hideEmphasisMarkers: false,
   foldPropertyDrawers: true,
   defaultFoldLevel: "foldall",
   journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
