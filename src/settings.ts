@@ -4,7 +4,7 @@
 
 export type ButtonId =
   | "undo" | "redo" | "visibility" | "zoom" | "new-heading" | "demote" | "promote" | "todo" | "schedule" | "deadline"
-  | "checkbox" | "src-block" | "quote-block" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture" | "attach" | "record" | "agenda" | "timeline";
+  | "checkbox" | "src-block" | "quote-block" | "table" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture" | "attach" | "record" | "agenda" | "timeline";
 
 export interface ButtonDef {
   id: ButtonId;
@@ -34,6 +34,8 @@ export const BUTTONS: ButtonDef[] = [
   { id: "checkbox", name: "Toggle checkbox", icon: "square-check", enabled: true, refocus: true },
   { id: "src-block", name: "Insert source block", icon: "code", enabled: true, refocus: "always" },
   { id: "quote-block", name: "Insert quote block", icon: "quote", enabled: true, refocus: "always" },
+  // TBL-6: it focuses the new table's first cell itself
+  { id: "table", name: "Insert table", icon: "table", enabled: true, refocus: false },
   { id: "wiki-link", name: "Insert wiki link", icon: "link", enabled: true, refocus: true },
   { id: "node-find", name: "Go to node", icon: "search", enabled: true, refocus: false },
   { id: "heading-id", name: "Assign ID to heading", icon: "fingerprint", enabled: true, refocus: true },
@@ -51,7 +53,7 @@ export const BUTTONS: ButtonDef[] = [
 /** PLAT-8: the buttons the core runs (`OrgFlexView.runButton`); the others belong to features. */
 export const CORE_BUTTONS: ReadonlySet<ButtonId> = new Set<ButtonId>([
   "undo", "redo", "visibility", "zoom", "new-heading", "demote", "promote", "todo", "schedule", "deadline",
-  "checkbox", "src-block", "quote-block", "wiki-link", "heading-id",
+  "checkbox", "src-block", "quote-block", "table", "wiki-link", "heading-id",
 ]);
 
 /** BAR-2: the buttons to show, in the order of the saved list; unknown and repeated ids are ignored. */
@@ -106,7 +108,7 @@ export interface OrgFlexSettings {
   showBacklinks: boolean;
 }
 
-export const BAR_VERSION = 9;
+export const BAR_VERSION = 10;
 
 export const DEFAULT_SETTINGS: OrgFlexSettings = {
   showShortcutBar: true,
@@ -153,5 +155,7 @@ export function migrateShortcutButtons(buttons: string[], version: number): { bu
   if (version < 8) for (const id of ["zoom", "node-find"]) if (!list.includes(id)) list.push(id);
   // until version 9 the bar ignored the list's order and used BUTTONS'; keep the bar looking the same
   if (version < 9) list = BUTTONS.map((b) => b.id as string).filter((id) => list.includes(id));
+  // from version 9 the order is the user's: a new button goes at the end, as turning one on does (BAR-10)
+  if (version < 10 && !list.includes("table")) list.push("table");
   return { buttons: list, changed: true };
 }

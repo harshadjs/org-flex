@@ -80,7 +80,7 @@ test("everything tappable in the editor goes through onTap, so a tap never bring
 const SHIPPED_COMMAND_IDS = [
   "cycle-orgmode-visibility", "org-toggle-stars", "org-insert-heading", "org-increase-heading-level",
   "org-decrease-heading-level", "org-cycle-task-state", "org-schedule-task", "org-deadline-task",
-  "org-toggle-checkbox", "org-insert-src-block", "org-insert-quote-block", "org-insert-id-link",
+  "org-toggle-checkbox", "org-insert-src-block", "org-insert-quote-block", "org-insert-table", "org-insert-id-link",
   "org-insert-wiki-link", "org-zoom", "org-toggle-reading", "org-roam-node-find", "org-assign-id",
   "open-todays-journal", "browse-journal-entries", "open-journal-calendar", "new-org-note", "org-capture",
   "org-agenda",

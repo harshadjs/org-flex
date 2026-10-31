@@ -284,6 +284,7 @@ export default class OrgFlexPlugin extends Plugin {
     inView("org-toggle-checkbox", "Toggle checkbox (- [ ])", (v) => v.command("checkbox"));
     inView("org-insert-src-block", "Insert source block (#+begin_src)", (v) => v.command("src-block"));
     inView("org-insert-quote-block", "Insert quote block (#+begin_quote)", (v) => v.command("quote-block"));
+    inView("org-insert-table", "Insert table", (v) => v.command("table"));
     inView("org-insert-id-link", "Insert ID link ([[id:]])", (v) => v.command("id-link"));
     inView("org-insert-wiki-link", "Insert wiki link ([[]])", (v) => v.command("wiki-link"));
     inView("org-zoom", "Zoom into heading / zoom out", (v) => v.toggleZoom());

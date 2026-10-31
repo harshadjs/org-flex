@@ -14,7 +14,7 @@ import { buttonFeature, FEATURES, hasFeature } from "./features";
 import { nextVisibility } from "./org/folding";
 import { appendEntry } from "./org/capture";
 import {
-  assignId, enclosingHeading, idAt, cycleTaskState, insertBlock, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
+  assignId, enclosingHeading, idAt, cycleTaskState, insertBlock, insertTable, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
 import { attachmentCompletion, headingTitle, linkDescription } from "./org/vault-index";
@@ -24,6 +24,7 @@ import { readingMode } from "./editor/reading";
 import { revealZoomEffects, toggleZoom, zoomToHeadingAt } from "./editor/zoom";
 import { applyVisibility, visibilityField } from "./editor/folding";
 import { shortcutBar } from "./editor/shortcut-bar";
+import { editTableCell } from "./editor/table";
 import { insertLinkWithCompletion, linkButton } from "./editor/completion";
 import { coreExtensions, externalChange, lockOuterScroll, trackKeyboard, VIEW_TYPE } from "./editor/setup";
 import { DatePickerModal, IdTimeModal } from "./ui/modals";
@@ -313,6 +314,7 @@ export class OrgFlexView extends TextFileView {
       case "checkbox": this.run(toggleCheckbox(state)); break;
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;
+      case "table": this.insertTable(); break;
       case "wiki-link": linkButton(view); break;
       case "heading-id": this.run(this.headingId(state)); break;
       // PLAT-8: the rest belong to features
@@ -353,12 +355,21 @@ export class OrgFlexView extends TextFileView {
     }).open();
   }
 
+  /** TBL-6: a new table, its first cell ready for typing */
+  insertTable() {
+    const editor = this.editor;
+    if (!editor) return;
+    const { spec, line } = insertTable(editor.state);
+    editor.dispatch(spec);
+    editTableCell(editor, line, { row: 0, col: 0 });
+  }
+
   private run(spec: Parameters<EditorView["dispatch"]>[0] | null) {
     if (spec && this.editor) this.editor.dispatch(spec);
   }
 
   /** Commands that edit (§9.3). */
-  command(name: "stars" | "new-heading" | "demote" | "promote" | "todo" | "checkbox" | "src-block" | "quote-block" | "id-link" | "wiki-link" | "heading-id") {
+  command(name: "stars" | "new-heading" | "demote" | "promote" | "todo" | "checkbox" | "src-block" | "quote-block" | "table" | "id-link" | "wiki-link" | "heading-id") {
     const editor = this.editor;
     if (!editor) return;
     const state = editor.state;
@@ -371,6 +382,7 @@ export class OrgFlexView extends TextFileView {
       case "checkbox": this.run(toggleCheckbox(state)); break;
       case "src-block": this.run(insertBlock(state, "src")); break;
       case "quote-block": this.run(insertBlock(state, "quote")); break;
+      case "table": this.insertTable(); break;
       case "id-link": insertLinkWithCompletion(editor, insertIdLink(state, this.plugin.scheme())); break;
       case "wiki-link": linkButton(editor); break;
       case "heading-id": this.run(this.headingId(state)); break;
