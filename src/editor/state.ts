@@ -120,8 +120,10 @@ export const LONG_PRESS_MS = 500;
  * editor or bringing up the mobile keyboard (MOB-7). A touch that moved
  * (a scroll or swipe) is not a tap. With `onLong`, holding the press still
  * for LONG_PRESS_MS runs that instead, and the tap that ends it does nothing.
+ * Events that `skip` picks (TBL-4: inside the cell being typed in) are left to
+ * the browser, so a caret can still be placed there.
  */
-export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () => void) {
+export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () => void, skip?: (e: Event) => boolean) {
   let start: { x: number; y: number } | null = null;
   let timer: number | null = null;
   let long = false;
@@ -141,6 +143,7 @@ export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () =
     }, LONG_PRESS_MS);
   };
   el.addEventListener("mousedown", (e) => {
+    if (skip?.(e)) return;
     e.preventDefault();
     if (e.button === 0) hold();
   });
@@ -148,6 +151,10 @@ export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () =
   el.addEventListener("mouseleave", stop);
   el.addEventListener("touchstart", (e) => {
     const t = e.touches[0];
+    if (skip?.(e)) {
+      start = null;
+      return;
+    }
     start = t ? { x: t.clientX, y: t.clientY } : null;
     hold();
   }, { passive: true });
@@ -170,6 +177,7 @@ export function onTap(el: HTMLElement, action: (e: Event) => void, onLong?: () =
     action(e);
   });
   el.addEventListener("click", (e) => {
+    if (skip?.(e)) return;
     e.preventDefault();
     if (long) {
       long = false;

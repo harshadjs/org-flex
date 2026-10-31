@@ -15,6 +15,7 @@ import { listDrag } from "./list-drag";
 import { hangingIndent } from "./hanging-indent";
 import { orgCompletion } from "./completion";
 import { orgZoom } from "./zoom";
+import { orgTables } from "./table";
 
 /** PLAT-3: the view type, which is also the plugin id. */
 export const VIEW_TYPE = "org-flex";
@@ -35,6 +36,7 @@ export function coreExtensions(options: { spellcheck: boolean }): Extension {
       ? { spellcheck: "true", autocorrect: "on", autocapitalize: "on" }
       : { spellcheck: "false" }),
     livePreview(),
+    orgTables(),
     srcHighlight,
     orgFolding(),
     checklists(),

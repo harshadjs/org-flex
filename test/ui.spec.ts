@@ -15,6 +15,8 @@ import { undo } from "@codemirror/commands";
 import { chooseDrop } from "../src/editor/list-drag";
 import { readingMode } from "../src/editor/reading";
 import { BUTTONS, ButtonId } from "../src/settings";
+import { editTableCell } from "../src/editor/table";
+import { insertTable } from "../src/org/edit";
 
 const views: EditorView[] = [];
 afterEach(() => {
@@ -863,4 +865,135 @@ test("a src block's copy button copies its body without moving the cursor; other
   expect(notices).toEqual(["Copied 2 lines"]);
   expect(view.state.selection.main.head).toBe(0);
   expect(view.state.doc.toString()).toBe(doc);
+});
+
+// ---------------------------------------------------------------- tables (§4a)
+
+const TABLE = "* H\n| Item | Qty |\n|------+-----|\n| [[id:a][fig]] | 3 |\n| pear | 12 |\nafter";
+
+function grid(view: EditorView): HTMLElement | null {
+  return view.contentDOM.querySelector(".org-table-wrap");
+}
+const cell = (view: EditorView, row: number, col: number) =>
+  grid(view)!.querySelector<HTMLElement>(`tr[data-row="${row}"] > [data-col="${col}"]`)!;
+const editingInput = (view: EditorView) => grid(view)!.querySelector<HTMLInputElement>("input.org-table-input");
+/** the edited cell's row and column */
+function editingAt(view: EditorView): [number, number] | null {
+  const td = editingInput(view)?.closest("td, th");
+  return td ? [Number(td.parentElement!.getAttribute("data-row")), Number(td.getAttribute("data-col"))] : null;
+}
+function key(el: Element, k: string, shiftKey = false) {
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: k, shiftKey, bubbles: true, cancelable: true }));
+}
+
+test("a table shows as a grid while the cursor is elsewhere, and as text while it is inside", () => {
+  const { view, opened } = mount(TABLE, [], 0);
+  const table = grid(view)!.querySelector("table")!;
+  expect(Array.from(table.querySelectorAll("th"), (th) => th.textContent)).toEqual(["Item", "Qty"]);
+  expect(Array.from(table.querySelectorAll("tbody tr"), (tr) => tr.textContent)).toEqual(["fig3", "pear12"]);
+  expect(cell(view, 2, 1).classList.contains("org-table-num")).toBe(true);
+  expect(cell(view, 2, 0).classList.contains("org-table-num")).toBe(false);
+  // the source lines are hidden
+  expect(view.contentDOM.textContent).not.toContain("|------");
+  // a link in a cell opens on a tap, without editing the cell
+  tap(cell(view, 2, 0).querySelector("[data-org-link]")!);
+  expect(opened.links).toEqual(["id:a"]);
+  expect(editingInput(view)).toBeNull();
+  // with the cursor in the table's text, the text shows
+  view.dispatch({ selection: EditorSelection.cursor(view.state.doc.line(4).from + 3) });
+  expect(grid(view)).toBeNull();
+  expect(view.contentDOM.textContent).toContain("|------+-----|");
+  view.dispatch({ selection: EditorSelection.cursor(view.state.doc.length) });
+  expect(grid(view)).not.toBeNull();
+});
+
+test("tapping a cell edits it in place; Enter and Tab write the table aligned and move on, Escape leaves it", () => {
+  const { view } = mount(TABLE, [], 0);
+  expect(tap(cell(view, 3, 0)).defaultPrevented).toBe(true);
+  let input = editingInput(view)!;
+  expect(document.activeElement).toBe(input);
+  expect(input.value).toBe("pear");
+  expect(grid(view)!.classList.contains("is-editing")).toBe(true);
+  input.value = "plum | ripe";
+  key(input, "Enter");
+  // written aligned, with a new row below the last, which is being edited now
+  expect(view.state.doc.toString()).toBe([
+    "* H",
+    "| Item              | Qty |",
+    "|-------------------+-----|",
+    "| [[id:a][fig]]               |   3 |",
+    "| plum \\vert{} ripe |  12 |",
+    "|                   |     |",
+    "after",
+  ].join("\n"));
+  input = editingInput(view)!;
+  expect(document.activeElement).toBe(input);
+  expect(editingAt(view)).toEqual([4, 0]);
+  // the cursor stayed out of the table
+  expect(view.state.selection.main.head).toBe(0);
+  input.value = "kiwi";
+  key(input, "Tab");
+  expect(view.state.doc.line(6).text).toBe("| kiwi              |     |");
+  input = editingInput(view)!;
+  expect(editingAt(view)).toEqual([4, 1]);
+  key(input, "Tab", true);
+  expect(editingInput(view)!.value).toBe("kiwi");
+  // a `|` typed shows as one
+  expect(cell(view, 3, 0).textContent).toBe("plum | ripe");
+  const before = view.state.doc.toString();
+  editingInput(view)!.value = "changed";
+  key(editingInput(view)!, "Escape");
+  expect(editingInput(view)).toBeNull();
+  expect(view.state.doc.toString()).toBe(before);
+  // a tap and Tab with nothing typed write nothing
+  tap(cell(view, 2, 1));
+  key(editingInput(view)!, "Tab");
+  expect(view.state.doc.toString()).toBe(before);
+  expect(editingAt(view)).toEqual([3, 0]);
+});
+
+test("the strip over the grid adds, deletes and moves rows and columns, each one undo", () => {
+  const { view, opened } = mount("| a | b |\n|---+---|\n| c | d |\n\nend");
+  const tool = (op: string) => grid(view)!.querySelector<HTMLElement>(`[data-table-op="${op}"]`)!;
+  tap(cell(view, 2, 0));
+  expect(opened.icons.get(tool("row-above"))).toBe("between-horizontal-start");
+  const run = (op: string) => {
+    expect(tap(tool(op)).defaultPrevented).toBe(true);
+    return view.state.doc.toString().split("\n\n")[0];
+  };
+  expect(run("row-above")).toBe("| a | b |\n|---+---|\n|   |   |\n| c | d |");
+  // the new row's cell is being edited
+  expect(editingAt(view)).toEqual([2, 0]);
+  undo(view);
+  expect(view.state.doc.toString().split("\n\n")[0]).toBe("| a | b |\n|---+---|\n| c | d |");
+  tap(cell(view, 2, 0));
+  expect(run("col-right")).toBe("| a |   | b |\n|---+---+---|\n| c |   | d |");
+  expect(run("col-delete")).toBe("| a | b |\n|---+---|\n| c | d |");
+  expect(editingAt(view)).toEqual([2, 1]);
+  expect(run("col-move-left")).toBe("| b | a |\n|---+---|\n| d | c |");
+  expect(run("row-up")).toBe("| b | a |\n| d | c |\n|---+---|");
+  expect(run("row-delete")).toBe("| b | a |\n|---+---|");
+  // the last row stays
+  expect(run("row-delete")).toBe("| b | a |\n|---+---|");
+  // typing then a tool writes both
+  editingInput(view)!.value = "x";
+  expect(run("row-below")).toBe("| x | a |\n|   |   |\n|---+---|");
+  tap(tool("done"));
+  expect(editingInput(view)).toBeNull();
+  // edit as text: the cursor goes into the cell's text, which then shows
+  tap(cell(view, 0, 1));
+  tap(tool("text"));
+  expect(grid(view)).toBeNull();
+  expect(view.state.selection.main.head).toBe(6);
+});
+
+test("a new table's first cell is ready for typing; reading mode shows the grid without editing", () => {
+  const { view } = mount("* H\n", [], 4);
+  const { spec, line } = insertTable(view.state);
+  view.dispatch(spec);
+  expect(editTableCell(view, line, { row: 0, col: 0 })).toBe(true);
+  expect(document.activeElement).toBe(editingInput(view));
+  const reading = mount(TABLE, readingMode({ keywords: () => ({ todo: [], done: [] }), pickDate: () => {} }), 0).view;
+  tap(cell(reading, 2, 1));
+  expect(editingInput(reading)).toBeNull();
 });

@@ -7,6 +7,7 @@ import { foldedRanges } from "@codemirror/language";
 import { analyze, headingLevel, isPlanningLine, Keywords, parseHeading } from "./syntax";
 import { taskStateEdits, type TaskLog } from "./repeat";
 import { BoxState, itemExtent, itemLines, nextBullet, parseItem, recountSection, sectionAround, setItemState, shiftItem, toggledState } from "./lists";
+import { NEW_TABLE } from "./table";
 
 export function docLines(doc: Text): string[] {
   const lines: string[] = [];
@@ -533,6 +534,29 @@ export function insertBlock(state: EditorState, kind: "src" | "quote"): Transact
     selection: EditorSelection.cursor(at + 1 + cursorIn),
     userEvent: "input",
     scrollIntoView: true,
+  };
+}
+
+/**
+ * TBL-6: a new table (NEW_TABLE), placed as ACT-12 places a block: a blank
+ * line becomes it, otherwise it goes on new lines right below (below the
+ * hidden text of a folded heading). The cursor stays before it, so the grid
+ * shows; `line` is its first line (0-based), for editing its first cell.
+ */
+export function insertTable(state: EditorState): { spec: TransactionSpec; line: number } {
+  const doc = state.doc;
+  const line = doc.lineAt(state.selection.main.head);
+  const text = NEW_TABLE.join("\n");
+  if (!line.text.trim()) {
+    return {
+      spec: { changes: { from: line.from, to: line.to, insert: text }, selection: EditorSelection.cursor(line.from), userEvent: "input", scrollIntoView: true },
+      line: line.number - 1,
+    };
+  }
+  const at = endPastFold(state, line.from, line.to);
+  return {
+    spec: { changes: { from: at, insert: "\n" + text }, selection: EditorSelection.cursor(at), userEvent: "input", scrollIntoView: true },
+    line: doc.lineAt(at).number,
   };
 }
 

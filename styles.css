@@ -308,6 +308,132 @@
   height: var(--icon-m);
 }
 
+/* TBL-2: a table shows as a grid that scrolls sideways when it's wider than the note */
+.org-flex-view .org-table-wrap {
+  margin: 4px 0;
+  max-width: 100%;
+}
+.org-flex-view .org-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+}
+.org-flex-view .org-table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+.org-flex-view .org-table th,
+.org-flex-view .org-table td {
+  border: 1px solid var(--background-modifier-border);
+  padding: 4px 8px;
+  min-width: 2.5em;
+  vertical-align: top;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-width: 24em;
+  cursor: text;
+  -webkit-touch-callout: none;
+}
+.org-flex-view .org-table th {
+  font-weight: var(--font-semibold, 600);
+  background-color: var(--background-secondary);
+  border-bottom: 2px solid var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.org-flex-view .org-table tr.org-table-rule > td {
+  border-top: 2px solid var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.org-flex-view .org-table .org-table-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* TBL-4: the cell being edited */
+.org-flex-view .org-table .is-editing {
+  padding: 0;
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+.org-flex-view .org-table-input {
+  width: 100%;
+  min-width: 6em;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0;
+  background: var(--background-primary);
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--text-normal);
+  box-shadow: none;
+}
+.org-flex-view .org-table-input:focus {
+  box-shadow: none;
+  outline: none;
+}
+/* TBL-5: the strip over the grid while a cell is edited, one row that scrolls sideways */
+.org-flex-view .org-table-tools {
+  display: none;
+  flex-wrap: nowrap;
+  gap: 10px;
+  align-items: center;
+  overflow-x: auto;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
+  margin-bottom: 4px;
+}
+.org-flex-view .org-table-wrap.is-editing .org-table-tools {
+  display: flex;
+}
+.org-flex-view .org-table-tool-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+}
+.org-flex-view .org-table-tool-group > span {
+  padding: 0 4px 0 8px;
+  font-size: var(--font-ui-smaller, 0.8em);
+  color: var(--text-muted);
+}
+.org-flex-view .org-table-tool {
+  padding: 4px 8px;
+  min-width: 32px;
+  height: 30px;
+  color: var(--text-muted);
+  background: none;
+  box-shadow: none;
+  font-size: var(--font-ui-small, 0.9em);
+}
+.org-flex-view .org-table-tool svg {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+.org-flex-view .org-table-tool:active {
+  background-color: var(--background-modifier-active-hover, var(--background-modifier-hover));
+}
+.is-mobile .org-flex-view .org-table th,
+.is-mobile .org-flex-view .org-table td {
+  padding: 8px 10px;
+  max-width: 16em;
+}
+.is-mobile .org-flex-view .org-table .is-editing {
+  padding: 0;
+}
+.is-mobile .org-flex-view .org-table-input {
+  padding: 8px 10px;
+}
+.is-mobile .org-flex-view .org-table-tool {
+  min-width: 44px;
+  height: 40px;
+}
+.is-mobile .org-flex-view .org-table-tool svg {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
+
 /* PARSE-4: source tokens use Obsidian's code colours */
 .org-flex-view .org-tok-keyword { color: var(--code-keyword); }
 .org-flex-view .org-tok-string { color: var(--code-string); }
