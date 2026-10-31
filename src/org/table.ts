@@ -2,7 +2,7 @@
 // back aligned the way Org's `org-table-align` does, and the row and column
 // operations the grid offers. Pure: works on lines, so it is tested directly.
 
-import { findLinks, OrgStructure } from "./syntax";
+import { findLinks, OrgStructure, parseInline, walkInline } from "./syntax";
 
 /** TBL-1: a table line starts with `|` after any indentation */
 export const TABLE_LINE_RE = /^[ \t]*\|/;
@@ -64,9 +64,14 @@ function textWidth(text: string): number {
   return width;
 }
 
-/** TBL-3: how wide a cell shows in Emacs: a link counts as its description (or its target), as Org aligns it. */
-export function cellWidth(cell: string): number {
+/**
+ * TBL-3: how wide a cell shows in Emacs: a link counts as its description (or
+ * its target), as Org aligns it; with `hideMarkers` (`org-hide-emphasis-markers`)
+ * the markers of bold, italic, code and the rest don't count either.
+ */
+export function cellWidth(cell: string, hideMarkers = false): number {
   let width = 0;
+  if (hideMarkers) for (const node of walkInline(parseInline(cell))) if (node.type !== "link") width -= 2;
   let at = 0;
   for (const link of findLinks(cell)) {
     if (link.style !== "regular") continue;
@@ -97,7 +102,10 @@ export function numericColumn(rows: TableRow[], col: number): boolean {
  * row as wide as the widest, each column padded to its widest cell (at least
  * 1), numbers on the right, separators `|---+---|`, all at `indent`.
  */
-export function formatTable(rows: TableRow[], indent = ""): string[] {
+const cellWidthOf = (cell: string, hide: boolean) => cellWidth(cell, hide);
+
+export function formatTable(rows: TableRow[], indent = "", hideMarkers = false): string[] {
+  const cellWidth = (cell: string) => cellWidthOf(cell, hideMarkers);
   const cols = columnCount(rows);
   const widths: number[] = [];
   const right: boolean[] = [];

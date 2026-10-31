@@ -11,7 +11,7 @@ import {
   CellAt, cellOffset, cleanCell, findTables, formatTable, headerRows, moveCell, numericColumn, OrgTable,
   parseRow, TableOp, tableOp, TableRow,
 } from "../org/table";
-import { onTap, orgHost, structureOf } from "./state";
+import { onTap, orgConfig, orgHost, structureOf } from "./state";
 
 const cache = new WeakMap<OrgStructure, OrgTable[]>();
 
@@ -277,7 +277,7 @@ class TableWidget extends WidgetType {
         return;
       }
       editing.leaving = true;
-      const text = formatTable(out, now.table.indent).join("\n");
+      const text = formatTable(out, now.table.indent, view.state.facet(orgConfig).hideEmphasisMarkers).join("\n");
       view.dispatch({ changes: { from: now.from, to: now.to, insert: text }, userEvent: "input.table" });
       // the grid was drawn again; carry on in the new one, in the same tap or key press, so the keyboard stays up
       if (target) editTableCell(view, begin, target);

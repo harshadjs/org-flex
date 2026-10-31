@@ -39,6 +39,10 @@ describe("tables", () => {
     expect(cellWidth("[[id:x][fig]]")).toBe(3);
     expect(cellWidth("see [[https://example.com]]")).toBe(4 + 19);
     expect(cellWidth("日本")).toBe(4);
+    // with org-hide-emphasis-markers, as Emacs shows them: "bold and code" and "x"
+    expect(cellWidth("*bold* and ~code~", true)).toBe(13);
+    expect(cellWidth("[[id:y][*x*]]", true)).toBe(3);
+    expect(formatTable(rows("| *a* |", "| bb |"), "", true)).toEqual(["| *a*  |", "| bb |"]);
     // empty columns are one wide; half numbers is not enough to go right
     expect(formatTable(rows("| | x |", "| 1 | y |"))).toEqual(["|   | x |", "| 1 | y |"]);
     expect(formatTable(rows("| a |", "| 1 |"))).toEqual(["| a |", "| 1 |"]);

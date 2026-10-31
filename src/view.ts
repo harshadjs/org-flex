@@ -181,6 +181,7 @@ export class OrgFlexView extends TextFileView {
     return orgConfig.of({
       keywords: this.plugin.keywords(),
       hideStars: s.hideStars,
+      hideEmphasisMarkers: s.hideEmphasisMarkers,
       foldPropertyDrawers: s.foldPropertyDrawers,
       frontMatterPanel: hasFeature("front-matter"),
     });
