@@ -48,7 +48,7 @@ export const FLAVOUR: Flavour = {
   doneKeywords: ["DONE", "CANCELLED"],
   defaultPriority: "B",
   hideStars: false,
-  hideEmphasisMarkers: false,
+  hideEmphasisMarkers: true,
   foldPropertyDrawers: true,
   defaultFoldLevel: "foldall",
   journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
