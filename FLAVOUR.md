@@ -21,6 +21,8 @@ This branch (`harshad`) is the plugin author's own copy, kept on top of the base
 
 - **Timeline** (2026-10-29): every file and heading ID newest first, journal days included, with attachments nested under the earliest node that links them (TL-1..4). Emacs has the same as `C-c n t`. Turn on the `timeline` bar button to use it from the phone.
 
+- **Notes grid** (2026-11-10): a Google Keep-like grid of every org file is the start page (`gridStartPage: true`, GRID-1), replacing the Bases-style view first discussed (collection fields such as status and rating dropped for now). Cards show the title and up to 12 lines; pinned first, then by last change. Pin and colour are `#+pinned` / `#+color` lines and labels are `#+filetags`, all of them (the user chose to see the noisy `recovered` and `unlinked` tags rather than hide them). `journal/`, `topics/` and `ai/` are hidden until their chip is chosen (`gridHiddenFolders: ["topics", "ai"]`, GRID-8), by folder because 119 of the 121 topic hubs have no tag. Nothing on the Emacs side.
+
 ## Wishes
 Raised in the 2026-10-29 interview and not built yet:
 - `org-crypt` (`:crypt:` subtrees) and `org-transclusion` are set up in Emacs but used nowhere in the vault. If they are used later: show encrypted entries folded and read-only, and transclusions inline and read-only.
