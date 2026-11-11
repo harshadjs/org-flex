@@ -73,8 +73,8 @@ export function editTableCell(view: EditorView, begin: number, at: CellAt): bool
   return false;
 }
 
-/** TBL-2: a cell's text with its markup and links, as live preview shows them; `\vert{}` shows as `|`. */
-function renderInline(parent: HTMLElement, text: string, from: number, to: number, nodes: InlineNode[]) {
+/** TBL-2: a cell's text with its markup and links, as live preview shows them; `\vert{}` shows as `|`. Also the notes grid's cards (GRID-3). */
+export function renderInline(parent: HTMLElement, text: string, from: number, to: number, nodes: InlineNode[]) {
   const plain = (a: number, b: number) => {
     if (b > a) parent.append(text.slice(a, b).replace(/\\vert\{\}/g, "|"));
   };

@@ -7,6 +7,7 @@ import type { ButtonId } from "../settings";
 import type { Feature } from "./feature";
 import { agendaFeature } from "./agenda";
 import { timelineFeature } from "./timeline";
+import { gridFeature } from "./grid";
 import { attachments } from "./attachments";
 import { backlinks } from "./backlinks";
 import { captureFeature } from "./capture";
@@ -31,6 +32,7 @@ export const FEATURES: Feature[] = [
   taskBlocks,
   agendaFeature,
   timelineFeature,
+  gridFeature,
 ];
 
 export function hasFeature(id: string): boolean {

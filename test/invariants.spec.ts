@@ -86,6 +86,7 @@ const SHIPPED_COMMAND_IDS = [
   "org-agenda",
   "org-timeline",
   "org-set-id-time",
+  "org-notes-grid",
 ];
 
 /** Ids whose feature this copy dropped; they may never be registered again, for anything. */

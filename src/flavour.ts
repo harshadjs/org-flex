@@ -41,6 +41,10 @@ export interface Flavour {
   mediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string;
   /** ACT-15: a task marked done gets `CLOSED: [time]`, as Emacs's `org-log-done 'time` */
   logDone: boolean;
+  /** GRID-1: Obsidian opens on the notes grid */
+  gridStartPage: boolean;
+  /** GRID-8: folders (besides the journal's) whose notes show only when their chip is chosen */
+  gridHiddenFolders: string[];
 }
 
 export const FLAVOUR: Flavour = {
@@ -58,4 +62,6 @@ export const FLAVOUR: Flavour = {
   journalId: timestampId,
   mediaName: stampedMediaName,
   logDone: false,
+  gridStartPage: false,
+  gridHiddenFolders: [],
 };

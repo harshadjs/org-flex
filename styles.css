@@ -1951,3 +1951,277 @@ input.org-icon-invalid {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* GRID-1..8: the notes grid, Keep-style cards in columns */
+.org-grid {
+  padding: 0 !important;
+  --grid-gap: 10px;
+  --grid-red: #faafa8; --grid-orange: #f39f76; --grid-yellow: #fff8b8; --grid-green: #e2f6d3;
+  --grid-teal: #b4ddd3; --grid-blue: #d4e4ed; --grid-darkblue: #aeccdc; --grid-purple: #d3bfdb;
+  --grid-pink: #f6e2dd; --grid-brown: #e9e3d4; --grid-gray: #efeff1;
+  --grid-ink: #202124;
+}
+.theme-dark .org-grid, .theme-dark .org-grid-menu {
+  --grid-red: #77172e; --grid-orange: #692b17; --grid-yellow: #7c4a03; --grid-green: #264d3b;
+  --grid-teal: #0c625d; --grid-blue: #256377; --grid-darkblue: #284255; --grid-purple: #472e5b;
+  --grid-pink: #6c394f; --grid-brown: #4b443a; --grid-gray: #232427;
+  --grid-ink: #e8eaed;
+}
+.org-grid-menu {
+  --grid-red: #faafa8; --grid-orange: #f39f76; --grid-yellow: #fff8b8; --grid-green: #e2f6d3;
+  --grid-teal: #b4ddd3; --grid-blue: #d4e4ed; --grid-darkblue: #aeccdc; --grid-purple: #d3bfdb;
+  --grid-pink: #f6e2dd; --grid-brown: #e9e3d4; --grid-gray: #efeff1;
+}
+.org-grid .org-grid-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--size-4-3) var(--size-4-12);
+}
+.org-grid .org-grid-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  padding: var(--size-4-3) 0 var(--size-4-2);
+}
+.org-grid .org-grid-search {
+  position: relative;
+}
+.org-grid .org-grid-search-icon {
+  position: absolute;
+  left: var(--size-4-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.org-grid .org-grid-search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.org-grid .org-grid-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--size-4-3) 0 36px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small, 14px);
+}
+.org-grid .org-grid-search input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+.org-grid .org-grid-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+.org-grid .org-grid-chips::-webkit-scrollbar {
+  display: none;
+}
+.org-grid .org-grid-chips.is-empty {
+  display: none;
+}
+.org-grid button.org-grid-chip, .org-grid-menu button.org-grid-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: auto;
+  padding: var(--size-4-1) var(--size-4-3);
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.org-grid button.org-grid-chip.is-active, .org-grid-menu button.org-grid-chip.is-active {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.org-grid .org-grid-chip-icon, .org-grid-menu .org-grid-chip-icon {
+  display: flex;
+}
+.org-grid .org-grid-chip-icon svg, .org-grid-menu .org-grid-chip-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.org-grid .org-grid-chip-count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.org-grid .org-grid-section {
+  margin: var(--size-4-3) var(--size-4-1) var(--size-4-1);
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.org-grid .org-grid-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--grid-gap);
+}
+.org-grid .org-grid-column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-gap);
+}
+.org-grid .org-grid-card {
+  position: relative;
+  padding: var(--size-4-3);
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.org-grid .org-grid-card[data-color] {
+  border-color: transparent;
+  color: var(--grid-ink);
+}
+.org-grid .org-grid-card:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.org-grid .org-grid-title {
+  font-weight: 600;
+  font-size: var(--font-ui-medium, 15px);
+  line-height: 1.3;
+  padding-right: 18px;
+}
+.org-grid .org-grid-pin {
+  position: absolute;
+  top: var(--size-4-2);
+  right: var(--size-4-2);
+  display: flex;
+  opacity: 0.6;
+}
+.org-grid .org-grid-pin svg {
+  width: 14px;
+  height: 14px;
+}
+.org-grid .org-grid-text {
+  margin-top: var(--size-4-1);
+  font-size: var(--font-ui-small, 13px);
+  line-height: 1.4;
+  opacity: 0.9;
+}
+.org-grid .org-grid-text.has-more {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.4em), transparent);
+  mask-image: linear-gradient(to bottom, black calc(100% - 1.4em), transparent);
+}
+.org-grid .org-grid-line {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+}
+.org-grid .org-grid-line.is-heading {
+  font-weight: 600;
+}
+.org-grid .org-grid-line.is-checked .org-grid-line-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.org-grid .org-grid-line-text {
+  min-width: 0;
+}
+.org-grid .org-grid-box {
+  display: flex;
+  flex: none;
+  padding-top: 2px;
+}
+.org-grid .org-grid-box svg {
+  width: 13px;
+  height: 13px;
+}
+.org-grid .org-grid-bullet {
+  flex: none;
+  opacity: 0.6;
+}
+.org-grid .org-grid-empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--size-4-12) 0;
+}
+.org-grid [data-color="red"], .org-grid-menu [data-color="red"] { background: var(--grid-red); }
+.org-grid [data-color="orange"], .org-grid-menu [data-color="orange"] { background: var(--grid-orange); }
+.org-grid [data-color="yellow"], .org-grid-menu [data-color="yellow"] { background: var(--grid-yellow); }
+.org-grid [data-color="green"], .org-grid-menu [data-color="green"] { background: var(--grid-green); }
+.org-grid [data-color="teal"], .org-grid-menu [data-color="teal"] { background: var(--grid-teal); }
+.org-grid [data-color="blue"], .org-grid-menu [data-color="blue"] { background: var(--grid-blue); }
+.org-grid [data-color="darkblue"], .org-grid-menu [data-color="darkblue"] { background: var(--grid-darkblue); }
+.org-grid [data-color="purple"], .org-grid-menu [data-color="purple"] { background: var(--grid-purple); }
+.org-grid [data-color="pink"], .org-grid-menu [data-color="pink"] { background: var(--grid-pink); }
+.org-grid [data-color="brown"], .org-grid-menu [data-color="brown"] { background: var(--grid-brown); }
+.org-grid [data-color="gray"], .org-grid-menu [data-color="gray"] { background: var(--grid-gray); }
+
+/* GRID-4..6: the long-press menu */
+.org-grid-menu .org-grid-menu-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+.org-grid-menu .org-grid-menu-label {
+  margin: var(--size-4-4) 0 var(--size-4-2);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.org-grid-menu .org-grid-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+}
+.org-grid-menu button.org-grid-swatch {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--background-modifier-border);
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.org-grid-menu button.org-grid-swatch.is-active {
+  border-color: var(--interactive-accent);
+  border-width: 3px;
+}
+.org-grid-menu .org-grid-menu-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.org-grid-menu .org-grid-menu-add {
+  display: flex;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-3);
+}
+.org-grid-menu .org-grid-menu-add input {
+  flex: 1;
+  min-width: 0;
+}
+.is-mobile .org-grid .org-grid-page {
+  padding: 0 var(--size-4-2) var(--size-4-12);
+}
+.is-mobile .org-grid {
+  --grid-gap: 8px;
+}
