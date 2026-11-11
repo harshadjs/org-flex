@@ -28,6 +28,8 @@ export class GridView extends ItemView {
   private columns = 2;
   private resize: ResizeObserver | null = null;
   private scrollTo: number | null = null;
+  /** the index has been read: until then the list says it is loading */
+  private loaded = false;
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
@@ -69,6 +71,9 @@ export class GridView extends ItemView {
       });
       this.resize.observe(this.contentEl);
     }
+    // GRID-1: the bar and a loading line at once; the cards once the index is read (on a phone that can take a while)
+    this.ensureBar();
+    this.listEl!.createDiv({ cls: "org-grid-empty", text: "Loading notes…" });
     await this.plugin.index.ready;
     this.render();
   }
@@ -94,13 +99,21 @@ export class GridView extends ItemView {
 
   /** GRID-2: every org file in the index as a card, then drawn as filtered */
   render() {
-    this.cards = [];
-    for (const note of this.plugin.index.notes.values()) {
-      const file = this.app.vault.getAbstractFileByPath(note.path);
-      this.cards.push(readCard(note, file instanceof TFile ? file.stat.mtime : 0));
-    }
     this.ensureBar();
-    this.draw();
+    this.loaded = true;
+    try {
+      this.cards = [];
+      for (const note of this.plugin.index.notes.values()) {
+        const file = this.app.vault.getAbstractFileByPath(note.path);
+        this.cards.push(readCard(note, file instanceof TFile ? file.stat.mtime : 0));
+      }
+      this.draw();
+    } catch (e) {
+      // GRID-1: a failure says so in the tab instead of leaving it blank
+      console.error("Org Flex: the notes grid failed", e);
+      this.listEl!.empty();
+      this.listEl!.createDiv({ cls: "org-grid-empty", text: `Couldn't draw the notes: ${e instanceof Error ? e.message : String(e)}` });
+    }
   }
 
   /** GRID-7: the search box, made once so typing keeps its focus */
@@ -182,7 +195,7 @@ export class GridView extends ItemView {
 
   /** GRID-2: pinned cards, then the others, each in Keep-style columns */
   draw() {
-    if (!this.listEl) return;
+    if (!this.listEl || !this.loaded) return;
     const el = this.contentEl;
     const scroll = this.scrollTo ?? el.scrollTop;
     this.scrollTo = null;

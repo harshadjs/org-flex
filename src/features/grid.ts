@@ -10,8 +10,10 @@ import type { Feature } from "./feature";
 async function openGrid(plugin: OrgFlexPlugin) {
   const { workspace } = plugin.app;
   const leaf = workspace.getLeavesOfType(GRID_VIEW)[0] ?? workspace.getLeaf(false);
-  if (leaf.view.getViewType() !== GRID_VIEW) await leaf.setViewState({ type: GRID_VIEW, active: true });
-  else (leaf.view as GridView).render();
+  // a tab restored at startup may not be loaded yet (Obsidian 1.7.2+): load it before using its view
+  if (typeof leaf.loadIfDeferred === "function") await leaf.loadIfDeferred();
+  if (leaf.view instanceof GridView) leaf.view.render();
+  else await leaf.setViewState({ type: GRID_VIEW, active: true });
   workspace.setActiveLeaf(leaf, { focus: true });
 }
 
@@ -22,6 +24,6 @@ export const gridFeature: Feature = {
     plugin.registerView(GRID_VIEW, (leaf) => new GridView(leaf, plugin));
     plugin.addCommand({ id: "org-notes-grid", name: "Open notes grid", callback: () => void openGrid(plugin) });
     // GRID-1: the start page, once the restored tabs are back
-    if (FLAVOUR.gridStartPage) plugin.app.workspace.onLayoutReady(() => void openGrid(plugin));
+    if (FLAVOUR.gridStartPage) plugin.app.workspace.onLayoutReady(() => openGrid(plugin).catch((e) => console.error("Org Flex: couldn't open the notes grid", e)));
   },
 };
