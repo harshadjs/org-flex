@@ -93,3 +93,10 @@ describe("notes grid", () => {
     expect([cleanLabel(" day trip "), cleanLabel(":x:"), cleanLabel("a/b"), cleanLabel("")]).toEqual(["day_trip", "x", null, null]);
   });
 });
+
+test("no view or dialog in src/ui defines its own open or close, which would replace Obsidian's and leave the tab blank", () => {
+  const { readdirSync, readFileSync } = require("node:fs") as typeof import("node:fs");
+  const dir = `${__dirname}/../src/ui`;
+  const found = readdirSync(dir).flatMap((f) => Array.from(readFileSync(`${dir}/${f}`, "utf8").matchAll(/^\s*(?:private |protected |public )?(?:async )?(open|close)\(/gm), (m) => `${f}: ${m[1]}`));
+  expect(found).toEqual([]);
+});

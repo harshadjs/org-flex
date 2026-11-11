@@ -243,11 +243,11 @@ export class GridView extends ItemView {
       }
       if (card.more) body.addClass("has-more");
     }
-    onTap(el, () => this.open(card.path), () => new GridCardModal(this.app, this.plugin, card.path, () => this.render()).open());
+    onTap(el, () => this.openNote(card.path), () => new GridCardModal(this.app, this.plugin, card.path, () => this.render()).open());
   }
 
   /** GRID-1: a card opens its note in this tab, so going back returns to the grid */
-  private open(path: string) {
+  private openNote(path: string) {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (file instanceof TFile) void this.leaf.openFile(file);
   }
