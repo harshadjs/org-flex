@@ -74,8 +74,8 @@ export class GridView extends ItemView {
     // GRID-1: the bar and a loading line at once; the cards once the index is read (on a phone that can take a while)
     this.ensureBar();
     this.listEl!.createDiv({ cls: "org-grid-empty", text: "Loading notes…" });
-    await this.plugin.index.ready;
-    this.render();
+    // not awaited: Obsidian waits for onOpen while restoring tabs, and the index is only read after that
+    void this.plugin.index.ready.then(() => this.render());
   }
 
   async onClose() {
