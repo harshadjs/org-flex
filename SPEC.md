@@ -443,7 +443,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 11c. Notes grid
 
-`src/features/grid.ts`, with `src/org/grid.ts` and the tab in `src/ui/grid-view.ts`. Every org file as a card, as Google Keep shows notes: pinned first, then the most recently changed, in columns, narrowed by labels and a search. Tests: `test/grid.spec.ts`.
+`src/features/grid.ts`, with `src/org/grid.ts` and the tab in `src/ui/grid-view.ts`. Every org file as a card, as Google Keep shows notes: pinned first, then the most recently changed, in columns, narrowed by labels and a search. Tests: `test/grid.spec.ts`. **This copy only:** not a usual Org feature, so it is not in the base (`main`); it was added on this flavour's branch (2026-11-10).
 
 | ID | Rule |
 |---|---|
@@ -489,8 +489,8 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 | `denoteId` | `YYYYMMDDTHHMMSS` | DEN-5: the identifier for a new note or file |
 | `journalId` | `YYYYMMDDTHHMMSS` | DEN-6: the identifier for a new journal day |
 | `logDone` | `false` (here `true`, as Emacs's `org-log-done 'time`) | ACT-15: a task marked done gets `CLOSED: [time]` |
-| `gridStartPage` | `false` (here `true`) | GRID-1: Obsidian opens on the notes grid |
-| `gridHiddenFolders` | none (here `topics`, `ai`) | GRID-8: folders, besides the journal's, whose notes show only when their chip is chosen |
+| `gridStartPage` | — (this copy only: `true`) | GRID-1: Obsidian opens on the notes grid |
+| `gridHiddenFolders` | — (this copy only: `topics`, `ai`) | GRID-8: folders, besides the journal's, whose notes show only when their chip is chosen |
 | `mediaName` | `Recording …`, `Pasted image …` by local time (here `YYMM-voice-note-CC`, `YYMM-pasted-image-CC`) | ATT-6: the names of new recordings and pasted images (`countedMediaName` gives `YYMM-voice-note-CC`) |
 
 ## 13. Layout and mobile requirements
