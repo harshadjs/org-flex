@@ -17,7 +17,7 @@ import { shortcutBar } from "../src/editor/shortcut-bar";
 import { CompletionContext, completionStatus, currentCompletions } from "@codemirror/autocomplete";
 import { exactIdMatches, insertLinkWithCompletion, linkButton, linkCompletions, orgCompletion } from "../src/editor/completion";
 import { insertIdLink, insertWikiLink } from "../src/org/edit";
-import { BUTTONS } from "../src/settings";
+import { barLayout } from "../src/settings";
 import { orgZoom, toggleZoom } from "../src/editor/zoom";
 
 const doc = `:PROPERTIES:
@@ -58,7 +58,7 @@ test("the editor renders every feature without errors", () => {
         orgHost.of({ setIcon() {}, openLink() {}, imageSrc: () => null, linkCompletions: () => [], idCompletions: () => [] }),
         docInfo, history(), livePreview(), srcHighlight, orgFolding(), checklists(), orgCompletion(), orgZoom(),
         frontMatterPanel(), backlinksSection(actions),
-        shortcutBar({ buttons: BUTTONS, icon: (d) => d.icon, setIcon() {}, run() {} }),
+        shortcutBar({ items: barLayout(() => true), setIcon() {}, run() {} }),
       ],
     }),
   });

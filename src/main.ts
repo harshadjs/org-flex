@@ -1,8 +1,8 @@
 // Org Flex: Org mode files in Obsidian, on the desktop and the phone.
 
 import { Transaction } from "@codemirror/state";
-import { FileView, getIcon, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
-import { ButtonDef, buttonIconName, CORE_BUTTONS, mergeSettings, migrateShortcutButtons, OrgFlexSettings, BAR_VERSION } from "./settings";
+import { FileView, Hotkey, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
+import { ButtonDef, CORE_BUTTONS, mergeSettings, OrgFlexSettings } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
 import { LinkScheme, readNote, searchOffset, VaultIndex } from "./org/vault-index";
 import { freeNotePath, noteFileContent, noteFileName, notePath } from "./org/new-note";
@@ -88,12 +88,6 @@ export default class OrgFlexPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = mergeSettings(await this.loadData());
-    const { buttons, changed } = migrateShortcutButtons(this.settings.shortcutBarButtons, this.settings.shortcutBarVersion);
-    this.settings.shortcutBarVersion = BAR_VERSION;
-    if (changed) {
-      this.settings.shortcutBarButtons = buttons;
-      await this.saveData(this.settings);
-    }
   }
 
   async saveSettings() {
@@ -242,11 +236,6 @@ export default class OrgFlexPlugin extends Plugin {
     return CORE_BUTTONS.has(def.id) || buttonFeature(def.id) !== undefined;
   }
 
-  /** BAR-7: the custom icon when Lucide knows it, else the default. */
-  buttonIcon(def: ButtonDef): string {
-    return buttonIconName(def, this.settings.shortcutCustomIcons[def.id], (name) => Boolean(getIcon(name)));
-  }
-
   forEachView(fn: (view: OrgFlexView) => void) {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (leaf.view instanceof OrgFlexView) fn(leaf.view);
@@ -261,10 +250,11 @@ export default class OrgFlexPlugin extends Plugin {
   // Commands (§9.3): the ids are a compatibility contract
 
   private addCommands() {
-    const inView = (id: string, name: string, run: (view: OrgFlexView) => void) => {
+    const inView = (id: string, name: string, run: (view: OrgFlexView) => void, hotkeys?: Hotkey[]) => {
       this.addCommand({
         id,
         name,
+        ...(hotkeys ? { hotkeys } : {}),
         checkCallback: (checking) => {
           const view = this.activeView();
           if (!view) return false;
@@ -284,6 +274,13 @@ export default class OrgFlexPlugin extends Plugin {
     inView("org-toggle-checkbox", "Toggle checkbox (- [ ])", (v) => v.command("checkbox"));
     inView("org-insert-src-block", "Insert source block (#+begin_src)", (v) => v.command("src-block"));
     inView("org-insert-quote-block", "Insert quote block (#+begin_quote)", (v) => v.command("quote-block"));
+    // ACT-17: formatting, Ctrl/Cmd+B and +I by default
+    inView("org-bold", "Bold", (v) => v.format("bold"), [{ modifiers: ["Mod"], key: "b" }]);
+    inView("org-italic", "Italic", (v) => v.format("italic"), [{ modifiers: ["Mod"], key: "i" }]);
+    inView("org-code", "Code", (v) => v.format("code"));
+    inView("org-verbatim", "Verbatim", (v) => v.format("verbatim"));
+    inView("org-strike-through", "Strike-through", (v) => v.format("strikethrough"));
+    inView("org-underline", "Underline", (v) => v.format("underline"));
     inView("org-insert-table", "Insert table", (v) => v.command("table"));
     inView("org-insert-id-link", "Insert ID link ([[id:]])", (v) => v.command("id-link"));
     inView("org-insert-wiki-link", "Insert wiki link ([[]])", (v) => v.command("wiki-link"));

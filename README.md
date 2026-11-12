@@ -53,7 +53,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 - **Live preview:** headings sized like Markdown headings, emphasis without its markers, links showing their description, styled quote and source blocks with syntax highlighting and a copy button. The line with the cursor shows its raw text.
 - **Folding:** fold any heading, drawer or block; cycle *Fold all → Outline → Expand all*.
 - **Zoom:** show one heading and its subtree, with breadcrumbs back out. Long-press a heading's arrow to zoom in.
-- **Shortcut bar** above the phone keyboard: undo, redo, visibility, zoom, new heading, heading level, TODO state, schedule, deadline, checkbox, blocks, links, IDs and more. Choose the buttons, their order and their icons.
+- **Shortcut bar** above the phone keyboard, in two levels: undo, redo and new heading, then groups that open their own row: Insert (blocks, tables, links, checkboxes, IDs, attachments, recordings), Format (bold, italic, code, verbatim, strike-through, underline), Task (TODO state, schedule, deadline, heading level, zoom, visibility), Journal and Open.
 - **Reading mode** per tab: no keyboard, no accidental edits; checkboxes, TODO keywords and dates still work.
 - **Vim mode** follows Obsidian's setting.
 

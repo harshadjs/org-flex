@@ -117,7 +117,7 @@ Write `FLAVOUR.md` at the repository root: who this copy is for, how they use Or
 For each change, edit `SPEC.md` before the code:
 - **A rule that changes:** rewrite it in place, keeping its ID.
 - **A new rule:** give it the next ID in its section.
-- **A dropped feature:** delete its section and every rule that only it had. Fix references elsewhere (the commands table §9.3, the bar buttons BAR-2 and BAR-3, the §16 checklist, the settings table).
+- **A dropped feature:** delete its section and every rule that only it had. Fix references elsewhere (the commands table §9.3, the bar's groups BAR-2, the §16 checklist, the settings table).
 - **Tests:** every rule you write cites a **Test:** (a test name you will write) or a **Manual:** (with a §16 checklist line).
 
 Keep the spec describing this fork, not the base. It is the fork's contract now.
@@ -130,7 +130,7 @@ Keep the spec describing this fork, not the base. It is the fork's contract now.
   2. Delete the pure logic, dialogs and tests only it used.
   3. Delete its SPEC section.
   4. Move its command ids to `RETIRED_COMMAND_IDS` in `test/invariants.spec.ts` (INV-4).
-  5. Remove its bar buttons from `BUTTONS` in `src/settings.ts`, or leave them; a button nothing runs never shows.
+  5. Remove its bar buttons from `BUTTONS` and `BAR_GROUPS` in `src/settings.ts`, or leave them; a button nothing runs never shows, nor does a group left empty.
 - **A new feature:**
   1. Write `src/features/<id>.ts` exporting a `Feature` (`src/features/feature.ts`).
   2. Put its pure logic in `src/org/` with tests.

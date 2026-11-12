@@ -212,7 +212,9 @@ test("only the feature list reaches into a feature, so dropping one stays local"
 });
 
 test("every bar button is run by the core or by exactly one feature", () => {
-  const ids = Array.from(read("src/settings.ts").matchAll(/\{ id: "([a-z-]+)", name:/g), (m) => m[1]);
+  const settings = read("src/settings.ts");
+  const list = settings.slice(settings.indexOf("export const BUTTONS"), settings.indexOf("];", settings.indexOf("export const BUTTONS")));
+  const ids = Array.from(list.matchAll(/\{ id: "([a-z-]+)", name:/g), (m) => m[1]);
   const core = /CORE_BUTTONS[^[]*\[([^\]]*)\]/.exec(read("src/settings.ts"))![1].match(/[a-z-]+/g)!;
   const owned = featureFiles.flatMap((f) => featureInfo(f).buttons);
   for (const id of ids) expect([...core, ...owned].filter((x) => x === id).length, id).toBe(1);
