@@ -276,7 +276,7 @@ describe("settings", () => {
       ["format", true, ["bold", "italic", "code", "verbatim", "strike", "underline"]],
       ["task", false, ["todo", "schedule", "deadline", "demote", "promote", "zoom", "visibility"]],
       ["journal", false, ["journal", "journal-picker", "journal-calendar"]],
-      ["open", false, ["agenda", "timeline", "node-find", "new-note", "capture"]],
+      ["open", false, ["agenda", "timeline", "node-find", "new-note", "capture", "grid"]],
     ]);
     const placed = [...TOP_BUTTONS, ...BAR_GROUPS.flatMap((g) => g.buttons)];
     expect([...placed].sort()).toEqual(BUTTONS.map((b) => b.id).sort());

@@ -26,4 +26,7 @@ export const gridFeature: Feature = {
     // GRID-1: the start page, once the restored tabs are back
     if (FLAVOUR.gridStartPage) plugin.app.workspace.onLayoutReady(() => openGrid(plugin).catch((e) => console.error("Org Flex: couldn't open the notes grid", e)));
   },
+  buttons: {
+    grid: (plugin) => void openGrid(plugin),
+  },
 };

@@ -5,7 +5,7 @@
 export type ButtonId =
   | "undo" | "redo" | "visibility" | "zoom" | "new-heading" | "demote" | "promote" | "todo" | "schedule" | "deadline"
   | "checkbox" | "src-block" | "quote-block" | "table" | "wiki-link" | "node-find" | "heading-id" | "journal" | "journal-picker" | "journal-calendar" | "new-note" | "capture" | "attach" | "record" | "agenda" | "timeline"
-  | "bold" | "italic" | "code" | "verbatim" | "strike" | "underline";
+  | "bold" | "italic" | "code" | "verbatim" | "strike" | "underline" | "grid";
 
 export interface ButtonDef {
   id: ButtonId;
@@ -53,6 +53,7 @@ export const BUTTONS: ButtonDef[] = [
   { id: "node-find", name: "Go to node", icon: "search", refocus: false },
   { id: "new-note", name: "New org note", icon: "file-plus", refocus: false },
   { id: "capture", name: "Capture to inbox", icon: "inbox", refocus: false },
+  { id: "grid", name: "Open notes grid", icon: "layout-grid", refocus: false },
 ];
 
 /** PLAT-8: the buttons the core runs (`OrgFlexView.runButton`); the others belong to features. */
@@ -80,7 +81,7 @@ export const BAR_GROUPS: BarGroup[] = [
   { id: "format", name: "Format", icon: "case-sensitive", stays: true, buttons: ["bold", "italic", "code", "verbatim", "strike", "underline"] },
   { id: "task", name: "Task and structure", icon: "list-checks", stays: false, buttons: ["todo", "schedule", "deadline", "demote", "promote", "zoom", "visibility"] },
   { id: "journal", name: "Journal", icon: "calendar-days", stays: false, buttons: ["journal", "journal-picker", "journal-calendar"] },
-  { id: "open", name: "Open", icon: "compass", stays: false, buttons: ["agenda", "timeline", "node-find", "new-note", "capture"] },
+  { id: "open", name: "Open", icon: "compass", stays: false, buttons: ["agenda", "timeline", "node-find", "new-note", "capture", "grid"] },
 ];
 
 /** BAR-2: the buttons always on the top row, before the groups */
