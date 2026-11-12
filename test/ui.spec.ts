@@ -14,7 +14,10 @@ import { revealZoomEffects, toggleZoom, zoomField, zoomToHeadingAt } from "../sr
 import { undo } from "@codemirror/commands";
 import { chooseDrop } from "../src/editor/list-drag";
 import { readingMode } from "../src/editor/reading";
-import { BUTTONS, ButtonId } from "../src/settings";
+import { BarItem, barLayout, BUTTONS, ButtonId } from "../src/settings";
+
+/** every button on one row, for the tests of single buttons */
+const FLAT: BarItem[] = BUTTONS.map((def) => ({ kind: "button", def }));
 import { editTableCell } from "../src/editor/table";
 import { insertTable } from "../src/org/edit";
 
@@ -470,8 +473,7 @@ test("tapping a backlink opens it, and a section header toggles it, without focu
 function barView(doc = "* a\ntext") {
   const ran: ButtonId[] = [];
   const bar = shortcutBar({
-    buttons: BUTTONS.filter((b) => b.enabled),
-    icon: (d) => d.icon,
+    items: FLAT,
     setIcon: (el, icon) => el.setAttribute("data-icon", icon),
     run: (id, v) => {
       ran.push(id);
@@ -486,8 +488,7 @@ function barView(doc = "* a\ntext") {
 test("holding the ID button runs its long action instead of its tap; buttons without one just tap", async () => {
   const ran: string[] = [];
   const bar = shortcutBar({
-    buttons: BUTTONS.filter((b) => b.enabled),
-    icon: (d) => d.icon,
+    items: FLAT,
     setIcon() {},
     run: (id) => void ran.push(id),
     long: (id) => (id === "heading-id" ? () => void ran.push("long heading-id") : undefined),
@@ -510,7 +511,46 @@ test("the shortcut bar is a panel at the bottom of the editor", () => {
   const bar = view.dom.querySelector(".org-shortcut-bar")!;
   expect(bar.closest(".cm-panels-bottom")).not.toBeNull();
   expect(view.dom.querySelector(".cm-panels-top .org-shortcut-bar")).toBeNull();
-  expect(Array.from(bar.children).map((b) => b.getAttribute("data-button"))).toEqual(BUTTONS.filter((b) => b.enabled).map((b) => b.id));
+  expect(Array.from(bar.children).map((b) => b.getAttribute("data-button"))).toEqual(BUTTONS.map((b) => b.id));
+});
+
+test("a group button swaps the bar for its row with a back button; a group goes back after a tap, Format stays and shows what is on", () => {
+  const ran: ButtonId[] = [];
+  const bar = shortcutBar({
+    items: barLayout(() => true),
+    setIcon: (el, icon) => el.setAttribute("data-icon", icon),
+    run: (id, v) => {
+      ran.push(id);
+      if (id === "bold") v.dispatch({ changes: { from: 0, insert: "*" } });
+    },
+  });
+  const doc = "a *b* c";
+  const { view } = mount(doc, bar, 0);
+  const el = view.dom.querySelector(".org-shortcut-bar") as HTMLElement;
+  const row = () => Array.from(el.children).map((b) => b.getAttribute("data-button") ?? `[${b.getAttribute("data-group")}]`);
+  expect(row()).toEqual(["undo", "redo", "new-heading", "[insert]", "[format]", "[task]", "[journal]", "[open]"]);
+  tap(el.querySelector('[data-group="insert"]')!);
+  expect(row()).toEqual(["back", "src-block", "quote-block", "table", "wiki-link", "checkbox", "heading-id", "attach", "record"]);
+  expect(el.classList.contains("is-group")).toBe(true);
+  expect(view.hasFocus).toBe(false);
+  // a button in a group runs and the bar goes back to the top row
+  tap(el.querySelector('[data-button="table"]')!);
+  expect(ran).toEqual(["table"]);
+  expect(row()[0]).toBe("undo");
+  // back from a group without running anything
+  tap(el.querySelector('[data-group="task"]')!);
+  expect(row()).toEqual(["back", "todo", "schedule", "deadline", "demote", "promote", "zoom", "visibility"]);
+  tap(el.querySelector('[data-button="back"]')!);
+  expect(row()[0]).toBe("undo");
+  // Format stays open, and its buttons show the emphasis around the cursor
+  tap(el.querySelector('[data-group="format"]')!);
+  const on = () => Array.from(el.querySelectorAll(".is-active")).map((b) => b.getAttribute("data-button"));
+  expect(on()).toEqual([]);
+  view.dispatch({ selection: EditorSelection.cursor(doc.indexOf("b")) });
+  expect(on()).toEqual(["bold"]);
+  tap(el.querySelector('[data-button="italic"]')!);
+  expect(row()[0]).toBe("back");
+  expect(ran).toEqual(["table", "italic"]);
 });
 
 test("bar taps keep focus where it was; editing buttons give it back, new heading takes it, swipes do nothing", () => {
@@ -609,7 +649,7 @@ test("the breadcrumbs name the file and each heading; tapping one zooms out to i
 
 test("jumping to hidden text zooms out; the zoom button shows when zoomed", () => {
   const doc = "* A\na\n* B\nb";
-  const { view } = mount(doc, shortcutBar({ buttons: BUTTONS, icon: (d) => d.icon, setIcon() {}, run: (_id, v) => void toggleZoom(v) }), 1);
+  const { view } = mount(doc, shortcutBar({ items: FLAT, setIcon() {}, run: (_id, v) => void toggleZoom(v) }), 1);
   const zoom = view.dom.querySelector('[data-button="zoom"]')!;
   tap(zoom);
   expect(zoom.classList.contains("is-active")).toBe(true);

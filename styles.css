@@ -2225,3 +2225,12 @@ input.org-icon-invalid {
 .is-mobile .org-grid {
   --grid-gap: 8px;
 }
+
+/* BAR-12: a group's row starts with Back, set apart from the group's buttons */
+.org-flex-view .org-shortcut-bar.is-group .org-shortcut-back {
+  border-right: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.org-flex-view .org-shortcut-bar.is-group {
+  background-color: var(--background-secondary-alt, var(--background-secondary));
+}

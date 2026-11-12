@@ -8,7 +8,9 @@ import { redo, undo } from "@codemirror/commands";
 import { foldedRanges, unfoldEffect } from "@codemirror/language";
 import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
-import { barButtons, ButtonId } from "./settings";
+import { barLayout, ButtonId } from "./settings";
+import { toggleMarkup } from "./org/markup";
+import type { MarkupType } from "./org/syntax";
 import { FLAVOUR } from "./flavour";
 import { buttonFeature, FEATURES, hasFeature } from "./features";
 import { nextVisibility } from "./org/folding";
@@ -197,8 +199,7 @@ export class OrgFlexView extends TextFileView {
     // RD-1: the bar edits, so reading mode has none
     if (!s.showShortcutBar || this.reading) return [];
     return shortcutBar({
-      buttons: barButtons(s.shortcutBarButtons).filter((b) => this.plugin.hasButton(b)),
-      icon: (def) => this.plugin.buttonIcon(def),
+      items: barLayout((b) => this.plugin.hasButton(b)),
       setIcon,
       run: (id, view) => this.runButton(id, view),
       // ACT-16: holding the ID button sets the ID's time
@@ -318,6 +319,12 @@ export class OrgFlexView extends TextFileView {
       case "table": this.insertTable(); break;
       case "wiki-link": linkButton(view); break;
       case "heading-id": this.run(this.headingId(state)); break;
+      case "bold": this.run(toggleMarkup(state, "bold")); break;
+      case "italic": this.run(toggleMarkup(state, "italic")); break;
+      case "code": this.run(toggleMarkup(state, "code")); break;
+      case "verbatim": this.run(toggleMarkup(state, "verbatim")); break;
+      case "strike": this.run(toggleMarkup(state, "strikethrough")); break;
+      case "underline": this.run(toggleMarkup(state, "underline")); break;
       // PLAT-8: the rest belong to features
       default: buttonFeature(id)?.buttons?.[id]?.(this.plugin, this);
     }
@@ -367,6 +374,11 @@ export class OrgFlexView extends TextFileView {
 
   private run(spec: Parameters<EditorView["dispatch"]>[0] | null) {
     if (spec && this.editor) this.editor.dispatch(spec);
+  }
+
+  /** ACT-17: the format commands */
+  format(type: MarkupType) {
+    if (this.editor) this.run(toggleMarkup(this.editor.state, type));
   }
 
   /** Commands that edit (§9.3). */

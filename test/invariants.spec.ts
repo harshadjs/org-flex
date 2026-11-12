@@ -87,6 +87,7 @@ const SHIPPED_COMMAND_IDS = [
   "org-timeline",
   "org-set-id-time",
   "org-notes-grid",
+  "org-bold", "org-italic", "org-code", "org-verbatim", "org-strike-through", "org-underline",
 ];
 
 /** Ids whose feature this copy dropped; they may never be registered again, for anything. */

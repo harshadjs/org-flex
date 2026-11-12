@@ -7,6 +7,7 @@ import {
   orgDateString, setPlanningDate, toggleBoxOnLine, toggleCheckbox, toggleLeadingStars, currentPlanningDate,
 } from "../src/org/edit";
 import { dropSlots, itemExtent, listDepths, moveItem, parseItem } from "../src/org/lists";
+import { activeMarkup, toggleMarkup } from "../src/org/markup";
 
 const kw = { todo: ["TODO", "DOING", "WAITING"], done: ["DONE", "CANCELLED"] };
 
@@ -527,5 +528,44 @@ describe("attachments", () => {
     expect(recorderType(can())).toBeUndefined();
     expect(RECORDING_AUDIO).toMatchObject({ echoCancellation: false, noiseSuppression: false, autoGainControl: false });
     expect(RECORDING_BITRATE).toBe(128000);
+  });
+});
+
+describe("formatting", () => {
+  const run = (doc: string, anchor: number, head: number, type: Parameters<typeof toggleMarkup>[1]) => {
+    const state = EditorState.create({ doc, selection: EditorSelection.range(anchor, head) });
+    const spec = toggleMarkup(state, type);
+    if (!spec) return null;
+    const next = state.update(spec).state;
+    const sel = next.selection.main;
+    return `${next.doc.sliceString(0, sel.from)}[${next.doc.sliceString(sel.from, sel.to)}]${next.doc.sliceString(sel.to)}`;
+  };
+
+  test("a format wraps the word at the cursor, or inserts an empty pair between words", () => {
+    expect(run("see appointment now", 6, 6, "bold")).toBe("see *ap[]pointment* now");
+    expect(run("don't", 0, 0, "italic")).toBe("/[]don't/");
+    expect(run("a  b", 2, 2, "code")).toBe("a ~[]~ b");
+    expect(run("", 0, 0, "verbatim")).toBe("=[]=");
+  });
+
+  test("a format wraps a selection on one line, spaces left outside; over several lines it does nothing", () => {
+    expect(run("say hello world", 3, 9, "underline")).toBe("say _[hello]_ world");
+    expect(run("a b", 1, 2, "bold")).toBeNull();
+    expect(run("one\ntwo", 1, 5, "bold")).toBeNull();
+  });
+
+  test("a format is removed inside text that has it, or over the text and its markers", () => {
+    expect(run("a *bold* b", 4, 4, "bold")).toBe("a b[]old b");
+    expect(run("a *bold* b", 3, 7, "bold")).toBe("a [bold] b");
+    expect(run("a *bold* b", 2, 8, "bold")).toBe("a [bold] b");
+    // another kind inside is added, not removed
+    expect(run("a *bold* b", 4, 4, "strikethrough")).toBe("a *+b[]old+* b");
+  });
+
+  test("the formats around the cursor are found for the bar", () => {
+    const at = (doc: string, pos: number) => [...activeMarkup(EditorState.create({ doc, selection: EditorSelection.cursor(pos) }))].sort();
+    expect(at("a */x/* b", 4)).toEqual(["bold", "italic"]);
+    expect(at("a *x* b", 0)).toEqual([]);
+    expect(at("a *x* b", 5)).toEqual([]);
   });
 });
