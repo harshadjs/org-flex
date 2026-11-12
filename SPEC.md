@@ -449,7 +449,7 @@ Known gaps: promote and demote change one line, not the whole subtree. Headings 
 
 ## 12. Settings
 
-`src/settings.ts` (defaults, upgrade), `src/ui/settings-tab.ts`, `src/main.ts` (`loadSettings`). Settings hold only what differs between one person's vaults and devices (folders, the inbox, the bar on this phone). How the person works with Org is the flavour (§12a), which is code. Saved settings are merged over the defaults on load, Saved keys that are no longer settings (`RETIRED_SETTINGS`: the old keyword, display, panel, backlinks and journal-template settings, `headingDragHandles`, and the bar's button list, icons and version, BAR-3) are dropped on load; their values are not carried into the flavour. **Test:** "saved settings merge over the defaults", "saved workflow choices are dropped: the flavour has them now", "a saved button list, order and icons are dropped: the bar's groups are fixed".
+`src/settings.ts` (defaults, upgrade), `src/ui/settings-tab.ts`, `src/main.ts` (`loadSettings`). Settings hold only what differs between one person's vaults and devices (folders, the inbox, the bar on this phone). How the person works with Org is the flavour (§12a), which is code. Saved settings are merged over the defaults on load. Saved keys that are no longer settings (`RETIRED_SETTINGS`: the old keyword, display, panel, backlinks and journal-template settings, `headingDragHandles`, and the bar's button list, icons and version, BAR-3) are dropped on load; their values are not carried into the flavour. **Test:** "saved settings merge over the defaults", "saved workflow choices are dropped: the flavour has them now", "a saved button list, order and icons are dropped: the bar's groups are fixed".
 
 | Key | Default | Effect |
 |---|---|---|
