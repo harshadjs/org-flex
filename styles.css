@@ -1709,6 +1709,17 @@ input.org-icon-invalid {
 .org-timeline .org-timeline-entry.is-journal .org-timeline-title {
   color: var(--text-muted);
 }
+/* TL-8: a day without a journal offers one: a hollow journal dot, faint */
+.org-timeline .org-timeline-add-journal { --tl-dot: var(--background-primary); }
+.org-timeline .org-timeline-add-journal::before {
+  border: 2px dashed var(--tl-journal);
+  box-sizing: border-box;
+}
+.org-timeline .org-timeline-add-journal .org-timeline-icon { color: var(--tl-journal); }
+.org-timeline .org-timeline-add-journal .org-timeline-title {
+  color: var(--text-faint);
+  font-weight: var(--font-normal);
+}
 .org-timeline .org-timeline-meta {
   display: flex;
   flex-wrap: wrap;

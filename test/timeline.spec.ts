@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildTimeline, cleanFilter, filterTimeline, idTime, NO_FILTER, timelineTags, untilEnd } from "../src/org/timeline";
+import { buildTimeline, cleanFilter, filterTimeline, idTime, needsJournal, NO_FILTER, timelineTags, untilEnd } from "../src/org/timeline";
 import { readNote } from "../src/org/vault-index";
 
 const created = () => new Date(2020, 0, 1, 12, 0);
@@ -20,13 +20,37 @@ describe("timeline", () => {
       readNote("notes/old.org", ":PROPERTIES:\n:ID: 0f3c9a1e-4b7d-4c2a-9a10-2b5e6d7f8a90\n:END:\n#+title: Old\n"),
       readNote("notes/plain.org", "* no IDs here\n"),
     ];
-    const { days } = buildTimeline(notes, [], created, new Set(["journal/2026/10/2026-10-28.org"]));
+    const { days } = buildTimeline(notes, [], created, new Map([["journal/2026/10/2026-10-28.org", "2026-10-28"]]));
     expect(days.flatMap((d) => d.entries.map((e) => e.kind))).toEqual(["note", "heading", "journal", "heading", "note"]);
     expect(days.map((d) => [d.date, d.entries.map((e) => [e.title, e.note, e.line])])).toEqual([
       [new Date(2026, 9, 29), [["Roti", undefined, 0]]],
       [new Date(2026, 9, 28), [["Walk", "2026-10-28", 4], ["2026-10-28", undefined, 0], ["Fix C", "Roti", 4]]],
       [new Date(2020, 0, 1), [["Old", undefined, 0]]],
     ]);
+  });
+
+  test("a journal day sits on its own date, at its ID's time only when that is on the day", () => {
+    const notes = [
+      // made on the 30th for the 28th: an ID of another day
+      readNote("journal/2026/10/2026-10-28.org", ":PROPERTIES:\n:ID: 20261030T090000\n:END:\n#+title: 2026-10-28\n"),
+      readNote("journal/2026/10/2026-10-29.org", ":PROPERTIES:\n:ID: 20261029T213000\n:END:\n#+title: 2026-10-29\n"),
+      // a UUID takes the file's creation time, on another day too
+      readNote("journal/2026/10/2026-10-27.org", ":PROPERTIES:\n:ID: 0f3c9a1e-4b7d-4c2a-9a10-2b5e6d7f8a90\n:END:\n#+title: 2026-10-27\n"),
+    ];
+    const journal = new Map([["journal/2026/10/2026-10-28.org", "2026-10-28"], ["journal/2026/10/2026-10-29.org", "2026-10-29"], ["journal/2026/10/2026-10-27.org", "2026-10-27"]]);
+    const { days } = buildTimeline(notes, [], created, journal);
+    expect(days.map((d) => d.entries.map((e) => e.time))).toEqual([
+      [new Date(2026, 9, 29, 21, 30)], [new Date(2026, 9, 28)], [new Date(2026, 9, 27)],
+    ]);
+  });
+
+  test("a day without a journal file offers one", () => {
+    const { days } = buildTimeline([
+      readNote("journal/2026/10/2026-10-28.org", ":PROPERTIES:\n:ID: 20261028T080000\n:END:\n#+title: 2026-10-28\n"),
+      readNote("notes/a.org", ":PROPERTIES:\n:ID: 20261029T080000\n:END:\n#+title: A\n"),
+    ], [], created, new Map([["journal/2026/10/2026-10-28.org", "2026-10-28"]]));
+    const dates = new Set(["2026-10-28"]);
+    expect(days.map((d) => needsJournal(d, dates))).toEqual([true, false]);
   });
 
   test("an attachment sits under the closest node that links it, the earliest when several do; the rest are unlinked", () => {
@@ -61,7 +85,7 @@ describe("timeline filters", () => {
     readNote("notes/2610-roti.org", ":PROPERTIES:\n:ID: 20261027T090000\n:END:\n#+title: Roti machine\n"),
   ];
   const files = ["attachments/2610-voice-note-01.webm", "attachments/2610-garden.png"];
-  const tl = buildTimeline(notes, files, created, new Set(["journal/2026/10/2026-10-28.org"]));
+  const tl = buildTimeline(notes, files, created, new Map([["journal/2026/10/2026-10-28.org", "2026-10-28"]]));
   const titles = (t: ReturnType<typeof filterTimeline>) => t.days.flatMap((d) => d.entries.map((e) => e.title));
 
   test("filters keep entries of the chosen kinds, with attachments, or matching the text; days left empty go", () => {

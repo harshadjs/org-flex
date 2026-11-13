@@ -3,6 +3,7 @@
 
 import { analyze, NO_KEYWORDS, parseHeading } from "./syntax";
 import { isMediaFile, type NoteRecord } from "./vault-index";
+import { journalDateString, parseJournalDate } from "./journal";
 
 /**
  * TL-2: the moment an ID was made: org-id's `ts` style
@@ -70,7 +71,7 @@ function fileTags(lines: string[], kinds: { kind: string }[]): string[] {
   return [...new Set(tags)];
 }
 
-function spans(note: NoteRecord, time: (id: string) => Date, journal: boolean): Span[] {
+function spans(note: NoteRecord, time: (id: string) => Date, journal: string | undefined): Span[] {
   const lines = note.text.split("\n");
   const kinds = analyze(lines).lines;
   const lineAt = (offset: number) => note.text.slice(0, offset).split("\n").length - 1;
@@ -97,7 +98,7 @@ function spans(note: NoteRecord, time: (id: string) => Date, journal: boolean): 
     seen.add(id);
     let entry: TimelineEntry;
     if (heading === undefined) {
-      entry = { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: time(id), tags: filetags, inherited: [], attachments: [] };
+      entry = { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: journal ? onDay(time(id), journal) : time(id), tags: filetags, inherited: [], attachments: [] };
       result.push({ entry, from: 0, to: lines.length, level: 0 });
       continue;
     }
@@ -119,6 +120,16 @@ function sourceOf(nodes: Span[], line: number): TimelineEntry | null {
   return best?.entry ?? null;
 }
 
+/** TL-2: a journal day sits on its own date: at its ID's time if that is on the day, else at the day's start */
+function onDay(time: Date, day: string): Date {
+  return journalDateString(time) === day ? time : parseJournalDate(day);
+}
+
+/** TL-8: whether a day of the timeline has no journal file; `journalDates` are the journal's days, "YYYY-MM-DD" */
+export function needsJournal(day: TimelineDay, journalDates: ReadonlySet<string>): boolean {
+  return !journalDates.has(journalDateString(day.date));
+}
+
 function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
@@ -126,14 +137,14 @@ function dayKey(d: Date): string {
 /**
  * TL-2, TL-3: the timeline of `notes`. `files` are the vault's paths (the
  * media among them are the attachments); `created` gives a file's creation
- * time, for IDs that carry none; `journal` holds the journal days' paths (JRN-3).
+ * time, for IDs that carry none; `journal` maps the journal days' paths (JRN-3) to their days, "YYYY-MM-DD".
  */
-export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], created: (path: string) => Date, journal: ReadonlySet<string> = new Set()): Timeline {
+export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], created: (path: string) => Date, journal: ReadonlyMap<string, string> = new Map()): Timeline {
   const entries: TimelineEntry[] = [];
   const first = new Map<string, TimelineEntry>();
   const taken = new Set<string>();
   for (const note of notes) {
-    const nodes = spans(note, (id) => idTime(id) ?? created(note.path), journal.has(note.path)).filter((s) => !taken.has(s.entry.id));
+    const nodes = spans(note, (id) => idTime(id) ?? created(note.path), journal.get(note.path)).filter((s) => !taken.has(s.entry.id));
     for (const s of nodes) {
       taken.add(s.entry.id);
       entries.push(s.entry);

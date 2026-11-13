@@ -6,7 +6,8 @@ import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
 import { journalEntries } from "../org/journal";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../org/syntax";
-import { ALL_KINDS, buildTimeline, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags, untilEnd } from "../org/timeline";
+import { FEATURES } from "../features";
+import { ALL_KINDS, buildTimeline, needsJournal, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags, untilEnd } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
 
@@ -30,6 +31,8 @@ export class TimelineView extends ItemView {
   private timer: number | null = null;
   private typing: number | null = null;
   private full: Timeline = { days: [], unlinked: [] };
+  /** TL-8: the days that have a journal file, "YYYY-MM-DD" */
+  private journalDates = new Set<string>();
   private filter: TimelineFilter;
   private listEl: HTMLElement | null = null;
   private countEl: HTMLElement | null = null;
@@ -60,8 +63,9 @@ export class TimelineView extends ItemView {
     this.registerEvent(vault.on("create", () => this.refreshSoon()));
     this.registerEvent(vault.on("delete", () => this.refreshSoon()));
     this.registerEvent(vault.on("rename", () => this.refreshSoon()));
-    await this.plugin.index.ready;
-    this.render();
+    // Obsidian waits for onOpen while it restores tabs (1.7.2+), and the index is built only after that: wait for it here and both hang
+    this.contentEl.setText("Loading…");
+    void this.plugin.index.ready.then(() => this.render());
   }
 
   async onClose() {
@@ -100,7 +104,8 @@ export class TimelineView extends ItemView {
     const files = vault.getFiles();
     const paths = files.map((f) => f.path);
     const ctime = new Map(files.map((f) => [f.path, f.stat.ctime]));
-    const journal = new Set(journalEntries([...this.plugin.index.notes.keys()], this.plugin.settings.journalFolder).map((e) => e.path));
+    const journal = new Map(journalEntries([...this.plugin.index.notes.keys()], this.plugin.settings.journalFolder).map((e) => [e.path, e.date]));
+    this.journalDates = new Set(journal.values());
     this.full = buildTimeline(this.plugin.index.notes.values(), paths, (path) => new Date(ctime.get(path) ?? 0), journal);
     this.ensureBar();
     this.draw();
@@ -292,6 +297,15 @@ export class TimelineView extends ItemView {
     badge.createDiv({ cls: "org-timeline-date-wd", text: day.date.toLocaleDateString(undefined, { weekday: "short" }) });
     const list = row.createDiv({ cls: "org-timeline-rail" });
     for (const entry of day.entries) this.renderEntry(list, entry);
+    // TL-8: a day without a journal file offers one, where its entry would go
+    const openDay = FEATURES.find((f) => f.openDay)?.openDay;
+    if (openDay && this.filter.kinds.includes("journal") && needsJournal(day, this.journalDates)) {
+      const add = list.createDiv({ cls: "org-timeline-entry org-timeline-add-journal" });
+      const head = add.createDiv({ cls: "org-timeline-head" });
+      setIcon(head.createSpan({ cls: "org-timeline-icon" }), "calendar-plus");
+      head.createDiv({ cls: "org-timeline-text" }).createDiv({ cls: "org-timeline-title", text: "Add journal" });
+      onTap(head, () => void openDay(this.plugin, day.date));
+    }
   }
 
   private renderEntry(parent: HTMLElement, entry: TimelineEntry) {

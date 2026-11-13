@@ -71,4 +71,5 @@ export const journal: Feature = {
     "journal-calendar": (plugin) => openCalendar(plugin),
   },
   start: { name: "Today's journal", open: (plugin) => openJournal(plugin, new Date()) },
+  openDay: openJournal,
 };

@@ -26,4 +26,6 @@ export interface Feature {
   buttons?: Partial<Record<ButtonId, (plugin: OrgFlexPlugin, view: OrgFlexView) => void>>;
   /** PLAT-10: the view it can show when Obsidian starts, named as the setting lists it */
   start?: { name: string; open(plugin: OrgFlexPlugin): Promise<void> };
+  /** TL-8: open (creating if needed) the journal file for a day */
+  openDay?(plugin: OrgFlexPlugin, date: Date): Promise<void>;
 }
