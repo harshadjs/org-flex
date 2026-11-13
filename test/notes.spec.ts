@@ -11,7 +11,7 @@ import {
 import { readNote } from "../src/org/vault-index";
 import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, sharedCaptureText } from "../src/org/capture";
 import { freeNotePath, noteFileName, notePath, noteFileContent, titleProblem } from "../src/org/new-note";
-import { BAR_GROUPS, barLayout, BUTTONS, CORE_BUTTONS, mergeSettings, DEFAULT_SETTINGS, TOP_BUTTONS } from "../src/settings";
+import { BAR_GROUPS, barLayout, BUTTONS, CORE_BUTTONS, mergeSettings, DEFAULT_SETTINGS, startView, TOP_BUTTONS } from "../src/settings";
 
 function folds(lines: string[]) {
   const doc = Text.of(lines);
@@ -254,13 +254,20 @@ describe("settings", () => {
     for (const key of ["headingDragHandles", "todoKeywords", "hideStars", "backlinks", "journalTemplate"]) expect(key in s, key).toBe(false);
     expect(s.captureFile).toBe("in.org");
     expect(Object.keys(DEFAULT_SETTINGS).sort()).toEqual(
-      ["captureFile", "journalFolder", "showBacklinks", "showShortcutBar"]);
+      ["captureFile", "journalFolder", "showBacklinks", "showShortcutBar", "startView"]);
   });
 
   test("backlinks are on by default and can be turned off per vault", () => {
     expect(DEFAULT_SETTINGS.showBacklinks).toBe(true);
     expect(mergeSettings({ showBacklinks: false }).showBacklinks).toBe(false);
     expect(mergeSettings({ journalFolder: "days" }).showBacklinks).toBe(true);
+  });
+
+  test("the start view is the saved one if this copy offers it, else none", () => {
+    expect(DEFAULT_SETTINGS.startView).toBe("grid");
+    expect(startView("", ["agenda", "journal"])).toBe(null);
+    expect(startView("journal", ["agenda", "journal"])).toBe("journal");
+    expect(startView("timeline", ["agenda", "journal"])).toBe(null);
   });
 
   test("a saved button list, order and icons are dropped: the bar's groups are fixed", () => {

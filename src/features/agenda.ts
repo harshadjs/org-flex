@@ -9,8 +9,10 @@ import type { Feature } from "./feature";
 async function openAgenda(plugin: OrgFlexPlugin) {
   const { workspace } = plugin.app;
   const leaf = workspace.getLeavesOfType(AGENDA_VIEW)[0] ?? workspace.getLeaf(false);
-  if (leaf.view.getViewType() !== AGENDA_VIEW) await leaf.setViewState({ type: AGENDA_VIEW, active: true });
-  else await (leaf.view as AgendaView).render();
+  // a tab restored at startup may not be loaded yet (Obsidian 1.7.2+): load it before using its view
+  if (typeof leaf.loadIfDeferred === "function") await leaf.loadIfDeferred();
+  if (leaf.view instanceof AgendaView) await leaf.view.render();
+  else await leaf.setViewState({ type: AGENDA_VIEW, active: true });
   workspace.setActiveLeaf(leaf, { focus: true });
 }
 
@@ -24,4 +26,5 @@ export const agendaFeature: Feature = {
   buttons: {
     agenda: (plugin) => void openAgenda(plugin),
   },
+  start: { name: "Agenda", open: openAgenda },
 };

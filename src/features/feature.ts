@@ -24,4 +24,6 @@ export interface Feature {
   settingsChanged?(view: OrgFlexView): void;
   /** what its shortcut bar buttons do */
   buttons?: Partial<Record<ButtonId, (plugin: OrgFlexPlugin, view: OrgFlexView) => void>>;
+  /** PLAT-10: the view it can show when Obsidian starts, named as the setting lists it */
+  start?: { name: string; open(plugin: OrgFlexPlugin): Promise<void> };
 }

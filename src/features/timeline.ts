@@ -9,8 +9,10 @@ import type { Feature } from "./feature";
 async function openTimeline(plugin: OrgFlexPlugin) {
   const { workspace } = plugin.app;
   const leaf = workspace.getLeavesOfType(TIMELINE_VIEW)[0] ?? workspace.getLeaf(false);
-  if (leaf.view.getViewType() !== TIMELINE_VIEW) await leaf.setViewState({ type: TIMELINE_VIEW, active: true });
-  else (leaf.view as TimelineView).render();
+  // a tab restored at startup may not be loaded yet (Obsidian 1.7.2+): load it before using its view
+  if (typeof leaf.loadIfDeferred === "function") await leaf.loadIfDeferred();
+  if (leaf.view instanceof TimelineView) leaf.view.render();
+  else await leaf.setViewState({ type: TIMELINE_VIEW, active: true });
   workspace.setActiveLeaf(leaf, { focus: true });
 }
 
@@ -24,4 +26,5 @@ export const timelineFeature: Feature = {
   buttons: {
     timeline: (plugin) => void openTimeline(plugin),
   },
+  start: { name: "Timeline", open: openTimeline },
 };

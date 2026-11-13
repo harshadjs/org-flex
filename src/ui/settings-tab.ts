@@ -3,7 +3,8 @@
 
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type OrgFlexPlugin from "../main";
-import { hasFeature } from "../features";
+import { FEATURES, hasFeature } from "../features";
+import { startView } from "../settings";
 
 export class OrgFlexSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: OrgFlexPlugin) {
@@ -15,6 +16,23 @@ export class OrgFlexSettingTab extends PluginSettingTab {
     const settings = this.plugin.settings;
     const save = () => this.plugin.saveSettings();
     containerEl.empty();
+
+    // PLAT-10
+    const starts = FEATURES.filter((f) => f.start);
+    if (starts.length) {
+      new Setting(containerEl).setName("Startup").setHeading();
+      new Setting(containerEl)
+        .setName("Open on startup")
+        .setDesc("Shown in the current tab once Obsidian has started.")
+        .addDropdown((d) => {
+          d.addOption("", "Nothing");
+          for (const f of starts) d.addOption(f.id, f.start!.name);
+          d.setValue(startView(settings.startView, starts.map((f) => f.id)) ?? "").onChange(async (v) => {
+            settings.startView = v;
+            await save();
+          });
+        });
+    }
 
     new Setting(containerEl).setName("Journal").setHeading();
     new Setting(containerEl)

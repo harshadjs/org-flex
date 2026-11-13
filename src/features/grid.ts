@@ -1,8 +1,7 @@
 // The notes grid (§11c): every org file as a Keep-style card, pinned first,
-// then the most recently changed; optionally the start page.
+// then the most recently changed; the default start view (PLAT-10).
 
 import type OrgFlexPlugin from "../main";
-import { FLAVOUR } from "../flavour";
 import { GRID_VIEW, GridView } from "../ui/grid-view";
 import type { Feature } from "./feature";
 
@@ -23,10 +22,10 @@ export const gridFeature: Feature = {
   load(plugin) {
     plugin.registerView(GRID_VIEW, (leaf) => new GridView(leaf, plugin));
     plugin.addCommand({ id: "org-notes-grid", name: "Open notes grid", callback: () => void openGrid(plugin) });
-    // GRID-1: the start page, once the restored tabs are back
-    if (FLAVOUR.gridStartPage) plugin.app.workspace.onLayoutReady(() => openGrid(plugin).catch((e) => console.error("Org Flex: couldn't open the notes grid", e)));
   },
   buttons: {
     grid: (plugin) => void openGrid(plugin),
   },
+  // PLAT-10: this copy opens on the grid by default
+  start: { name: "Notes grid", open: openGrid },
 };
