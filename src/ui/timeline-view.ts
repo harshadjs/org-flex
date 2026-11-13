@@ -60,8 +60,9 @@ export class TimelineView extends ItemView {
     this.registerEvent(vault.on("create", () => this.refreshSoon()));
     this.registerEvent(vault.on("delete", () => this.refreshSoon()));
     this.registerEvent(vault.on("rename", () => this.refreshSoon()));
-    await this.plugin.index.ready;
-    this.render();
+    // Obsidian waits for onOpen while it restores tabs (1.7.2+), and the index is built only after that: wait for it here and both hang
+    this.contentEl.setText("Loading…");
+    void this.plugin.index.ready.then(() => this.render());
   }
 
   async onClose() {

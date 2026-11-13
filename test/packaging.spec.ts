@@ -209,6 +209,13 @@ test("the agenda, timeline and journal offer themselves as start views", () => {
   expect(offered.sort()).toEqual(["agenda", "journal", "timeline"]);
 });
 
+test("no tab waits for the index while it opens, as Obsidian waits for it while restoring tabs", () => {
+  for (const file of sources().filter((f) => f.startsWith("src/ui/"))) {
+    const open = /async onOpen\(\) \{([\s\S]*?)\n  \}/.exec(read(file))?.[1] ?? "";
+    expect(open, file).not.toMatch(/await[^;]*index/);
+  }
+});
+
 test("only the feature list reaches into a feature, so dropping one stays local", () => {
   for (const file of sources()) {
     if (file.startsWith("src/features/")) continue;
