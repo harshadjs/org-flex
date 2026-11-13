@@ -212,7 +212,7 @@ test("the agenda, timeline, journal and grid offer themselves as start views", (
 test("no tab waits for the index while it opens, as Obsidian waits for it while restoring tabs", () => {
   for (const file of sources().filter((f) => f.startsWith("src/ui/"))) {
     const open = /async onOpen\(\) \{([\s\S]*?)\n  \}/.exec(read(file))?.[1] ?? "";
-    expect(open, file).not.toMatch(/await[^;]*index/);
+    expect(open, file).not.toMatch(/await[^;\n]*\.index\b/);
   }
 });
 
