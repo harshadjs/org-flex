@@ -2,7 +2,7 @@
 
 import { Transaction } from "@codemirror/state";
 import { FileView, Hotkey, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
-import { ButtonDef, CORE_BUTTONS, mergeSettings, OrgFlexSettings } from "./settings";
+import { ButtonDef, CORE_BUTTONS, mergeSettings, OrgFlexSettings, startView } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
 import { LinkScheme, readNote, searchOffset, VaultIndex } from "./org/vault-index";
 import { freeNotePath, noteFileContent, noteFileName, notePath } from "./org/new-note";
@@ -65,7 +65,19 @@ export default class OrgFlexPlugin extends Plugin {
     this.addCommands();
     // PLAT-8: everything else comes from the features this copy has
     for (const feature of FEATURES) feature.load?.(this);
+    // PLAT-10: the start view, once Obsidian has restored its tabs; not when the plugin is turned on later
+    if (!this.app.workspace.layoutReady) this.app.workspace.onLayoutReady(() => void this.openStartView());
     this.addSettingTab(new OrgFlexSettingTab(this.app, this));
+  }
+
+  /** PLAT-10: show the view chosen in settings, if this copy has it. */
+  private async openStartView() {
+    const id = startView(this.settings.startView, FEATURES.filter((f) => f.start).map((f) => f.id));
+    try {
+      await FEATURES.find((f) => f.id === id)?.start?.open(this);
+    } catch (e) {
+      console.error("Org Flex: couldn't open the start view", e);
+    }
   }
 
   /** PLAT-3, PLAT-6: open .org files in the org view, or explain who has them already. */

@@ -20,7 +20,7 @@ In most plugins, making it yours means a long settings page. In Org Flex, your c
 - **How each thing behaves** is a numbered rule in [`SPEC.md`](SPEC.md), with tests. Your agent changes the rule, then the code and the tests, and the test suite tells it whether everything else still holds.
 - **Who you are and why** is recorded in `FLAVOUR.md`, so the next agent session doesn't ask again.
 
-The settings tab keeps only what differs between your own vaults and devices: the journal folder, the capture inbox, the shortcut bar. Everything about *how you work with Org* is code you own, in a plain git history you can read, diff and undo.
+The settings tab keeps only what differs between your own vaults and devices: what opens at startup, the journal folder, the capture inbox, the shortcut bar. Everything about *how you work with Org* is code you own, in a plain git history you can read, diff and undo.
 
 Four invariants hold in every fork, guarded by tests: files stay plain Org, the phone comes first, every rule is tested, and command ids never change.
 

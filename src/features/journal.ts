@@ -70,4 +70,5 @@ export const journal: Feature = {
     "journal-picker": (plugin) => browseJournal(plugin),
     "journal-calendar": (plugin) => openCalendar(plugin),
   },
+  start: { name: "Today's journal", open: (plugin) => openJournal(plugin, new Date()) },
 };

@@ -204,6 +204,11 @@ test("each feature is one file, listed once, and owns a section of the spec that
   }
 });
 
+test("the agenda, timeline and journal offer themselves as start views", () => {
+  const offered = featureFiles.filter((file) => /\n  start: \{ name: "/.test(read(`src/features/${file}`))).map((file) => file.replace(/\.ts$/, ""));
+  expect(offered.sort()).toEqual(["agenda", "journal", "timeline"]);
+});
+
 test("only the feature list reaches into a feature, so dropping one stays local", () => {
   for (const file of sources()) {
     if (file.startsWith("src/features/")) continue;

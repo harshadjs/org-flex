@@ -107,13 +107,21 @@ export interface OrgFlexSettings {
   showShortcutBar: boolean;
   journalFolder: string;
   captureFile: string;
+  /** PLAT-10: the feature whose view opens when Obsidian starts (`agenda`, `timeline`, `journal`...); empty for none */
+  startView: string;
 }
 
 export const DEFAULT_SETTINGS: OrgFlexSettings = {
   showShortcutBar: true,
   journalFolder: "journal",
   captureFile: "inbox.org",
+  startView: "",
 };
+
+/** PLAT-10: the start view to open: the saved one if this copy offers it, else none. */
+export function startView(saved: string, offered: string[]): string | null {
+  return saved && offered.includes(saved) ? saved : null;
+}
 
 /** §12: saved keys that are no longer settings (gone, or moved to the flavour, §12a); dropped on load. */
 export const RETIRED_SETTINGS = [
