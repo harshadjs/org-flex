@@ -11,7 +11,7 @@ async function openTimeline(plugin: OrgFlexPlugin) {
   const leaf = workspace.getLeavesOfType(TIMELINE_VIEW)[0] ?? workspace.getLeaf(false);
   // a tab restored at startup may not be loaded yet (Obsidian 1.7.2+): load it before using its view
   if (typeof leaf.loadIfDeferred === "function") await leaf.loadIfDeferred();
-  if (leaf.view instanceof TimelineView) leaf.view.render();
+  if (leaf.view instanceof TimelineView) leaf.view.showToday();
   else await leaf.setViewState({ type: TIMELINE_VIEW, active: true });
   workspace.setActiveLeaf(leaf, { focus: true });
 }

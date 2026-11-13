@@ -51,3 +51,10 @@ export function monthGrid(month: Date): Date[] {
 export function cellTitles(titles: string[], max = 2): { shown: string[]; more: number } {
   return { shown: titles.slice(0, max), more: Math.max(0, titles.length - max) };
 }
+
+/** AG-6, TL-9: the month view's chosen day: the one chosen if it is in `month`, else today when the month holds it, else the 1st. */
+export function chosenDay(chosen: Date | null, month: Date, today: Date): Date {
+  const inMonth = (d: Date) => d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
+  if (chosen && inMonth(chosen)) return chosen;
+  return inMonth(today) ? new Date(today.getFullYear(), today.getMonth(), today.getDate()) : new Date(month.getFullYear(), month.getMonth(), 1);
+}
