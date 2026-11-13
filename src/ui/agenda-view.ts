@@ -3,7 +3,8 @@
 import { ItemView, moment, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
-import { agendaFiles, AGENDA_DAYS, AGENDA_QUERY, cellTitles, dayOffset, monthGrid, monthStart, relativeDay, weekSpanStart } from "../org/agenda";
+import { agendaFiles, AGENDA_DAYS, AGENDA_QUERY, chosenDay, dayOffset, monthGrid, monthStart, relativeDay, weekSpanStart } from "../org/agenda";
+import { drawModes, drawMonthGrid, drawStepper, monthName } from "./month-grid";
 import { FEATURES } from "../features";
 import { agenda, type AgendaDay, type AgendaItem, overdueLabel, parseQuery } from "../org/query";
 import { OrgTask, parseTasks, toggleTaskInText } from "../org/tasks";
@@ -19,7 +20,6 @@ const MODE_KEY = "org-flex-agenda-mode";
 
 type Mode = "week" | "month";
 
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 export class AgendaView extends ItemView {
   private timer: number | null = null;
@@ -138,27 +138,13 @@ export class AgendaView extends ItemView {
 
   /** AG-5, AG-6: ‹ ›, Today while elsewhere, and the Week / Month switch */
   private drawNav(page: HTMLElement) {
-    const nav = page.createDiv({ cls: "org-agenda-nav" });
-    const step = (label: string, icon: string, by: number) => {
-      const b = nav.createEl("button", { cls: "org-agenda-step clickable-icon", attr: { "aria-label": label } });
-      setIcon(b, icon);
-      b.addEventListener("click", () => this.move(this.offset + by));
-    };
-    const unit = this.mode === "week" ? "week" : "month";
-    step(`Previous ${unit}`, "chevron-left", -1);
-    step(`Next ${unit}`, "chevron-right", 1);
-    if (this.offset !== 0) nav.createEl("button", { cls: "org-agenda-today", text: "Today" }).addEventListener("click", () => this.move(0));
-    const modes = nav.createDiv({ cls: "org-agenda-modes" });
-    for (const [mode, label] of [["week", "Week"], ["month", "Month"]] as const) {
-      const b = modes.createEl("button", { cls: "org-agenda-mode", text: label, attr: { "aria-pressed": String(this.mode === mode) } });
-      b.toggleClass("is-active", this.mode === mode);
-      b.addEventListener("click", () => {
-        if (this.mode === mode) return;
-        this.mode = mode;
-        this.saveMode();
-        this.move(0);
-      });
-    }
+    const nav = page.createDiv({ cls: "org-month-nav" });
+    drawStepper(nav, this.mode, this.offset, (offset) => this.move(offset));
+    drawModes(nav, [["week", "Week"], ["month", "Month"]] as const, this.mode, (mode) => {
+      this.mode = mode;
+      this.saveMode();
+      this.move(0);
+    });
   }
 
   private move(offset: number) {
@@ -189,26 +175,16 @@ export class AgendaView extends ItemView {
   private drawMonth(page: HTMLElement, month: Date, grid: Date[], days: AgendaDay[], now: Date, locale: string) {
     const byDay = new Map(days.filter((d) => d.date).map((d) => [d.date!.toDateString(), d]));
     const inMonth = (d: Date) => d.getMonth() === month.getMonth();
-    const name = month.toLocaleDateString(locale, { month: "long", year: "numeric" });
-    this.header(page, name.charAt(0).toLocaleUpperCase(locale) + name.slice(1), days.filter((d) => d.date && inMonth(d.date)), days, locale);
-    const chosen = this.chosen && inMonth(this.chosen) ? this.chosen : inMonth(now) ? now : month;
-    const el = page.createDiv({ cls: "org-agenda-month" });
-    for (const d of grid.slice(0, 7)) el.createDiv({ cls: "org-agenda-wd", text: d.toLocaleDateString(locale, { weekday: "short" }) });
-    for (const date of grid) {
-      const cell = el.createDiv({ cls: "org-agenda-cell" });
-      cell.toggleClass("is-outside", !inMonth(date));
-      cell.toggleClass("is-today", sameDay(date, now));
-      cell.toggleClass("is-chosen", sameDay(date, chosen));
-      cell.createDiv({ cls: "org-agenda-cell-num", text: String(date.getDate()) });
-      const items = byDay.get(date.toDateString())?.items ?? [];
-      const { shown, more } = cellTitles(items.map((i) => linkText(i.task.title)));
-      for (const t of shown) cell.createDiv({ cls: "org-agenda-cell-title", text: t });
-      if (more) cell.createDiv({ cls: "org-agenda-cell-more", text: `+${more}` });
-      onTap(cell, () => {
+    this.header(page, monthName(month, locale), days.filter((d) => d.date && inMonth(d.date)), days, locale);
+    const chosen = chosenDay(this.chosen, month, now);
+    drawMonthGrid(page, {
+      month, now, chosen, locale,
+      titles: (date) => (byDay.get(date.toDateString())?.items ?? []).map((i) => linkText(i.task.title)),
+      choose: (date) => {
         this.chosen = date;
         this.draw(true);
-      });
-    }
+      },
+    });
     this.renderDay(page, byDay.get(chosen.toDateString()) ?? { date: chosen, items: [] }, now, locale, "Add");
     const overdue = days.find((d) => !d.date);
     if (overdue) this.renderDay(page, overdue, now, locale);

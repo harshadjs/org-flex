@@ -1,12 +1,14 @@
 // TL-1..7: the timeline tab, every node in the index newest first, with the
 // attachments each one links to.
 
-import { ItemView, setIcon, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, moment, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
 import { journalEntries } from "../org/journal";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../org/syntax";
 import { FEATURES } from "../features";
+import { chosenDay, monthStart } from "../org/agenda";
+import { drawModes, drawMonthGrid, drawStepper, monthName } from "./month-grid";
 import { ALL_KINDS, buildTimeline, needsJournal, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags, untilEnd } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
@@ -27,6 +29,11 @@ function fileIcon(ext: string): string {
 /** TL-5: where this device keeps the filter */
 const FILTER_KEY = "org-flex-timeline-filter";
 
+/** TL-9: where this device keeps the List / Month choice */
+const MODE_KEY = "org-flex-timeline-mode";
+
+type Mode = "list" | "month";
+
 export class TimelineView extends ItemView {
   private timer: number | null = null;
   private typing: number | null = null;
@@ -37,12 +44,30 @@ export class TimelineView extends ItemView {
   private listEl: HTMLElement | null = null;
   private countEl: HTMLElement | null = null;
   private tagsEl: HTMLElement | null = null;
+  private navEl: HTMLElement | null = null;
+  /** TL-9: the list or the month grid; the month is `offset` months from today's, and `chosen` its chosen day */
+  private mode: Mode = "list";
+  private offset = 0;
+  private chosen: Date | null = null;
   /** TL-3: loads a video when it comes near the screen */
   private videoObserver: IntersectionObserver | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
     this.filter = cleanFilter(this.loadFilter());
+    try {
+      const saved = typeof this.app.loadLocalStorage === "function" ? this.app.loadLocalStorage(MODE_KEY) : window.localStorage.getItem(MODE_KEY);
+      this.mode = saved === "month" ? "month" : "list";
+    } catch {
+      // the list, then
+    }
+  }
+
+  /** TL-9: back to this month, as opening the timeline again does */
+  showToday() {
+    this.offset = 0;
+    this.chosen = null;
+    this.render();
   }
 
   getViewType() {
@@ -119,6 +144,7 @@ export class TimelineView extends ItemView {
     el.addClass("org-timeline");
     const page = el.createDiv({ cls: "org-timeline-page" });
     const bar = page.createDiv({ cls: "org-timeline-filters" });
+    this.navEl = bar.createDiv({ cls: "org-month-nav org-timeline-nav" });
     const search = bar.createDiv({ cls: "org-timeline-search" });
     setIcon(search.createSpan({ cls: "org-timeline-search-icon" }), "search");
     const input = search.createEl("input", { attr: { type: "search", placeholder: "Filter by title, tag or file", enterkeyhint: "search" } });
@@ -259,6 +285,12 @@ export class TimelineView extends ItemView {
     const shown = days.reduce((n, d) => n + d.entries.length, 0);
     this.drawTags({ days, unlinked });
     this.countEl!.setText(shown === total ? `${total} ${total === 1 ? "entry" : "entries"}` : `${shown} of ${total} entries`);
+    this.drawNav();
+    if (this.mode === "month") {
+      this.drawMonth(list, days);
+      el.scrollTop = scroll;
+      return;
+    }
     if (!days.length && !unlinked.length) {
       list.createDiv({ cls: "org-timeline-empty", text: total ? "Nothing matches the filter." : "No notes with an ID yet." });
       return;
@@ -286,6 +318,54 @@ export class TimelineView extends ItemView {
       this.renderAttachments(section, unlinked);
     }
     el.scrollTop = scroll;
+  }
+
+  /** TL-9: ‹ › and Today in the month view, and the List / Month switch */
+  private drawNav() {
+    const nav = this.navEl!;
+    nav.empty();
+    if (this.mode === "month") drawStepper(nav, "month", this.offset, (offset) => this.move(offset));
+    drawModes(nav, [["list", "List"], ["month", "Month"]] as const, this.mode, (mode) => {
+      this.mode = mode;
+      try {
+        if (typeof this.app.saveLocalStorage === "function") this.app.saveLocalStorage(MODE_KEY, mode);
+        else window.localStorage.setItem(MODE_KEY, mode);
+      } catch {
+        // the choice just isn't kept
+      }
+      this.move(0);
+    });
+  }
+
+  private move(offset: number) {
+    this.offset = offset;
+    this.chosen = null;
+    this.draw();
+    this.contentEl.scrollTop = 0;
+  }
+
+  /** TL-9: the month's grid of what the filter leaves, then the chosen day as the list shows it (TL-8's Add journal included) */
+  private drawMonth(list: HTMLElement, days: TimelineDay[]) {
+    const now = new Date();
+    const locale = moment.locale();
+    const month = monthStart(now, this.offset);
+    const byDay = new Map(days.map((d) => [d.date.toDateString(), d]));
+    const inMonth = days.filter((d) => d.date.getFullYear() === month.getFullYear() && d.date.getMonth() === month.getMonth());
+    const count = inMonth.reduce((n, d) => n + d.entries.length, 0);
+    const section = list.createDiv({ cls: "org-timeline-month" });
+    const header = section.createDiv({ cls: "org-timeline-month-header" });
+    header.createSpan({ cls: "org-timeline-month-name", text: monthName(month, locale) });
+    header.createSpan({ cls: "org-timeline-count", text: `${count} ${count === 1 ? "entry" : "entries"}` });
+    const chosen = chosenDay(this.chosen, month, now);
+    drawMonthGrid(section, {
+      month, now, chosen, locale,
+      titles: (date) => (byDay.get(date.toDateString())?.entries ?? []).map((e) => (e.kind === "journal" ? "Journal" : e.title)),
+      choose: (date) => {
+        this.chosen = date;
+        this.draw();
+      },
+    });
+    this.renderDay(section, byDay.get(chosen.toDateString()) ?? { date: chosen, entries: [] });
   }
 
   private renderDay(parent: HTMLElement, day: TimelineDay) {

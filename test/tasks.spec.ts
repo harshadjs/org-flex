@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseTasks, taskBlockConfig, toggleTaskInText } from "../src/org/tasks";
 import { agenda, overdueLabel, parseQuery, QueryError, runQuery } from "../src/org/query";
-import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles, cellTitles, dayOffset, monthGrid, monthStart, relativeDay, weekSpanStart } from "../src/org/agenda";
+import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles, cellTitles, chosenDay, dayOffset, monthGrid, monthStart, relativeDay, weekSpanStart } from "../src/org/agenda";
 
 const kw = { todo: ["TODO", "NEXT"], done: ["DONE", "CANCELLED"] };
 const ctx = { todoKeywords: kw.todo, doneKeywords: kw.done, defaultPriority: "B" };
@@ -176,6 +176,15 @@ test("a month grid is Monday-start weeks covering the month", () => {
   const feb = monthGrid(new Date(2027, 1, 1));
   expect([feb.length, feb[0], feb[27]]).toEqual([28, new Date(2027, 1, 1), new Date(2027, 1, 28)]);
   expect(nov.slice(0, 7).map((d) => d.getDay())).toEqual([1, 2, 3, 4, 5, 6, 0]);
+});
+
+test("the month view starts on today when the month holds it, else on the 1st", () => {
+  const today = new Date(2026, 10, 12, 15, 30);
+  expect(chosenDay(null, new Date(2026, 10, 1), today)).toEqual(new Date(2026, 10, 12));
+  expect(chosenDay(null, new Date(2026, 11, 1), today)).toEqual(new Date(2026, 11, 1));
+  expect(chosenDay(new Date(2026, 11, 24), new Date(2026, 11, 1), today)).toEqual(new Date(2026, 11, 24));
+  // a day chosen in another month doesn't carry over
+  expect(chosenDay(new Date(2026, 10, 3), new Date(2026, 11, 1), today)).toEqual(new Date(2026, 11, 1));
 });
 
 test("a month cell shows two titles, then how many more", () => {
