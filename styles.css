@@ -1428,6 +1428,13 @@ input.org-icon-invalid {
   color: var(--text-faint);
 }
 
+/* AG-4, TL-1: on a phone the floating navigation bar covers the bottom of a
+   tab, so the end of the page leaves room to scroll the last item clear of it */
+.is-phone .org-agenda .org-agenda-page,
+.is-phone .org-timeline .org-timeline-page {
+  padding-bottom: calc(var(--size-4-12) + max(0px, var(--view-bottom-spacing, 0px)));
+}
+
 /* TL-1..4: the timeline tab */
 .org-timeline {
   padding: 0 !important;
@@ -1982,7 +1989,8 @@ input.org-icon-invalid {
   --tl-badge: 40px;
 }
 .is-mobile .org-timeline .org-timeline-page {
-  padding: 0 var(--size-4-3) var(--size-4-12);
+  padding-left: var(--size-4-3);
+  padding-right: var(--size-4-3);
 }
 .is-mobile .org-timeline .org-timeline-head {
   box-sizing: border-box;
