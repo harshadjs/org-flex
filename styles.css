@@ -2371,7 +2371,12 @@ input.org-icon-invalid {
   min-width: 0;
 }
 .is-mobile .org-grid .org-grid-page {
-  padding: 0 var(--size-4-2) var(--size-4-12);
+  padding-left: var(--size-4-2);
+  padding-right: var(--size-4-2);
+}
+/* GRID-2: room for the floating navigation bar, as the agenda's (AG-4) */
+.is-phone .org-grid .org-grid-page {
+  padding-bottom: calc(var(--size-4-12) + max(0px, var(--view-bottom-spacing, 0px)));
 }
 .is-mobile .org-grid {
   --grid-gap: 8px;
