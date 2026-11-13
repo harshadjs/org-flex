@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseTasks, taskBlockConfig, toggleTaskInText } from "../src/org/tasks";
 import { agenda, overdueLabel, parseQuery, QueryError, runQuery } from "../src/org/query";
-import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles, dayOffset, relativeDay } from "../src/org/agenda";
+import { AGENDA_DAYS, AGENDA_QUERY, agendaFiles, cellTitles, dayOffset, monthGrid, monthStart, relativeDay, weekSpanStart } from "../src/org/agenda";
 
 const kw = { todo: ["TODO", "NEXT"], done: ["DONE", "CANCELLED"] };
 const ctx = { todoKeywords: kw.todo, doneKeywords: kw.done, defaultPriority: "B" };
@@ -140,6 +140,48 @@ test("the agenda reads the top-level org files and shows the week: overdue, then
     [3, []],
     [4, ["Sam timestamp Anniversary"]],
   ]);
+});
+
+test("the agenda shows any 7 days from a start, overdue only when they include today", () => {
+  const kw = { todo: ["TODO"], done: ["DONE"] };
+  const tasks = parseTasks([
+    "* TODO Late", "SCHEDULED: <2026-11-01 Sun>",
+    "* TODO Next week", "SCHEDULED: <2026-11-20 Fri>",
+    "* TODO Last week", "DEADLINE: <2026-11-06 Fri>",
+  ].join("\n"), kw).map((t) => ({ ...t, path: "tasks.org" }));
+  const ctx = { todoKeywords: kw.todo, doneKeywords: kw.done, defaultPriority: "B" };
+  const today = new Date(2026, 10, 12, 9, 0);
+  const show = (start: Date) => agenda(parseQuery(AGENDA_QUERY), tasks, today, AGENDA_DAYS, ctx, start)
+    .filter((d) => d.items.length).map((d) => [d.date?.getDate() ?? "overdue", d.items.map((i) => i.task.title)]);
+  expect(weekSpanStart(today, 1)).toEqual(new Date(2026, 10, 19));
+  expect(weekSpanStart(today, -1)).toEqual(new Date(2026, 10, 5));
+  expect(show(weekSpanStart(today, 0))).toEqual([["overdue", ["Late", "Last week"]]]);
+  expect(show(weekSpanStart(today, 1))).toEqual([[20, ["Next week"]]]);
+  // a past week: its own items, no overdue group
+  expect(show(weekSpanStart(today, -1))).toEqual([[6, ["Last week"]]]);
+});
+
+test("a month grid is Monday-start weeks covering the month", () => {
+  const today = new Date(2026, 10, 12);
+  expect(monthStart(today, 0)).toEqual(new Date(2026, 10, 1));
+  expect(monthStart(today, 2)).toEqual(new Date(2027, 0, 1));
+  expect(monthStart(today, -11)).toEqual(new Date(2025, 11, 1));
+  // November 2026 starts on a Sunday: from Monday 26 October to Sunday 6 December
+  const nov = monthGrid(new Date(2026, 10, 1));
+  expect(nov.length).toBe(42);
+  expect(nov[0]).toEqual(new Date(2026, 9, 26));
+  expect(nov[41]).toEqual(new Date(2026, 11, 6));
+  expect(nov.every((d) => d.getHours() === 0)).toBe(true);
+  // February 2027 starts on a Monday and ends on a Sunday: four whole weeks
+  const feb = monthGrid(new Date(2027, 1, 1));
+  expect([feb.length, feb[0], feb[27]]).toEqual([28, new Date(2027, 1, 1), new Date(2027, 1, 28)]);
+  expect(nov.slice(0, 7).map((d) => d.getDay())).toEqual([1, 2, 3, 4, 5, 6, 0]);
+});
+
+test("a month cell shows two titles, then how many more", () => {
+  expect(cellTitles(["A", "B", "C", "D"])).toEqual({ shown: ["A", "B"], more: 2 });
+  expect(cellTitles(["A"])).toEqual({ shown: ["A"], more: 0 });
+  expect(cellTitles([])).toEqual({ shown: [], more: 0 });
 });
 
 test("agenda days are counted by the calendar and named relative to today", () => {

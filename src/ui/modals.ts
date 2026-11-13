@@ -5,7 +5,7 @@
 import { App, FuzzySuggestModal, Modal, Platform, prepareFuzzySearch, setIcon, SuggestModal } from "obsidian";
 import { findNodes, NodeChoice } from "../org/node-find";
 import { TitleCompletion } from "../org/vault-index";
-import { addDays, dateFieldValue, parseDateField } from "../org/capture";
+import { addDays, CaptureDate, CaptureDateKind, dateFieldValue, parseDateField, parseTimeField } from "../org/capture";
 import { recorderType, RECORDING_AUDIO, RECORDING_BITRATE } from "../org/edit";
 import { calendarMonth, journalDateString, JournalEntry, journalEntryLabel, localeWeekStart } from "../org/journal";
 
@@ -261,7 +261,8 @@ export interface CaptureChoice {
   text: string;
   /** "" for no keyword */
   state: string;
-  scheduled: Date | null;
+  /** CAP-8: null for no date */
+  when: CaptureDate | null;
 }
 
 /**
@@ -277,6 +278,8 @@ export class CaptureModal extends Modal {
     private cursor: number,
     private states: string[],
     private file: (choice: CaptureChoice) => Promise<string | null>,
+    /** AG-7: the day the date field starts on */
+    private day: Date = new Date(),
   ) {
     super(app);
   }
@@ -295,8 +298,26 @@ export class CaptureModal extends Modal {
     for (const s of this.states) state.createEl("option", { value: s, text: s || "None" });
     state.value = this.states[0] ?? "";
 
+    // CAP-8: what the date is
+    const kindRow = contentEl.createDiv({ cls: "org-capture-row org-capture-kinds" });
+    let kind: CaptureDateKind = "scheduled";
+    const kinds = ([["scheduled", "Scheduled"], ["deadline", "Deadline"], ["timestamp", "Timestamp"]] as const).map(([value, label]) => {
+      const chip = kindRow.createEl("button", { text: label, cls: "org-capture-chip org-capture-kind" });
+      chip.setAttribute("data-kind", value);
+      chip.addEventListener("click", () => {
+        kind = value;
+        showKind();
+      });
+      return { chip, value };
+    });
+    const showKind = () => kinds.forEach(({ chip, value }) => {
+      chip.toggleClass("is-active", value === kind);
+      chip.setAttribute("aria-pressed", String(value === kind));
+    });
+    showKind();
+
     const dateRow = contentEl.createDiv({ cls: "org-capture-row" });
-    dateRow.createSpan({ cls: "org-capture-label", text: "Scheduled" });
+    dateRow.createSpan({ cls: "org-capture-label", text: "Date" });
     const date = dateRow.createEl("input", { type: "date", cls: "org-capture-date" });
     const quick = dateRow.createDiv({ cls: "org-capture-quick" });
     const today = new Date();
@@ -310,21 +331,31 @@ export class CaptureModal extends Modal {
       return { chip, value: value ? dateFieldValue(value) : "" };
     });
     const mark = () => buttons.forEach(({ chip, value }) => chip.toggleClass("is-active", value === date.value));
-    date.value = dateFieldValue(today);
+    date.value = dateFieldValue(this.day);
     date.addEventListener("input", mark);
     date.addEventListener("change", mark);
     mark();
+
+    const timeRow = contentEl.createDiv({ cls: "org-capture-row" });
+    timeRow.createSpan({ cls: "org-capture-label", text: "Time" });
+    const time = timeRow.createEl("input", { type: "time", cls: "org-capture-time" });
+    const clearTime = timeRow.createEl("button", { cls: "org-capture-chip org-capture-time-clear", attr: { "aria-label": "All day" } });
+    setIcon(clearTime, "x");
+    clearTime.addEventListener("click", () => {
+      time.value = "";
+    });
 
     const error = contentEl.createDiv({ cls: "org-capture-error" });
     const actions = contentEl.createDiv({ cls: "modal-button-container" });
     const submit = async () => {
       // a half-typed date counts as none only when the field is empty
-      const scheduled = parseDateField(date.value);
-      if (date.value && !scheduled) {
+      const day = parseDateField(date.value);
+      if (date.value && !day) {
         error.setText("Finish the date, or choose None.");
         return;
       }
-      const problem = await this.file({ text: input.value, state: state.value, scheduled });
+      const when = day ? { kind, date: day, time: parseTimeField(time.value) } : null;
+      const problem = await this.file({ text: input.value, state: state.value, when });
       if (problem) error.setText(problem);
       else this.close();
     };

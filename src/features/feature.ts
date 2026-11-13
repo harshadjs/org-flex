@@ -27,4 +27,6 @@ export interface Feature {
   start?: { name: string; open(plugin: OrgFlexPlugin): Promise<void> };
   /** TL-8: open (creating if needed) the journal file for a day, in `leaf` */
   openDay?(plugin: OrgFlexPlugin, date: Date, leaf: WorkspaceLeaf): Promise<void>;
+  /** AG-7: open the capture dialog dated on a day */
+  captureOn?(plugin: OrgFlexPlugin, day: Date): void;
 }

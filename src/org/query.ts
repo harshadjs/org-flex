@@ -269,19 +269,22 @@ export interface AgendaDay {
 const hhmm = (s: Stamp) => (s.timed ? `${String(s.date.getHours()).padStart(2, "0")}:${String(s.date.getMinutes()).padStart(2, "0")}` : null);
 
 /**
- * TASK-5, AG-2: the matching tasks by day for `days` days from today. A task
+ * TASK-5, AG-2: the matching tasks by day for `days` days from `start` (today unless given). A task
  * is on each day its SCHEDULED or DEADLINE date falls on, and each active
  * timestamp in its heading or body falls on, repeaters (`+1y`) included.
  * Open tasks scheduled or due before today come first, in an overdue group,
- * once each. Within a day, items with a time come first, by time; the rest
+ * once each, when the days include today. Within a day, items with a time come first, by time; the rest
  * keep the tasks' order.
  */
-export function agenda(query: Query, tasks: OrgTask[], now: Date, days: number, ctx: SortContext): AgendaDay[] {
+export function agenda(query: Query, tasks: OrgTask[], now: Date, days: number, ctx: SortContext, start: Date = now): AgendaDay[] {
   const matching = runQuery(query, tasks, now, ctx);
   const today = startOfDay(now);
+  const first = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   const groups: AgendaDay[] = [];
   const overdue: AgendaItem[] = [];
-  for (const task of matching) {
+  // AG-2: overdue belongs to the span with today
+  const hasToday = first.getTime() <= today && today < new Date(first.getFullYear(), first.getMonth(), first.getDate() + days).getTime();
+  for (const task of hasToday ? matching : []) {
     if (task.done) continue;
     const late = ([["deadline", task.deadlineStamp ?? task.deadline], ["scheduled", task.scheduledStamp ?? task.scheduled]] as const)
       .find(([, s]) => s && startOfDay(s instanceof Date ? s : s.date) < today);
@@ -289,7 +292,7 @@ export function agenda(query: Query, tasks: OrgTask[], now: Date, days: number, 
   }
   if (overdue.length) groups.push({ date: null, items: overdue });
   for (let i = 0; i < days; i++) {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    const day = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i);
     const items: AgendaItem[] = [];
     for (const task of matching) {
       for (const kind of ["scheduled", "deadline"] as const) {

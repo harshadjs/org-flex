@@ -11,20 +11,32 @@ export function capturePath(setting: string): string {
   return path.endsWith(".org") ? path : `${path}.org`;
 }
 
+/** CAP-8: what the chosen date is */
+export type CaptureDateKind = "scheduled" | "deadline" | "timestamp";
+
+/** CAP-8: the chosen date, with its time (`HH:MM`) or null for all day */
+export interface CaptureDate {
+  kind: CaptureDateKind;
+  date: Date;
+  time: string | null;
+}
+
 /**
  * CAP-3: the entry for the typed text: the first non-blank line is the
- * heading, `* <keyword> <line>` (no keyword when it is empty), scheduled for
- * `scheduled` unless that is null; the lines after it are its body. Null when
- * nothing but blanks was typed.
+ * heading, `* <keyword> <line>` (no keyword when it is empty), with `when`
+ * on the line after it (`SCHEDULED:`, `DEADLINE:` or a bare timestamp)
+ * unless that is null; the lines after it are its body. Null when nothing
+ * but blanks was typed.
  */
-export function captureEntry(text: string, keyword: string, scheduled: Date | null): string | null {
+export function captureEntry(text: string, keyword: string, when: CaptureDate | null): string | null {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
   const first = lines.findIndex((l) => l.trim());
   if (first < 0) return null;
   const body = lines.slice(first + 1);
   while (body.length && !body[body.length - 1].trim()) body.pop();
   const head = `* ${keyword ? `${keyword} ` : ""}${lines[first].trim()}`;
-  const planning = scheduled ? [`SCHEDULED: <${orgDateString(scheduled)}>`] : [];
+  const stamp = when && `<${orgDateString(when.date)}${when.time ? ` ${when.time}` : ""}>`;
+  const planning = !when ? [] : when.kind === "timestamp" ? [stamp!] : [`${when.kind === "deadline" ? "DEADLINE" : "SCHEDULED"}: ${stamp}`];
   return [head, ...planning, ...body].join("\n") + "\n";
 }
 
@@ -46,6 +58,12 @@ export function dateFieldValue(date: Date): string {
 export function parseDateField(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+}
+
+/** CAP-8: a time field's value, `HH:MM`, or null when empty or not a whole time. */
+export function parseTimeField(value: string): string | null {
+  const m = /^(\d{2}):(\d{2})/.exec(value.trim());
+  return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? `${m[1]}:${m[2]}` : null;
 }
 
 /** CAP-8: `days` after `date`, at midnight. */
