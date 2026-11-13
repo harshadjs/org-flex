@@ -61,7 +61,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 - **Checklists:** tap to tick, `[n/m]` and `[n%]` counters, parent boxes that follow their children, Enter continues the list.
 - **Drag to reorder** list items by their grip, sideways to indent, children included.
 - **TODO keywords**, with scheduled and deadline dates from a date picker.
-- **Agenda:** a tab with overdue tasks and the coming week from your top-level org files, including repeating dates such as birthdays (`<… +1y>`).
+- **Agenda:** a tab with overdue tasks and the coming week from your top-level org files, including repeating dates such as birthdays (`<… +1y>`); move week by week, or switch to a month calendar, and plan on any day with a + that opens Capture dated there.
 - **Timeline:** a tab with every note, heading and journal day with an ID, newest first by when its ID was made, and the images and recordings each one links to.
 - **Repeating tasks** move on when marked done, as in Emacs, and `CLOSED:` can be logged.
 - **Task lists in Markdown notes:** an ` ```orgmode-tasks ` block lists an org file's tasks, filtered and sorted with Orgzly's search language, or as an agenda.
@@ -76,7 +76,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 - **Links follow renames:** rename or move a file or folder and the file links to it in org notes are updated, relative to each note, as Obsidian does for Markdown.
 
 **Capture and journal**
-- **Capture:** one box from anywhere (command, ribbon, bar or an `obsidian://org-capture` link from other apps) files a TODO, with its state and scheduled date, into your inbox, linked back to the note you were in.
+- **Capture:** one box from anywhere (command, ribbon, bar or an `obsidian://org-capture` link from other apps) files a TODO, with its state and a scheduled date, deadline or timestamp (with an optional time), into your inbox, linked back to the note you were in.
 - **Journal:** today's file, a searchable list and a calendar, stored as `journal/YYYY/MM/YYYY-MM-DD.org`, started from the template in `src/flavour.ts`.
 - **New org notes** named after their title, with an org-roam style UUID `:ID:`.
 

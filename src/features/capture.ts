@@ -13,7 +13,7 @@ import type { Feature } from "./feature";
  * CAP-1: the capture dialog, with `initial` already typed (CAP-6), or, with
  * none, a link to the org note being viewed (CAP-9).
  */
-function capture(plugin: OrgFlexPlugin, initial?: string) {
+function capture(plugin: OrgFlexPlugin, initial?: string, day?: Date) {
   const path = capturePath(plugin.settings.captureFile);
   const states = captureStates(FLAVOUR.todoKeywords, FLAVOUR.doneKeywords);
   let text = initial ?? "";
@@ -23,13 +23,13 @@ function capture(plugin: OrgFlexPlugin, initial?: string) {
     text = noteCaptureText(readNote(view.file.path, view.getViewData(), plugin.keywords()), plugin.scheme());
     cursor = 0;
   }
-  new CaptureModal(plugin.app, path, text, cursor, states, (choice) => fileCapture(plugin, path, choice)).open();
+  new CaptureModal(plugin.app, path, text, cursor, states, (choice) => fileCapture(plugin, path, choice), day).open();
 }
 
 /** CAP-2, CAP-3, CAP-5: add the entry (CAP-7, CAP-8: with the chosen state and date) to the inbox, creating it when missing; why not, or null when done. */
 async function fileCapture(plugin: OrgFlexPlugin, path: string, choice: CaptureChoice): Promise<string | null> {
   const { app } = plugin;
-  const entry = captureEntry(choice.text, choice.state, choice.scheduled);
+  const entry = captureEntry(choice.text, choice.state, choice.when);
   if (!entry) return "Type something to capture.";
   try {
     let file = app.vault.getAbstractFileByPath(path);
@@ -65,4 +65,5 @@ export const captureFeature: Feature = {
       (params) => capture(plugin, sharedCaptureText({ title: params.title, text: params.text, url: params.url })));
   },
   buttons: { capture: (plugin) => capture(plugin) },
+  captureOn: (plugin, day) => capture(plugin, undefined, day),
 };

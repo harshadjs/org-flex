@@ -3,7 +3,8 @@
 import { ItemView, moment, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { onTap } from "../editor/state";
-import { agendaFiles, AGENDA_DAYS, AGENDA_QUERY, dayOffset, relativeDay } from "../org/agenda";
+import { agendaFiles, AGENDA_DAYS, AGENDA_QUERY, cellTitles, dayOffset, monthGrid, monthStart, relativeDay, weekSpanStart } from "../org/agenda";
+import { FEATURES } from "../features";
 import { agenda, type AgendaDay, type AgendaItem, overdueLabel, parseQuery } from "../org/query";
 import { OrgTask, parseTasks, toggleTaskInText } from "../org/tasks";
 import { FLAVOUR } from "../flavour";
@@ -13,8 +14,21 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 export const AGENDA_VIEW = "org-flex-agenda";
 
+/** AG-6: where this device keeps the Week / Month choice */
+const MODE_KEY = "org-flex-agenda-mode";
+
+type Mode = "week" | "month";
+
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
 export class AgendaView extends ItemView {
   private timer: number | null = null;
+  private tasks: OrgTask[] = [];
+  private mode: Mode = "week";
+  /** AG-5: weeks or months from today's */
+  private offset = 0;
+  /** AG-6: the month view's chosen day */
+  private chosen: Date | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: OrgFlexPlugin) {
     super(leaf);
@@ -44,7 +58,33 @@ export class AgendaView extends ItemView {
       changed(file);
       changed({ path: old });
     }));
+    this.mode = this.loadMode();
     await this.render();
+  }
+
+  /** AG-5: back to today's span, as opening the agenda again does */
+  async showToday() {
+    this.offset = 0;
+    this.chosen = null;
+    await this.render();
+  }
+
+  private loadMode(): Mode {
+    try {
+      const saved = typeof this.app.loadLocalStorage === "function" ? this.app.loadLocalStorage(MODE_KEY) : window.localStorage.getItem(MODE_KEY);
+      return saved === "month" ? "month" : "week";
+    } catch {
+      return "week";
+    }
+  }
+
+  private saveMode() {
+    try {
+      if (typeof this.app.saveLocalStorage === "function") this.app.saveLocalStorage(MODE_KEY, this.mode);
+      else window.localStorage.setItem(MODE_KEY, this.mode);
+    } catch {
+      // the choice just isn't kept
+    }
   }
 
   async onClose() {
@@ -69,32 +109,112 @@ export class AgendaView extends ItemView {
       if (!(file instanceof TFile)) continue;
       for (const task of parseTasks(await vault.cachedRead(file), keywords)) tasks.push({ ...task, path });
     }
-    const ctx = { todoKeywords: FLAVOUR.todoKeywords, doneKeywords: FLAVOUR.doneKeywords, defaultPriority: FLAVOUR.defaultPriority };
-    const days = agenda(parseQuery(AGENDA_QUERY), tasks, new Date(), AGENDA_DAYS, ctx);
+    this.tasks = tasks;
+    this.draw(true);
+  }
+
+  /** AG-2, AG-5, AG-6: the moving buttons, then the week or the month as the tasks read last fall on it */
+  private draw(keepScroll: boolean) {
     const el = this.contentEl;
+    const scroll = el.scrollTop;
     el.empty();
     el.addClass("org-agenda");
-    this.draw(el.createDiv({ cls: "org-agenda-page" }), days, new Date());
+    const page = el.createDiv({ cls: "org-agenda-page" });
+    const now = new Date();
+    const locale = moment.locale();
+    const ctx = { todoKeywords: FLAVOUR.todoKeywords, doneKeywords: FLAVOUR.doneKeywords, defaultPriority: FLAVOUR.defaultPriority };
+    const query = parseQuery(AGENDA_QUERY);
+    this.drawNav(page);
+    if (this.mode === "week") {
+      const start = weekSpanStart(now, this.offset);
+      this.drawWeek(page, agenda(query, this.tasks, now, AGENDA_DAYS, ctx, start), now, locale);
+    } else {
+      const month = monthStart(now, this.offset);
+      const grid = monthGrid(month);
+      this.drawMonth(page, month, grid, agenda(query, this.tasks, now, grid.length, ctx, grid[0]), now, locale);
+    }
+    el.scrollTop = keepScroll ? scroll : 0;
+  }
+
+  /** AG-5, AG-6: ‹ ›, Today while elsewhere, and the Week / Month switch */
+  private drawNav(page: HTMLElement) {
+    const nav = page.createDiv({ cls: "org-agenda-nav" });
+    const step = (label: string, icon: string, by: number) => {
+      const b = nav.createEl("button", { cls: "org-agenda-step clickable-icon", attr: { "aria-label": label } });
+      setIcon(b, icon);
+      b.addEventListener("click", () => this.move(this.offset + by));
+    };
+    const unit = this.mode === "week" ? "week" : "month";
+    step(`Previous ${unit}`, "chevron-left", -1);
+    step(`Next ${unit}`, "chevron-right", 1);
+    if (this.offset !== 0) nav.createEl("button", { cls: "org-agenda-today", text: "Today" }).addEventListener("click", () => this.move(0));
+    const modes = nav.createDiv({ cls: "org-agenda-modes" });
+    for (const [mode, label] of [["week", "Week"], ["month", "Month"]] as const) {
+      const b = modes.createEl("button", { cls: "org-agenda-mode", text: label, attr: { "aria-pressed": String(this.mode === mode) } });
+      b.toggleClass("is-active", this.mode === mode);
+      b.addEventListener("click", () => {
+        if (this.mode === mode) return;
+        this.mode = mode;
+        this.saveMode();
+        this.move(0);
+      });
+    }
+  }
+
+  private move(offset: number) {
+    this.offset = offset;
+    this.chosen = null;
+    this.draw(false);
   }
 
   /** AG-4: a header with the week and its counts, then a section per day, each with its date badge */
-  private draw(page: HTMLElement, days: AgendaDay[], now: Date) {
-    const locale = moment.locale();
+  private drawWeek(page: HTMLElement, days: AgendaDay[], now: Date, locale: string) {
     const dated = days.filter((d) => d.date);
-    const overdue = days.find((d) => !d.date)?.items.length ?? 0;
-    const planned = dated.reduce((n, d) => n + d.items.length, 0);
-    const header = page.createDiv({ cls: "org-agenda-header" });
-    const first = dated[0]?.date ?? now;
-    const last = dated[dated.length - 1]?.date ?? now;
     const fmt = (d: Date) => d.toLocaleDateString(locale, { month: "short", day: "numeric" });
-    header.createDiv({ cls: "org-agenda-range", text: `${fmt(first)} – ${fmt(last)}` });
-    const counts = header.createDiv({ cls: "org-agenda-counts" });
-    counts.createSpan({ text: plural(planned, "item", "items") });
-    if (overdue) counts.createSpan({ cls: "org-agenda-counts-overdue", text: `${overdue} ${overdueLabel(locale).toLowerCase()}` });
+    this.header(page, `${fmt(dated[0]?.date ?? now)} – ${fmt(dated[dated.length - 1]?.date ?? now)}`, dated, days, locale);
     for (const day of days) this.renderDay(page, day, now, locale);
   }
 
-  private renderDay(parent: HTMLElement, day: AgendaDay, now: Date, locale: string) {
+  private header(page: HTMLElement, range: string, dated: AgendaDay[], days: AgendaDay[], locale: string) {
+    const overdue = days.find((d) => !d.date)?.items.length ?? 0;
+    const planned = dated.reduce((n, d) => n + d.items.length, 0);
+    const header = page.createDiv({ cls: "org-agenda-header" });
+    header.createDiv({ cls: "org-agenda-range", text: range });
+    const counts = header.createDiv({ cls: "org-agenda-counts" });
+    counts.createSpan({ text: plural(planned, "item", "items") });
+    if (overdue) counts.createSpan({ cls: "org-agenda-counts-overdue", text: `${overdue} ${overdueLabel(locale).toLowerCase()}` });
+  }
+
+  /** AG-6: the month's grid, the chosen day's items under it, then Overdue when the grid holds today */
+  private drawMonth(page: HTMLElement, month: Date, grid: Date[], days: AgendaDay[], now: Date, locale: string) {
+    const byDay = new Map(days.filter((d) => d.date).map((d) => [d.date!.toDateString(), d]));
+    const inMonth = (d: Date) => d.getMonth() === month.getMonth();
+    const name = month.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    this.header(page, name.charAt(0).toLocaleUpperCase(locale) + name.slice(1), days.filter((d) => d.date && inMonth(d.date)), days, locale);
+    const chosen = this.chosen && inMonth(this.chosen) ? this.chosen : inMonth(now) ? now : month;
+    const el = page.createDiv({ cls: "org-agenda-month" });
+    for (const d of grid.slice(0, 7)) el.createDiv({ cls: "org-agenda-wd", text: d.toLocaleDateString(locale, { weekday: "short" }) });
+    for (const date of grid) {
+      const cell = el.createDiv({ cls: "org-agenda-cell" });
+      cell.toggleClass("is-outside", !inMonth(date));
+      cell.toggleClass("is-today", sameDay(date, now));
+      cell.toggleClass("is-chosen", sameDay(date, chosen));
+      cell.createDiv({ cls: "org-agenda-cell-num", text: String(date.getDate()) });
+      const items = byDay.get(date.toDateString())?.items ?? [];
+      const { shown, more } = cellTitles(items.map((i) => linkText(i.task.title)));
+      for (const t of shown) cell.createDiv({ cls: "org-agenda-cell-title", text: t });
+      if (more) cell.createDiv({ cls: "org-agenda-cell-more", text: `+${more}` });
+      onTap(cell, () => {
+        this.chosen = date;
+        this.draw(true);
+      });
+    }
+    this.renderDay(page, byDay.get(chosen.toDateString()) ?? { date: chosen, items: [] }, now, locale, "Add");
+    const overdue = days.find((d) => !d.date);
+    if (overdue) this.renderDay(page, overdue, now, locale);
+  }
+
+  private renderDay(parent: HTMLElement, day: AgendaDay, now: Date, locale: string, addLabel?: string) {
     const offset = day.date ? dayOffset(day.date, now) : null;
     const row = parent.createDiv({ cls: "org-agenda-day" });
     if (!day.date) row.addClass("is-overdue");
@@ -118,6 +238,15 @@ export class AgendaView extends ItemView {
       head.createSpan({ cls: "org-agenda-day-name", text: overdueLabel(locale) });
     }
     if (day.items.length) head.createSpan({ cls: "org-agenda-count", text: String(day.items.length) });
+    // AG-7: plan on this day
+    const captureOn = FEATURES.find((f) => f.captureOn)?.captureOn;
+    if (day.date && captureOn) {
+      const date = day.date;
+      const add = head.createEl("button", { cls: "org-agenda-add clickable-icon", attr: { "aria-label": `Plan on ${date.toLocaleDateString(locale, { month: "long", day: "numeric" })}` } });
+      setIcon(add.createSpan({ cls: "org-agenda-add-icon" }), "plus");
+      if (addLabel) add.createSpan({ text: addLabel });
+      onTap(add, () => captureOn(this.plugin, date));
+    }
     else body.createDiv({ cls: "org-agenda-nothing", text: "Nothing planned" });
     for (const item of day.items) this.renderItem(body, item, day.date === null, now, locale);
   }

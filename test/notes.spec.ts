@@ -9,7 +9,7 @@ import {
   calendarMonth, journalDateString, journalEntries, journalEntryLabel, journalFileContent, DEFAULT_JOURNAL_TEMPLATE, journalPathForDate,
 } from "../src/org/journal";
 import { readNote } from "../src/org/vault-index";
-import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, sharedCaptureText } from "../src/org/capture";
+import { addDays, appendEntry, captureEntry, capturePath, captureStates, dateFieldValue, noteCaptureText, parseDateField, parseTimeField, sharedCaptureText } from "../src/org/capture";
 import { freeNotePath, noteFileName, notePath, noteFileContent, titleProblem } from "../src/org/new-note";
 import { BAR_GROUPS, barLayout, BUTTONS, CORE_BUTTONS, mergeSettings, DEFAULT_SETTINGS, startView, TOP_BUTTONS } from "../src/settings";
 
@@ -192,16 +192,27 @@ describe("capture", () => {
     expect(capturePath("")).toBe("inbox.org");
   });
 
+  const sched = { kind: "scheduled" as const, date: day, time: null };
+
   test("captureEntry makes a TODO scheduled today, later lines as its body", () => {
-    expect(captureEntry("  Buy milk ", "TODO", day)).toBe("* TODO Buy milk\nSCHEDULED: <2026-10-23 Fri>\n");
-    expect(captureEntry("\nCall Sam\r\n- about the trip\n  ask dates\n\n", "NEXT", day))
+    expect(captureEntry("  Buy milk ", "TODO", sched)).toBe("* TODO Buy milk\nSCHEDULED: <2026-10-23 Fri>\n");
+    expect(captureEntry("\nCall Sam\r\n- about the trip\n  ask dates\n\n", "NEXT", sched))
       .toBe("* NEXT Call Sam\nSCHEDULED: <2026-10-23 Fri>\n- about the trip\n  ask dates\n");
-    expect(captureEntry(" \n\t\n", "TODO", day)).toBeNull();
+    expect(captureEntry(" \n\t\n", "TODO", sched)).toBeNull();
   });
 
   test("captureEntry leaves out the keyword or the schedule when none is chosen", () => {
-    expect(captureEntry("Read book", "", day)).toBe("* Read book\nSCHEDULED: <2026-10-23 Fri>\n");
+    expect(captureEntry("Read book", "", sched)).toBe("* Read book\nSCHEDULED: <2026-10-23 Fri>\n");
     expect(captureEntry("Read book\nch. 3", "DONE", null)).toBe("* DONE Read book\nch. 3\n");
+  });
+
+  test("captureEntry writes a deadline or a timestamp, with a time when one is chosen", () => {
+    expect(captureEntry("File taxes", "TODO", { kind: "deadline", date: day, time: null })).toBe("* TODO File taxes\nDEADLINE: <2026-10-23 Fri>\n");
+    expect(captureEntry("Dentist\nbring card", "TODO", { kind: "timestamp", date: day, time: "10:00" })).toBe("* TODO Dentist\n<2026-10-23 Fri 10:00>\nbring card\n");
+    expect(captureEntry("Call", "TODO", { kind: "scheduled", date: day, time: "09:30" })).toBe("* TODO Call\nSCHEDULED: <2026-10-23 Fri 09:30>\n");
+    expect(parseTimeField("09:30")).toBe("09:30");
+    expect(parseTimeField("")).toBeNull();
+    expect(parseTimeField("25:00")).toBeNull();
   });
 
   test("noteCaptureText links back to the note by its file ID, else by file name", () => {
