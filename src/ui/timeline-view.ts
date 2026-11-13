@@ -304,7 +304,8 @@ export class TimelineView extends ItemView {
       const head = add.createDiv({ cls: "org-timeline-head" });
       setIcon(head.createSpan({ cls: "org-timeline-icon" }), "calendar-plus");
       head.createDiv({ cls: "org-timeline-text" }).createDiv({ cls: "org-timeline-title", text: "Add journal" });
-      onTap(head, () => void openDay(this.plugin, day.date));
+      // in this tab, so going back returns to the timeline
+      onTap(head, () => void openDay(this.plugin, day.date, this.leaf));
     }
   }
 

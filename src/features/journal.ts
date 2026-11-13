@@ -1,14 +1,14 @@
 // The journal (§10): today's file, a list of days and a calendar.
 
-import { Notice, TFile } from "obsidian";
+import { Notice, TFile, WorkspaceLeaf } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { FLAVOUR } from "../flavour";
 import { denoteJournalContent, journalDateString, journalEntries, journalFileContent, journalPathForDate } from "../org/journal";
 import { JournalCalendarModal, JournalPickerModal } from "../ui/modals";
 import type { Feature } from "./feature";
 
-/** JRN-2: open (creating if needed) the journal file for `date` in the current tab. */
-async function openJournal(plugin: OrgFlexPlugin, date: Date) {
+/** JRN-2: open (creating if needed) the journal file for `date` in the current tab, or in `leaf` (TL-8). */
+async function openJournal(plugin: OrgFlexPlugin, date: Date, leaf?: WorkspaceLeaf) {
   const { app } = plugin;
   try {
     const folder = plugin.settings.journalFolder;
@@ -27,7 +27,7 @@ async function openJournal(plugin: OrgFlexPlugin, date: Date) {
       }
     }
     if (!(file instanceof TFile)) throw new Error(`${day} is not a file`);
-    await app.workspace.getLeaf(false).openFile(file);
+    await (leaf ?? app.workspace.getLeaf(false)).openFile(file);
   } catch (e) {
     new Notice(`Couldn't open the journal: ${(e as Error).message}`);
   }
