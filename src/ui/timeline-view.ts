@@ -1,4 +1,4 @@
-// TL-1..7: the timeline tab, every node in the index newest first, with the
+// TL-1..10: the timeline tab, every node in the index newest first, with the
 // attachments each one links to.
 
 import { ItemView, moment, setIcon, TFile, WorkspaceLeaf } from "obsidian";
@@ -9,6 +9,7 @@ import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../org/syn
 import { FEATURES } from "../features";
 import { chosenDay, monthStart } from "../org/agenda";
 import { drawModes, drawMonthGrid, drawStepper, monthName } from "./month-grid";
+import { NodeFinderModal } from "./modals";
 import { ALL_KINDS, buildTimeline, needsJournal, cleanFilter, filterTimeline, type Timeline, type TimelineDay, type TimelineEntry, type TimelineFilter, type TimelineKind, timelineTags, untilEnd } from "../org/timeline";
 
 export const TIMELINE_VIEW = "org-flex-timeline";
@@ -184,6 +185,7 @@ export class TimelineView extends ItemView {
     toggle("Headings", KIND_ICON.heading, () => this.filter.kinds.includes("heading"), kind("heading"));
     toggle("With attachments", "paperclip", () => this.filter.attachments, () => (this.filter = { ...this.filter, attachments: !this.filter.attachments }));
     this.untilChip(chips);
+    this.linksChip(chips);
     this.countEl = chips.createDiv({ cls: "org-timeline-shown" });
     this.tagsEl = bar.createDiv({ cls: "org-timeline-tag-strip" });
     this.listEl = page.createDiv({ cls: "org-timeline-list" });
@@ -243,6 +245,37 @@ export class TimelineView extends ItemView {
       }
     });
     clear.addEventListener("click", () => set(""));
+    show();
+  }
+
+  /** TL-10: "Links to" or "Links to <title>", choosing the node from a list, and an × once one is chosen */
+  private linksChip(parent: HTMLElement) {
+    const chip = parent.createEl("button", { cls: "org-timeline-toggle org-timeline-until org-timeline-links" });
+    setIcon(chip.createSpan({ cls: "org-timeline-toggle-icon" }), "link");
+    const label = chip.createSpan({ cls: "org-timeline-links-name" });
+    const clear = chip.createSpan({ cls: "org-timeline-until-clear", attr: { role: "button", "aria-label": "Any links" } });
+    setIcon(clear, "x");
+    const show = () => {
+      const id = this.filter.linksTo;
+      const title = id && (this.plugin.index.titles("id").find((n) => n.id === id)?.label ?? id);
+      label.setText(title ? `Links to ${title}` : "Links to");
+      chip.setAttribute("title", title ? `Links to ${title}` : "Show entries linking to a node");
+      chip.toggleClass("is-active", !!title);
+      clear.toggleClass("is-hidden", !title);
+    };
+    const set = (linksTo: string) => {
+      this.filter = { ...this.filter, linksTo };
+      show();
+      this.save();
+      this.draw();
+      this.contentEl.scrollTop = 0;
+    };
+    chip.addEventListener("click", (e) => {
+      if (clear.contains(e.target as Node)) return set("");
+      new NodeFinderModal(this.app, this.plugin.index.titles("id"), (choice) => {
+        if (choice.kind === "node") set(choice.node.id);
+      }, { placeholder: "Show entries linking to…", purpose: "to filter" }).open();
+    });
     show();
   }
 

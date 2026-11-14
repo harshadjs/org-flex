@@ -447,16 +447,17 @@ export class RecorderModal extends Modal {
   }
 }
 
-/** FIND-1..3: every note and heading with an ID, by title; the last entry can create the note. */
+/** FIND-1..3: every note and heading with an ID, by title; the last entry can create the note. TL-10 picks a node with it, without creating. */
 export class NodeFinderModal extends SuggestModal<NodeChoice> {
-  constructor(app: App, private nodes: TitleCompletion[], private onChoose: (choice: NodeChoice) => void) {
+  constructor(app: App, private nodes: TitleCompletion[], private onChoose: (choice: NodeChoice) => void, private pick?: { placeholder: string; purpose: string }) {
     super(app);
-    this.setPlaceholder("Find or create a node");
-    this.setInstructions([{ command: "↵", purpose: "to open" }]);
+    this.setPlaceholder(pick?.placeholder ?? "Find or create a node");
+    this.setInstructions([{ command: "↵", purpose: pick?.purpose ?? "to open" }]);
   }
   getSuggestions(query: string): NodeChoice[] {
     const match = prepareFuzzySearch(query.trim());
-    return findNodes(this.nodes, query, (label) => match(label)?.score ?? null);
+    const found = findNodes(this.nodes, query, (label) => match(label)?.score ?? null);
+    return this.pick ? found.filter((c) => c.kind === "node") : found;
   }
   renderSuggestion(choice: NodeChoice, el: HTMLElement) {
     el.addClass("org-node-choice");
