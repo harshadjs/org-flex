@@ -40,6 +40,8 @@ export interface TimelineEntry {
   inherited: string[];
   /** TL-3: vault paths of the media files first linked from here */
   attachments: string[];
+  /** TL-10: the IDs it links to with `[[id:…]]`, as org-roam takes a link's source (TL-3) */
+  links: string[];
 }
 
 export interface TimelineDay {
@@ -98,14 +100,14 @@ function spans(note: NoteRecord, time: (id: string) => Date, journal: string | u
     seen.add(id);
     let entry: TimelineEntry;
     if (heading === undefined) {
-      entry = { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: journal ? onDay(time(id), journal) : time(id), tags: filetags, inherited: [], attachments: [] };
+      entry = { id, kind: journal ? "journal" : "note", path: note.path, line: 0, title: note.title, time: journal ? onDay(time(id), journal) : time(id), tags: filetags, inherited: [], attachments: [], links: [] };
       result.push({ entry, from: 0, to: lines.length, level: 0 });
       continue;
     }
     const line = lineAt(offset);
     const tags = [...new Set(tagsOf(line))];
     const inherited = [...new Set(above(line))].filter((t) => !tags.includes(t));
-    entry = { id, kind: "heading", path: note.path, line, title: heading, note: note.title, time: time(id), tags, inherited, attachments: [] };
+    entry = { id, kind: "heading", path: note.path, line, title: heading, note: note.title, time: time(id), tags, inherited, attachments: [], links: [] };
     const level = levelOf(line);
     const next = headingLines.find((n) => n > line && levelOf(n) <= level);
     result.push({ entry, from: line, to: next ?? lines.length, level });
@@ -149,6 +151,10 @@ export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], crea
       taken.add(s.entry.id);
       entries.push(s.entry);
     }
+    for (const link of note.links) {
+      const source = sourceOf(nodes, link.line);
+      if (source && !source.links.includes(link.target)) source.links.push(link.target);
+    }
     for (const link of note.fileLinks) {
       if (!isMediaFile(link.target)) continue;
       const source = sourceOf(nodes, link.line);
@@ -182,11 +188,13 @@ export interface TimelineFilter {
   tags: string[];
   /** TL-7: only entries on or before this day, `YYYY-MM-DD`; "" for any */
   until: string;
+  /** TL-10: only entries linking to this ID; "" for any */
+  linksTo: string;
 }
 
 export const ALL_KINDS: TimelineKind[] = ["journal", "note", "heading"];
 
-export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "", tags: [], until: "" };
+export const NO_FILTER: TimelineFilter = { kinds: ALL_KINDS, attachments: false, text: "", tags: [], until: "", linksTo: "" };
 
 /** TL-5: the filter as saved, with anything missing or unknown set back to showing everything. */
 export function cleanFilter(saved: unknown): TimelineFilter {
@@ -194,7 +202,8 @@ export function cleanFilter(saved: unknown): TimelineFilter {
   const kinds = Array.isArray(s.kinds) ? ALL_KINDS.filter((k) => s.kinds!.includes(k)) : ALL_KINDS;
   const tags = Array.isArray(s.tags) ? [...new Set(s.tags.filter((t): t is string => typeof t === "string" && t !== ""))] : [];
   const until = typeof s.until === "string" && untilEnd(s.until) ? s.until : "";
-  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "", tags, until };
+  const linksTo = typeof s.linksTo === "string" ? s.linksTo.trim() : "";
+  return { kinds, attachments: s.attachments === true, text: typeof s.text === "string" ? s.text : "", tags, until, linksTo };
 }
 
 /** TL-7: the moment after the `until` day ends, local time; null if it isn't a real `YYYY-MM-DD` day */
@@ -217,12 +226,13 @@ export function filterTimeline(timeline: Timeline, filter: TimelineFilter): Time
     const entries = day.entries.filter((e) =>
       filter.kinds.includes(e.kind)
       && (!end || e.time < end)
+      && (!filter.linksTo || e.links.includes(filter.linksTo))
       && (!filter.attachments || e.attachments.length > 0)
       && filter.tags.every((t) => e.tags.includes(t) || e.inherited.includes(t))
       && matches([e.title, e.note ?? "", ...e.tags, ...e.inherited, ...e.attachments.map(base)].join("\n").toLowerCase()));
     if (entries.length) days.push({ date: day.date, entries });
   }
-  const unlinked = filter.attachments || filter.tags.length || end || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
+  const unlinked = filter.attachments || filter.tags.length || end || filter.linksTo || filter.kinds.length < ALL_KINDS.length ? [] : timeline.unlinked.filter((p) => matches(base(p)));
   return { days, unlinked };
 }
 

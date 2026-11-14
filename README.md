@@ -62,7 +62,7 @@ This is the starting point every fork inherits, with plain `TODO | DONE` keyword
 - **Drag to reorder** list items by their grip, sideways to indent, children included.
 - **TODO keywords**, with scheduled and deadline dates from a date picker.
 - **Agenda:** a tab with overdue tasks and the coming week from your top-level org files, including repeating dates such as birthdays (`<… +1y>`); move week by week, or switch to a month calendar, and plan on any day with a + that opens Capture dated there.
-- **Timeline:** a tab with every note, heading and journal day with an ID, newest first by when its ID was made, and the images and recordings each one links to; or as a month calendar, where any day, ahead too, can be given its journal.
+- **Timeline:** a tab with every note, heading and journal day with an ID, newest first by when its ID was made, and the images and recordings each one links to. Narrow it to what links to a person or note; or see it as a month calendar, where any day, ahead too, can be given its journal.
 - **Repeating tasks** move on when marked done, as in Emacs, and `CLOSED:` can be logged.
 - **Task lists in Markdown notes:** an ` ```orgmode-tasks ` block lists an org file's tasks, filtered and sorted with Orgzly's search language, or as an agenda.
 

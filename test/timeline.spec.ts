@@ -103,7 +103,9 @@ describe("timeline filters", () => {
 
   test("a saved filter is cleaned: unknown kinds dropped, anything missing shows everything", () => {
     expect(cleanFilter(null)).toEqual(NO_FILTER);
-    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "", tags: [], until: "" });
+    expect(cleanFilter({ kinds: ["heading", "bogus"], attachments: "yes", text: 3 })).toEqual({ kinds: ["heading"], attachments: false, text: "", tags: [], until: "", linksTo: "" });
+    expect(cleanFilter({ linksTo: " 20261029T120000 " }).linksTo).toBe("20261029T120000");
+    expect(cleanFilter({ linksTo: 7 }).linksTo).toBe("");
     expect(cleanFilter({ tags: ["book", 4, "", "book", "recipe"] }).tags).toEqual(["book", "recipe"]);
     expect(cleanFilter({ until: "2026-10-28" }).until).toBe("2026-10-28");
     expect(cleanFilter({ until: "2026-02-30" }).until).toBe("");
@@ -160,5 +162,20 @@ describe("timeline filters", () => {
     expect(until("2026-10-26").days).toEqual([]);
     expect(until("").days.length).toBe(3);
     expect(until("").unlinked).toEqual(["attachments/x.png"]);
+  });
+
+  test("links to a node: entries whose own subtree links to its ID, as org-roam takes a link's source", () => {
+    const notes = [
+      readNote("notes/avyaan.org", ":PROPERTIES:\n:ID: 20250101T000000\n:END:\n#+title: Avyaan\n"),
+      readNote("journal/2026-10-28.org", ":PROPERTIES:\n:ID: 20261028T080000\n:END:\n#+title: 2026-10-28\n* Swim\nWith [[id:20250101T000000][Avyaan]].\n* Park\n:PROPERTIES:\n:ID: 20261028T170000\n:END:\nAvyaan on the slide: [[id:20250101T000000::*Games]]\n** Later\nNothing here.\n"),
+      readNote("notes/mira.org", ":PROPERTIES:\n:ID: 20261027T080000\n:END:\n#+title: Mira\n* Friends\n:PROPERTIES:\n:ID: 20261027T090000\n:END:\n[[id:20250101T000000]]\n"),
+      readNote("notes/other.org", ":PROPERTIES:\n:ID: 20261026T080000\n:END:\n#+title: Other\n[[id:20261027T080000][Mira]] and [[avyaan]]\n"),
+    ];
+    const tl = buildTimeline(notes, ["attachments/x.png"], created, new Map([["journal/2026-10-28.org", "2026-10-28"]]));
+    const linking = filterTimeline(tl, { ...NO_FILTER, linksTo: "20250101T000000" });
+    expect(linking.days.flatMap((d) => d.entries.map((e) => e.title))).toEqual(["Park", "2026-10-28", "Friends"]);
+    expect(linking.unlinked).toEqual([]);
+    expect(filterTimeline(tl, { ...NO_FILTER, linksTo: "20261027T080000" }).days.flatMap((d) => d.entries.map((e) => e.title))).toEqual(["Other"]);
+    expect(filterTimeline(tl, { ...NO_FILTER, linksTo: "gone" }).days).toEqual([]);
   });
 });
