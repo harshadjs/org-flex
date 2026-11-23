@@ -8,7 +8,7 @@
 import type { VisibilityLevel } from "./org/folding";
 import { DEFAULT_JOURNAL_TEMPLATE } from "./org/journal";
 import { timestampId } from "./org/denote";
-import { tsId } from "./org/ids";
+import { uuidId } from "./org/ids";
 import { countedMediaName, type MediaKind } from "./org/edit";
 import type { LinkScheme } from "./org/vault-index";
 
@@ -41,6 +41,8 @@ export interface Flavour {
   mediaName(kind: MediaKind, date: Date, ext: string, taken: ReadonlySet<string>): string;
   /** ACT-15: a task marked done gets `CLOSED: [time]`, as Emacs's `org-log-done 'time` */
   logDone: boolean;
+  /** ATT-7: org-attach's `org-attach-id-dir`, a vault path: where each node's attachment folder is */
+  attachDir: string;
   /** GRID-8: folders (besides the journal's) whose notes show only when their chip is chosen */
   gridHiddenFolders: string[];
 }
@@ -54,11 +56,12 @@ export const FLAVOUR: Flavour = {
   foldPropertyDrawers: true,
   defaultFoldLevel: "foldall",
   journalTemplate: DEFAULT_JOURNAL_TEMPLATE,
-  orgId: tsId,
+  orgId: uuidId,
   links: "id",
   denoteId: timestampId,
   journalId: timestampId,
   mediaName: countedMediaName,
   logDone: true,
   gridHiddenFolders: ["topics", "ai"],
+  attachDir: "attachments",
 };

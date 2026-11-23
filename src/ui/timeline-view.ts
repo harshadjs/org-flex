@@ -434,7 +434,7 @@ export class TimelineView extends ItemView {
     if (entry.note) meta.createSpan({ cls: "org-timeline-note", text: entry.note });
     if (!meta.childElementCount) meta.remove();
     onTap(head, () => void this.plugin.openAt(this.app.workspace.getLeaf(false), entry.path, { line: entry.line, top: true }),
-      // ACT-16: holding an entry sets its ID's time; the timeline redraws with the index
+      // ACT-16: holding an entry sets its created time; the timeline redraws with the index
       () => this.plugin.pickIdTime(entry.id, entry.kind === "journal" ? `the journal for ${entry.title}` : `“${entry.title}”`));
     if (entry.tags.length || entry.inherited.length) {
       // TL-6: its own tags, then the inherited ones fainter; a tap filters by it

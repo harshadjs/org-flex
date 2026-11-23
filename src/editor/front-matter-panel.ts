@@ -130,7 +130,7 @@ class PanelWidget extends WidgetType {
         value.textContent = "Empty";
       }
       el.addEventListener("click", editLine(row.line));
-      // ACT-16: holding the ID row sets the ID's time
+      // ACT-16: holding the ID row sets the node's created time
       if (row.key.toLowerCase() === "id" && host?.pickIdTime) onLongPress(el, () => host.pickIdTime!(view.state.doc.line(row.line + 1).from));
     }
     return root;

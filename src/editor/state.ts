@@ -47,6 +47,8 @@ export interface OrgHost {
   openLink(target: string, view: EditorView): void;
   /** a URL for an image or audio link target, or null to use the target as is */
   imageSrc(target: string): string | null;
+  /** ATT-7: an `attachment:` link at `pos` as a `file:` link to the file in its node's folder; the target as is when it isn't one or nothing owns it */
+  resolveTarget?(target: string, pos: number): string;
   /** DEN-8: the vault path of the file a `denote:` link names, so it can show inline; null when none */
   mediaPath?(target: string): string | null;
   /** after `[[`: notes and headings by title, then files without an ID */

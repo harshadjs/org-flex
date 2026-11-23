@@ -134,11 +134,13 @@ function inlineDecorations(
     const to = base + node.to;
     const raw = selectionTouches(state, from, to);
     if (node.type === "link") {
+      // ATT-7: an attachment: link stands for the file in its node's folder
+      const target = /^attachment:/i.test(node.target) ? host?.resolveTarget?.(node.target, from) ?? node.target : node.target;
       if (node.style !== "regular") {
         // bare URLs never hide, but open only while the cursor is elsewhere
         out.push(raw
           ? mark("org-link").range(from, to)
-          : Decoration.mark({ class: "org-link", attributes: { "data-org-link": node.target } }).range(from, to));
+          : Decoration.mark({ class: "org-link", attributes: { "data-org-link": target } }).range(from, to));
         continue;
       }
       if (raw) {
@@ -146,20 +148,20 @@ function inlineDecorations(
         continue;
       }
       // DEN-8: a denote: link shows inline when the file it names is an image or audio
-      const media = /^denote:/i.test(node.target) ? host?.mediaPath?.(node.target) ?? "" : node.target;
+      const media = /^denote:/i.test(target) ? host?.mediaPath?.(target) ?? "" : target;
       if (isImageTarget(media) && node.description === null) {
-        const target = node.target.replace(/^file:/, "");
-        const src = host?.imageSrc(target) ?? target;
-        out.push(Decoration.replace({ widget: new ImageWidget(src, node.target) }).range(from, to));
+        const path = target.replace(/^file:/, "");
+        const src = host?.imageSrc(path) ?? path;
+        out.push(Decoration.replace({ widget: new ImageWidget(src, target) }).range(from, to));
         continue;
       }
       if (isAudioTarget(media) && node.description === null) {
-        const src = host?.imageSrc(node.target) ?? node.target.replace(/^file:/, "");
-        out.push(Decoration.replace({ widget: new AudioWidget(src, node.target) }).range(from, to));
+        const src = host?.imageSrc(target) ?? target.replace(/^file:/, "");
+        out.push(Decoration.replace({ widget: new AudioWidget(src, target) }).range(from, to));
         continue;
       }
       out.push(hidden.range(from, base + node.descFrom));
-      out.push(Decoration.mark({ class: "org-link", attributes: { "data-org-link": node.target } })
+      out.push(Decoration.mark({ class: "org-link", attributes: { "data-org-link": target } })
         .range(base + node.descFrom, base + node.descTo));
       out.push(hidden.range(base + node.descTo, to));
       continue;

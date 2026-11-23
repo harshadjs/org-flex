@@ -195,6 +195,18 @@ describe("IDs", () => {
     expect(text(apply(s, assignId(s, ID)))).toBe(`* a\n** b\n:PROPERTIES:\n:ID:       ${ID}\n:END:`);
   });
 
+  test("assignId writes CREATED under the ID when given, unless the drawer has one", () => {
+    const C = "[2026-11-22 Sun 14:05]";
+    let s = at("* H|\ntext");
+    expect(text(apply(s, assignId(s, ID, undefined, "ID", C)))).toBe(`* H\n:PROPERTIES:\n:ID:       ${ID}\n:CREATED:  ${C}\n:END:\ntext`);
+    s = at("* H\n  :PROPERTIES:\n  :CUSTOM: x\n  :END:\nbody|");
+    expect(text(apply(s, assignId(s, ID, undefined, "ID", C)))).toBe(`* H\n  :PROPERTIES:\n  :ID:       ${ID}\n  :CREATED:  ${C}\n  :CUSTOM: x\n  :END:\nbody`);
+    s = at("* H|\n:PROPERTIES:\n:CREATED:  [2001-01-01 Mon 00:00]\n:END:");
+    expect(text(apply(s, assignId(s, ID, undefined, "ID", C)))).toBe(`* H\n:PROPERTIES:\n:ID:       ${ID}\n:CREATED:  [2001-01-01 Mon 00:00]\n:END:`);
+    s = at("intro|\n* H");
+    expect(text(apply(s, assignId(s, ID, undefined, "ID", C)))).toBe(`:PROPERTIES:\n:ID:       ${ID}\n:CREATED:  ${C}\n:END:\nintro\n* H`);
+  });
+
   test("assignId adds to an existing drawer, fills an empty ID, and keeps an existing one", () => {
     let s = at("* H\n  :PROPERTIES:\n  :CUSTOM: x\n  :END:\nbody|");
     s = apply(s, assignId(s, ID));

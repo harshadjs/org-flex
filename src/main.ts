@@ -1,6 +1,5 @@
 // Org Flex: Org mode files in Obsidian, on the desktop and the phone.
 
-import { Transaction } from "@codemirror/state";
 import { FileView, Hotkey, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { ButtonDef, CORE_BUTTONS, mergeSettings, OrgFlexSettings, startView } from "./settings";
 import { Keywords, classifyLink, resolveRelative } from "./org/syntax";
@@ -11,8 +10,9 @@ import { OrgFlexView, VIEW_TYPE } from "./view";
 import { FLAVOUR } from "./flavour";
 import type { TaskLog } from "./org/repeat";
 import { orgConflictMessage } from "./conflicts";
-import { datedId, idChanges, rewriteId } from "./org/redate";
-import { idTime } from "./org/timeline";
+import { createdChange, setCreated } from "./org/redate";
+import { nodeTime } from "./org/timeline";
+import { createdStamp } from "./org/ids";
 import { IdTimeModal } from "./ui/modals";
 import { buttonFeature, FEATURES } from "./features";
 import { OrgFlexSettingTab } from "./ui/settings-tab";
@@ -34,6 +34,7 @@ export default class OrgFlexPlugin extends Plugin {
         return this.app.vault.cachedRead(file);
       },
       keywords: () => this.keywords(),
+      attachDir: () => FLAVOUR.attachDir,
     });
 
     this.registerView(VIEW_TYPE, (leaf) => new OrgFlexView(leaf, this));
@@ -164,75 +165,53 @@ export default class OrgFlexPlugin extends Plugin {
     return id;
   }
 
-  /** ACT-16: a `ts` style ID at `date`, never one the vault has or one already given out. */
-  datedOrgId(date: Date): string {
-    const taken = new Set([...this.index.ids().map((i) => i.id), ...this.givenIds]);
-    const id = datedId(date, taken);
-    this.givenIds.add(id);
-    return id;
-  }
-
-  /** ACT-16: how many links to `id` the vault's org files hold, and in how many files */
-  idLinks(id: string): { links: number; files: number } {
-    let links = 0;
-    let files = 0;
+  /** ACT-16: the `:CREATED:` the index has for the node `id` */
+  createdOf(id: string): string | undefined {
     for (const note of this.index.notes.values()) {
-      const n = idChanges(note.text, id, id).links;
-      links += n;
-      if (n) files++;
+      const hit = note.ids.find((i) => i.id === id);
+      if (hit) return hit.created;
     }
-    return { links, files };
+    return undefined;
   }
 
   /**
-   * ACT-16: ask for a moment, then re-date the node `old`: its `:ID:` and every
-   * link to it become a `ts` style ID at that moment. `title` names the node in
-   * the dialog's heading.
+   * ACT-16: ask for a moment, then set the `:CREATED:` of the node `id` to it.
+   * `title` names the node in the dialog's heading; `created` is its current
+   * `:CREATED:`, the index's when not given.
    */
-  pickIdTime(old: string, title: string) {
-    const { links, files } = this.idLinks(old);
-    const detail = links
-      ? `${links} ${links === 1 ? "link" : "links"} in ${files} ${files === 1 ? "note" : "notes"} will follow.`
-      : "Nothing links to it yet.";
-    new IdTimeModal(this.app, `Set the time of ${title}`, idTime(old) ?? new Date(), detail, (date) => void this.redateId(old, date)).open();
+  pickIdTime(id: string, title: string, created = this.createdOf(id)) {
+    const start = nodeTime(created, id) ?? new Date();
+    new IdTimeModal(this.app, `Set the time of ${title}`, start, "Its :CREATED: changes; the ID and links stay.", (date) => void this.redateId(id, date)).open();
   }
 
   /**
-   * ACT-16: re-date the node `old` to `date` everywhere: an open org view edits
-   * its text (outside undo), every other org file naming it is rewritten on disk.
+   * ACT-16: set the `:CREATED:` of the node `id` to `date`: in an open org view
+   * as an edit, else in the file on disk.
    */
-  async redateId(old: string, date: Date): Promise<string> {
-    const next = this.datedOrgId(date);
-    const open = new Map<string, OrgFlexView>();
+  async redateId(id: string, date: Date): Promise<boolean> {
+    const stamp = createdStamp(date);
+    let done = false;
     this.forEachView((v) => {
-      if (v.file && v.editor) open.set(v.file.path, v);
+      if (done || !v.file || !v.editor) return;
+      const change = createdChange(v.editor.state.doc.toString(), id, stamp);
+      if (change) {
+        v.editor.dispatch({ changes: change, userEvent: "input" });
+        done = true;
+      }
     });
-    const paths = new Set([...this.index.notes.values()].filter((n) => n.text.includes(old)).map((n) => n.path));
-    for (const path of open.keys()) if (open.get(path)!.editor!.state.doc.toString().includes(old)) paths.add(path);
-    let links = 0;
-    let files = 0;
-    for (const path of paths) {
-      const view = open.get(path);
-      let n = 0;
-      if (view?.editor) {
-        const found = idChanges(view.editor.state.doc.toString(), old, next);
-        // not undoable: undoing one note would leave the others' links pointing nowhere
-        if (found.changes.length) view.editor.dispatch({ changes: found.changes, annotations: Transaction.addToHistory.of(false) });
-        n = found.links;
-      } else {
-        const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile)) continue;
+    if (!done) {
+      const hit = this.index.findId(id);
+      const file = hit ? this.app.vault.getAbstractFileByPath(hit.path) : null;
+      if (file instanceof TFile) {
         await this.app.vault.process(file, (text) => {
-          const out = rewriteId(text, old, next);
-          n = out?.links ?? 0;
-          return out?.text ?? text;
+          const out = setCreated(text, id, stamp);
+          if (out !== null) done = true;
+          return out ?? text;
         });
       }
-      links += n;
-      if (n) files++;
     }
-    new Notice(links ? `ID is now ${next}; ${links} ${links === 1 ? "link" : "links"} in ${files} ${files === 1 ? "note" : "notes"} updated.` : `ID is now ${next}.`);
-    return next;
+    new Notice(done ? `Created: ${stamp}` : `Couldn't find the node ${id}.`);
+    return done;
   }
 
   /** DEN-5, DEN-6: a new Denote identifier, never one a file has or one already given out. */
@@ -299,7 +278,7 @@ export default class OrgFlexPlugin extends Plugin {
     inView("org-zoom", "Zoom into heading / zoom out", (v) => v.toggleZoom());
     inView("org-toggle-reading", "Toggle reading mode", (v) => v.toggleReading());
     inView("org-assign-id", "Assign ID to heading (:ID:)", (v) => v.command("heading-id"));
-    inView("org-set-id-time", "Set ID time…", (v) => v.pickIdTime());
+    inView("org-set-id-time", "Set created time…", (v) => v.pickIdTime());
   }
 
   // -------------------------------------------------------------------------
@@ -391,7 +370,7 @@ export default class OrgFlexPlugin extends Plugin {
     if (hit) return hit;
     for (const file of this.app.vault.getFiles()) {
       if (file.extension !== "org") continue;
-      const note = readNote(file.path, await this.app.vault.cachedRead(file));
+      const note = readNote(file.path, await this.app.vault.cachedRead(file), this.keywords(), FLAVOUR.attachDir);
       const found = note.ids.find((i) => i.id === id);
       if (found) return { path: file.path, offset: found.offset };
     }
@@ -433,7 +412,7 @@ export default class OrgFlexPlugin extends Plugin {
       return { path: notePath(folder, title, id), content: denoteFrontMatter(title, now, [], id), target: `denote:${id}` };
     }
     const id = this.newOrgId();
-    return { path: notePath(folder, title), content: noteFileContent(title, id), target: `id:${id}` };
+    return { path: notePath(folder, title), content: noteFileContent(title, id, createdStamp(new Date())), target: `id:${id}` };
   }
 
   /** LP-10, FIND-3: a note at the vault root; the link target now, the file once written (null if it failed). */

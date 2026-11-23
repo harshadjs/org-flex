@@ -3,6 +3,7 @@
 import { Notice, TFile, WorkspaceLeaf } from "obsidian";
 import type OrgFlexPlugin from "../main";
 import { FLAVOUR } from "../flavour";
+import { createdStamp } from "../org/ids";
 import { denoteJournalContent, journalDateString, journalEntries, journalFileContent, journalPathForDate } from "../org/journal";
 import { JournalCalendarModal, JournalPickerModal } from "../ui/modals";
 import type { Feature } from "./feature";
@@ -23,7 +24,7 @@ async function openJournal(plugin: OrgFlexPlugin, date: Date, leaf?: WorkspaceLe
       file = app.vault.getAbstractFileByPath(path);
       if (!file) {
         await plugin.ensureFolder(path.slice(0, path.lastIndexOf("/")));
-        file = await app.vault.create(path, denote ? denoteJournalContent(date, id, new Date()) : journalFileContent(date, FLAVOUR.journalTemplate, id));
+        file = await app.vault.create(path, denote ? denoteJournalContent(date, id, new Date()) : journalFileContent(date, FLAVOUR.journalTemplate, id, createdStamp(new Date())));
       }
     }
     if (!(file instanceof TFile)) throw new Error(`${day} is not a file`);

@@ -5,6 +5,7 @@ import type OrgFlexPlugin from "../main";
 import { FLAVOUR } from "../flavour";
 import { appendEntry, captureEntry, capturePath, captureStates, noteCaptureText, sharedCaptureText } from "../org/capture";
 import { noteFileContent } from "../org/new-note";
+import { createdStamp } from "../org/ids";
 import { readNote } from "../org/vault-index";
 import { CaptureChoice, CaptureModal } from "../ui/modals";
 import type { Feature } from "./feature";
@@ -37,7 +38,7 @@ async function fileCapture(plugin: OrgFlexPlugin, path: string, choice: CaptureC
       const slash = path.lastIndexOf("/");
       if (slash > 0) await plugin.ensureFolder(path.slice(0, slash));
       const name = path.slice(slash + 1).replace(/\.org$/, "");
-      file = await app.vault.create(path, noteFileContent(name, plugin.newOrgId()));
+      file = await app.vault.create(path, noteFileContent(name, plugin.newOrgId(), createdStamp(new Date())));
     }
     if (!(file instanceof TFile)) return `${path} is not a file.`;
     // an open inbox takes it as an edit, so nothing typed there is lost

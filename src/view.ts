@@ -10,15 +10,17 @@ import { vim } from "@replit/codemirror-vim";
 import type OrgFlexPlugin from "./main";
 import { barLayout, ButtonId } from "./settings";
 import { toggleMarkup } from "./org/markup";
-import type { MarkupType } from "./org/syntax";
+import { relativeLinkPath, type MarkupType } from "./org/syntax";
+import { resolveAttachment } from "./org/attach";
 import { FLAVOUR } from "./flavour";
 import { buttonFeature, FEATURES, hasFeature } from "./features";
 import { nextVisibility } from "./org/folding";
 import { appendEntry } from "./org/capture";
 import {
-  assignId, enclosingHeading, idAt, cycleTaskState, insertBlock, insertTable, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
+  assignId, enclosingHeading, idAt, createdAt, cycleTaskState, insertBlock, insertTable, insertHeading, decreaseHeadingLevel, increaseHeadingLevel, insertIdLink,
   currentPlanningDate, PlanningKind, setPlanningDate, toggleCheckbox, toggleLeadingStars,
 } from "./org/edit";
+import { createdStamp } from "./org/ids";
 import { attachmentCompletion, headingTitle, linkDescription } from "./org/vault-index";
 import { denoteIdOf, denoteLabel } from "./org/denote";
 import { allowInReading, OrgHost, orgConfig, orgHost } from "./editor/state";
@@ -137,7 +139,9 @@ export class OrgFlexView extends TextFileView {
       setIcon,
       notice: (message) => void new Notice(message),
       pickIdTime: (pos) => this.pickIdTime(pos),
-      openLink: (target) => void this.plugin.openLink(target, this.file?.path ?? "", this.leaf),
+      // ATT-7: an attachment: link not resolved yet (a table cell) is taken at the cursor
+      openLink: (target, view) => void this.plugin.openLink(this.resolveTarget(target, view.state.selection.main.head), this.file?.path ?? "", this.leaf),
+      resolveTarget: (target, pos) => this.resolveTarget(target, pos),
       imageSrc: (target) => {
         const file = this.plugin.linkFile(target, this.file?.path ?? "");
         return file ? app.vault.getResourcePath(file) : null;
@@ -202,7 +206,7 @@ export class OrgFlexView extends TextFileView {
       items: barLayout((b) => this.plugin.hasButton(b)),
       setIcon,
       run: (id, view) => this.runButton(id, view),
-      // ACT-16: holding the ID button sets the ID's time
+      // ACT-16: holding the ID button sets the node's created time
       long: (id) => (id === "heading-id" ? () => this.pickIdTime() : undefined),
     });
   }
@@ -330,22 +334,30 @@ export class OrgFlexView extends TextFileView {
     }
   }
 
+  /** ATT-7: an `attachment:` link at `pos` as a `file:` link, relative to this note, to the file in its node's folder; anything else as is. */
+  resolveTarget(target: string, pos: number): string {
+    const doc = this.editor?.state.doc;
+    if (!doc || !/^attachment:/i.test(target.trim())) return target;
+    const path = resolveAttachment(target, FLAVOUR.attachDir, (n) => doc.line(n + 1).text, doc.lines, doc.lineAt(Math.min(pos, doc.length)).number - 1);
+    return path ? `file:${relativeLinkPath(this.file?.path ?? "", path)}` : target;
+  }
+
   /** ACT-10: an `:ID:` with a new ID (IDX-3); DEN-7: with Denote, a `CUSTOM_ID` as Denote makes them (`h:` and a UUID). */
   private headingId(state: EditorState) {
     return this.plugin.scheme() === "denote"
       ? assignId(state, `h:${crypto.randomUUID()}`, undefined, "CUSTOM_ID")
-      : assignId(state, this.plugin.newOrgId());
+      : assignId(state, this.plugin.newOrgId(), undefined, "ID", createdStamp(new Date()));
   }
 
   /**
-   * ACT-16: re-date the ID of the heading at `pos` (the cursor), or of the
-   * file above the first heading; one without an ID gets one at the picked moment.
+   * ACT-16: set the `:CREATED:` of the heading at `pos` (the cursor), or of the
+   * file above the first heading; one without an ID gets one, created at the picked moment.
    */
   pickIdTime(pos?: number) {
     const editor = this.editor;
     if (!editor) return;
     if (this.plugin.scheme() === "denote") {
-      new Notice("With Denote, IDs are made from the file name; there is no ID time to set.");
+      new Notice("With Denote, IDs are made from the file name; there is no created time to set.");
       return;
     }
     pos ??= editor.state.selection.main.head;
@@ -353,12 +365,12 @@ export class OrgFlexView extends TextFileView {
     const heading = enclosingHeading(editor.state.doc, pos);
     const title = heading === null ? (this.plugin.index.notes.get(this.file?.path ?? "")?.title ?? this.file?.basename ?? "this note") : `“${headingTitle(editor.state.doc.line(heading).text, this.plugin.keywords())}”`;
     if (old) {
-      this.plugin.pickIdTime(old, title);
+      this.plugin.pickIdTime(old, title, createdAt(editor.state, pos) ?? undefined);
       return;
     }
     new IdTimeModal(this.app, `New ID for ${title}`, new Date(), "It has no ID yet; it gets one at this moment.", (date) => {
       if (!this.editor) return;
-      const spec = assignId(this.editor.state, this.plugin.datedOrgId(date), pos);
+      const spec = assignId(this.editor.state, this.plugin.newOrgId(), pos, "ID", createdStamp(date));
       if (spec) this.editor.dispatch(spec);
     }).open();
   }

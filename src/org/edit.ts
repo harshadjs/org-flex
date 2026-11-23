@@ -396,7 +396,7 @@ function idLine(indent: string, id: string, key = "ID"): string {
  * (1-based; 0 is the top of the file), the drawer when there is a closed one,
  * and the ID property in it when there is one.
  */
-function idSlot(state: EditorState, pos: number, key: "ID" | "CUSTOM_ID") {
+function idSlot(state: EditorState, pos: number, key: "ID" | "CUSTOM_ID" | "CREATED") {
   const doc = state.doc;
   const heading = enclosingHeading(doc, pos);
   const after = heading === null ? 0
@@ -432,22 +432,30 @@ export function idAt(state: EditorState, pos = state.selection.main.head): strin
  * `org-id-get-create` does. Before the first heading, the file gets one.
  * The ID goes into the heading's property drawer (straight after the heading
  * and its planning line) or the file's (on the first line), which is made
- * when missing. Null when there already is an ID.
+ * when missing. IDX-4: `created`, when given, goes on the line after it as
+ * `:CREATED:`, unless the drawer already has one. Null when there already is an ID.
  */
-export function assignId(state: EditorState, id: string, pos = state.selection.main.head, key: "ID" | "CUSTOM_ID" = "ID"): TransactionSpec | null {
+export function assignId(state: EditorState, id: string, pos = state.selection.main.head, key: "ID" | "CUSTOM_ID" = "ID", created?: string): TransactionSpec | null {
   const doc = state.doc;
   const { heading, after, drawer, prop } = idSlot(state, pos, key);
   // DEN-7: a Denote file is named by its identifier; only headings get a CUSTOM_ID
   if (key === "CUSTOM_ID" && heading === null) return null;
   if (prop?.value) return null;
+  const stamp = created && !idSlot(state, pos, "CREATED").prop ? created : undefined;
+  const lines = (indent: string) => idLine(indent, id, key) + (stamp ? "\n" + idLine(indent, stamp, "CREATED") : "");
   if (prop) {
     // fill an empty :ID:
-    return { changes: { from: prop.line.from, to: prop.line.to, insert: idLine(/^[ \t]*/.exec(prop.line.text)![0], id, key) }, userEvent: "input" };
+    return { changes: { from: prop.line.from, to: prop.line.to, insert: lines(/^[ \t]*/.exec(prop.line.text)![0]) }, userEvent: "input" };
   }
-  if (drawer) return { changes: { from: drawer.first.to, insert: "\n" + idLine(drawer.indent, id, key) }, userEvent: "input" };
-  const fresh = `:PROPERTIES:\n${idLine("", id, key)}\n:END:`;
+  if (drawer) return { changes: { from: drawer.first.to, insert: "\n" + lines(drawer.indent) }, userEvent: "input" };
+  const fresh = `:PROPERTIES:\n${lines("")}\n:END:`;
   if (after === 0) return { changes: { from: 0, insert: fresh + "\n" }, userEvent: "input" };
   return { changes: { from: doc.line(after).to, insert: "\n" + fresh }, userEvent: "input" };
+}
+
+/** ACT-16: the `:CREATED:` of the heading enclosing `pos`, or of the file above the first heading; null when it has none. */
+export function createdAt(state: EditorState, pos = state.selection.main.head): string | null {
+  return idSlot(state, pos, "CREATED").prop?.value || null;
 }
 
 // ---------------------------------------------------------------------------

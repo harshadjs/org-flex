@@ -30,3 +30,23 @@ export function tsId(now: number, taken: ReadonlySet<string>): string {
     if (!taken.has(id)) return id;
   }
 }
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/**
+ * IDX-4: `date` as a `:CREATED:` value, an inactive Org timestamp to the
+ * minute in local time, as the Emacs config writes it: `[2026-11-22 Sun 14:05]`.
+ */
+export function createdStamp(date: Date): string {
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `[${date.getFullYear()}-${p2(date.getMonth() + 1)}-${p2(date.getDate())} ${WEEKDAYS[date.getDay()]} ${p2(date.getHours())}:${p2(date.getMinutes())}]`;
+}
+
+/** TL-2: the moment a `:CREATED:` value names (`[2026-11-22 Sun 14:05]`, active or inactive, time optional), or null. */
+export function parseCreated(value: string | undefined): Date | null {
+  if (!value) return null;
+  const m = /^[[<](\d{4})-(\d{2})-(\d{2})(?:[ \t]+[^\d\]>\s]+)?(?:[ \t]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?[^\]>]*[\]>]$/.exec(value.trim());
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  return new Date(+y, +mo - 1, +d, h ? +h : 0, mi ? +mi : 0, s ? +s : 0);
+}

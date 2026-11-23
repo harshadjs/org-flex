@@ -1,55 +1,41 @@
-// Re-dating an ID (ACT-16): a node's `:ID:` becomes a `ts` style ID at a
-// moment the user picks, and every `[[id:…]]` link to it follows.
+// Re-dating a node (ACT-16): its `:CREATED:` becomes a moment the user picks.
+// The `:ID:` stays, so no link changes (IDX-4: a node's time is its
+// `:CREATED:`, not its ID).
 
-import { tsId } from "./ids";
-
-/** ACT-16: a `ts` style ID at `date` (to the second, `.000000`), a microsecond later while that one is taken. */
-export function datedId(date: Date, taken: ReadonlySet<string>): string {
-  return tsId(Math.floor(date.getTime() / 1000) * 1e6, taken);
-}
-
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** ACT-16: one spot where `old` is replaced */
-export interface IdChange {
+/** ACT-16: one spot of a file that changes */
+export interface TextChange {
   from: number;
   to: number;
   insert: string;
 }
 
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
- * ACT-16: where `text` names `old`: the `:ID:` property holding it and every
- * link to it (`[[id:old]]`, `[[id:old][…]]`, `[[id:old::search]]`), each as a
- * change to `next`, in order.
+ * ACT-16: the change that sets `:CREATED:` to `stamp` in the property drawer
+ * whose `:ID:` is `id`: its `:CREATED:` line is rewritten, or one is added
+ * straight after the `:ID:` line, with its indentation. Null when no drawer
+ * in `text` has that ID.
  */
-export function idChanges(text: string, old: string, next: string): { changes: IdChange[]; links: number; property: boolean } {
-  const changes: IdChange[] = [];
-  let links = 0;
-  let property = false;
-  if (!text.includes(old)) return { changes, links, property };
-  for (const m of text.matchAll(new RegExp(`^([ \\t]*:ID:[ \\t]+)${escape(old)}[ \\t]*$`, "gim"))) {
-    const from = m.index! + m[1].length;
-    changes.push({ from, to: from + old.length, insert: next });
-    property = true;
+export function createdChange(text: string, id: string, stamp: string): TextChange | null {
+  const lines = text.split("\n");
+  const idRe = new RegExp(`^([ \\t]*):ID:[ \\t]+${escape(id)}[ \\t]*$`, "i");
+  const at = lines.findIndex((l) => idRe.test(l));
+  if (at < 0) return null;
+  const indent = idRe.exec(lines[at])![1];
+  const start = (n: number) => lines.slice(0, n).reduce((sum, l) => sum + l.length + 1, 0);
+  let first = at;
+  while (first > 0 && !/^[ \t]*:PROPERTIES:[ \t]*$/i.test(lines[first])) first--;
+  for (let n = first + 1; n < lines.length && !/^[ \t]*:END:[ \t]*$/i.test(lines[n]) && !/^\*+[ \t]/.test(lines[n]); n++) {
+    const m = /^([ \t]*):CREATED:/i.exec(lines[n]);
+    if (m) return { from: start(n), to: start(n) + lines[n].length, insert: `${m[1]}:CREATED:  ${stamp}` };
   }
-  for (const m of text.matchAll(new RegExp(`\\[\\[id:${escape(old)}(?=\\]|::)`, "g"))) {
-    const from = m.index! + 5;
-    changes.push({ from, to: from + old.length, insert: next });
-    links++;
-  }
-  changes.sort((x, y) => x.from - y.from);
-  return { changes, links, property };
+  const end = start(at) + lines[at].length;
+  return { from: end, to: end, insert: `\n${indent}:CREATED:  ${stamp}` };
 }
 
-/** ACT-16: `text` with `idChanges` made; null when nothing in it names `old`. */
-export function rewriteId(text: string, old: string, next: string): { text: string; links: number; property: boolean } | null {
-  const { changes, links, property } = idChanges(text, old, next);
-  if (!changes.length) return null;
-  let out = "";
-  let at = 0;
-  for (const c of changes) {
-    out += text.slice(at, c.from) + c.insert;
-    at = c.to;
-  }
-  return { text: out + text.slice(at), links, property };
+/** ACT-16: `text` with `createdChange` made; null when no drawer has `id`. */
+export function setCreated(text: string, id: string, stamp: string): string | null {
+  const c = createdChange(text, id, stamp);
+  return c ? text.slice(0, c.from) + c.insert + text.slice(c.to) : null;
 }

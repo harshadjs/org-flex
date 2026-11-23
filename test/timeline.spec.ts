@@ -13,6 +13,23 @@ describe("timeline", () => {
     expect(idTime("2610-some-note")).toBeNull();
   });
 
+  test("a node is at its CREATED time, before its ID's time or its file's", () => {
+    const notes = [
+      readNote("notes/a.org", ":PROPERTIES:\n:ID:       0f3c9a1e-4b7d-4c2a-9a10-2b5e6d7f8a90\n:CREATED:  [2026-11-22 Sun 14:05]\n:END:\n#+title: A\n* H\n:PROPERTIES:\n:CREATED:  [2019-05-06 Mon 07:08]\n:ID:       1a3c9a1e-4b7d-4c2a-9a10-2b5e6d7f8a90\n:END:\n* Old\n:PROPERTIES:\n:ID:       20261028T080000.000000\n:END:\n"),
+      readNote("notes/b.org", ":PROPERTIES:\n:ID:       20261029T090000.000000\n:CREATED:  [2026-11-01 Sun 10:00]\n:END:\n#+title: B\n"),
+      readNote("notes/c.org", ":PROPERTIES:\n:ID:       2b3c9a1e-4b7d-4c2a-9a10-2b5e6d7f8a90\n:END:\n#+title: C\n* H2\n:CREATED:  [2025-01-01 Wed 00:00]\n"),
+    ];
+    const { days } = buildTimeline(notes, [], created);
+    expect(days.flatMap((d) => d.entries.map((e) => [e.title, e.time]))).toEqual([
+      ["A", new Date(2026, 10, 22, 14, 5)],
+      ["B", new Date(2026, 10, 1, 10, 0)],
+      ["Old", new Date(2026, 9, 28, 8, 0)],
+      // a CREATED outside a property drawer doesn't count
+      ["C", new Date(2020, 0, 1, 12, 0)],
+      ["H", new Date(2019, 4, 6, 7, 8)],
+    ]);
+  });
+
   test("the timeline lists every ID newest first by its time, grouped by day, headings with their note's title, journal days marked", () => {
     const notes = [
       readNote("journal/2026/10/2026-10-28.org", ":PROPERTIES:\n:ID: 20261028T080000.000000\n:END:\n#+title: 2026-10-28\n* Walk\n:PROPERTIES:\n:ID: 20261028T190000.000000\n:END:\n"),

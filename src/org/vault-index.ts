@@ -2,6 +2,7 @@
 // It answers "where is ID X" and "who links to this note" without reading
 // files, and finds unlinked mentions in the text it keeps.
 
+import { DEFAULT_ATTACH_DIR, resolveAttachment } from "./attach";
 import { analyze, AUDIO_EXTENSIONS, findLinks, IMAGE_EXTENSIONS, Keywords, parseHeading, parseProperty, relativeLinkPath, resolveRelative, VIDEO_EXTENSIONS } from "./syntax";
 import { denoteIdOf } from "./denote";
 
@@ -14,6 +15,8 @@ export interface NoteId {
   offset: number;
   /** the heading's title (links shown as their description); absent for a file-level ID */
   heading?: string;
+  /** TL-2: the entry's `:CREATED:` value, as written (`[2026-11-22 Sun 14:05]`) */
+  created?: string;
 }
 
 const DEFAULT_KEYWORDS: Keywords = { todo: ["TODO"], done: ["DONE"] };
@@ -88,7 +91,7 @@ export function fileName(path: string): string {
 }
 
 /** IDX-1: what the index keeps about one file. */
-export function readNote(path: string, text: string, keywords: Keywords = DEFAULT_KEYWORDS): NoteRecord {
+export function readNote(path: string, text: string, keywords: Keywords = DEFAULT_KEYWORDS, attachDir = DEFAULT_ATTACH_DIR): NoteRecord {
   const lines = text.split("\n");
   const structure = analyze(lines);
   const ids: NoteId[] = [];
@@ -100,6 +103,7 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
   let heading: string | undefined;
   let offset = 0;
   let seenHeading = false;
+  const created = new Map<string, string>();
   for (let n = 0; n < lines.length; n++) {
     const line = lines[n];
     const kind = structure.lines[n].kind;
@@ -110,6 +114,9 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
     } else if (kind === "property") {
       const prop = parseProperty(line);
       const key = prop?.key.toUpperCase();
+      if (prop && key === "CREATED" && prop.value.trim() && structure.drawers[structure.lines[n].drawer].name === "PROPERTIES") {
+        created.set(heading === undefined ? "file" : String(entry), prop.value.trim());
+      }
       if (prop && (key === "ID" || key === "CUSTOM_ID") && prop.value.trim() && structure.drawers[structure.lines[n].drawer].name === "PROPERTIES") {
         const found = heading === undefined ? { id: prop.value.trim(), offset: entry } : { id: prop.value.trim(), offset: entry, heading };
         if (key === "ID") ids.push(found);
@@ -122,6 +129,12 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
     if (line.includes("[[")) {
       for (const link of findLinks(line)) {
         if (link.style !== "regular") continue;
+        // ATT-7: an attachment is a file in its owning node's folder
+        if (/^attachment:/i.test(link.target.trim())) {
+          const file = resolveAttachment(link.target, attachDir, (k) => lines[k], lines.length, n);
+          if (file) fileLinks.push({ target: file, line: n });
+          continue;
+        }
         if (/^file:/i.test(link.target.trim())) {
           const file = resolveRelative(path, link.target);
           if (file) fileLinks.push({ target: file, line: n });
@@ -132,6 +145,10 @@ export function readNote(path: string, text: string, keywords: Keywords = DEFAUL
       }
     }
     offset += line.length + 1;
+  }
+  for (const i of ids) {
+    const c = created.get(i.heading === undefined ? "file" : String(i.offset));
+    if (c) i.created = c;
   }
   const name = fileName(path);
   return { path, name, title: title ?? name, ids, denoteId: denoteIdOf(path), customIds, links, fileLinks, text };
@@ -326,6 +343,8 @@ export interface IndexSource {
   read(path: string): Promise<string>;
   /** the TODO keywords, so heading titles leave them out */
   keywords?(): Keywords;
+  /** ATT-7: org-attach's folder, a vault path */
+  attachDir?(): string;
 }
 
 /** IDX-1: keeps a NoteRecord per .org file and tells listeners about changes (batched). */
@@ -344,7 +363,7 @@ export class VaultIndex {
     const notes = new Map<string, NoteRecord>();
     for (const path of this.source.paths()) {
       try {
-        notes.set(path, readNote(path, await this.source.read(path), this.source.keywords?.()));
+        notes.set(path, readNote(path, await this.source.read(path), this.source.keywords?.(), this.source.attachDir?.()));
       } catch {
         // unreadable: left out
       }
@@ -357,7 +376,7 @@ export class VaultIndex {
   async update(path: string): Promise<void> {
     await this.ready;
     try {
-      this.notes.set(path, readNote(path, await this.source.read(path), this.source.keywords?.()));
+      this.notes.set(path, readNote(path, await this.source.read(path), this.source.keywords?.(), this.source.attachDir?.()));
     } catch {
       this.notes.delete(path);
     }

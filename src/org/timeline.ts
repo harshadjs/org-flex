@@ -1,9 +1,10 @@
-// The timeline (§11b): every org-roam node by the time its ID was made,
+// The timeline (§11b): every org-roam node by when it was made (:CREATED:),
 // newest first, with the attachments each one links to.
 
 import { analyze, NO_KEYWORDS, parseHeading } from "./syntax";
 import { isMediaFile, type NoteRecord } from "./vault-index";
 import { journalDateString, parseJournalDate } from "./journal";
+import { parseCreated } from "./ids";
 
 /**
  * TL-2: the moment an ID was made: org-id's `ts` style
@@ -19,6 +20,11 @@ export function idTime(id: string): Date | null {
   }
   if (/^\d{16}$/.test(id)) return new Date(Math.floor(Number(id) / 1000));
   return null;
+}
+
+/** TL-2: when a node was made: its `:CREATED:`, else its ID's time (`idTime`); null when neither says. */
+export function nodeTime(created: string | undefined, id: string): Date | null {
+  return parseCreated(created) ?? idTime(id);
 }
 
 /** TL-2: a journal day's file-level ID, another note's, or a heading's */
@@ -122,7 +128,7 @@ function sourceOf(nodes: Span[], line: number): TimelineEntry | null {
   return best?.entry ?? null;
 }
 
-/** TL-2: a journal day sits on its own date: at its ID's time if that is on the day, else at the day's start */
+/** TL-2: a journal day sits on its own date: at its own time if that is on the day, else at the day's start */
 function onDay(time: Date, day: string): Date {
   return journalDateString(time) === day ? time : parseJournalDate(day);
 }
@@ -146,7 +152,8 @@ export function buildTimeline(notes: Iterable<NoteRecord>, files: string[], crea
   const first = new Map<string, TimelineEntry>();
   const taken = new Set<string>();
   for (const note of notes) {
-    const nodes = spans(note, (id) => idTime(id) ?? created(note.path), journal.get(note.path)).filter((s) => !taken.has(s.entry.id));
+    const stamps = new Map(note.ids.map((i) => [i.id, i.created]));
+    const nodes = spans(note, (id) => nodeTime(stamps.get(id), id) ?? created(note.path), journal.get(note.path)).filter((s) => !taken.has(s.entry.id));
     for (const s of nodes) {
       taken.add(s.entry.id);
       entries.push(s.entry);

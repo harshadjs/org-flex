@@ -37,13 +37,16 @@ export function denoteJournalContent(date: Date, id: string, now: Date): string 
   return denoteFrontMatter(journalDateString(date), now, ["journal"], id);
 }
 
-/** JRN-2: the base flavour's journal header: a new UUID as `:ID:`, the date as title. */
-export const DEFAULT_JOURNAL_TEMPLATE = ":PROPERTIES:\n:ID:       {{id}}\n:END:\n#+title: {{date}}\n\n";
+/** JRN-2: the base flavour's journal header: a new UUID as `:ID:`, when it was made as `:CREATED:` (IDX-4), the date as title. */
+export const DEFAULT_JOURNAL_TEMPLATE = ":PROPERTIES:\n:ID:       {{id}}\n:CREATED:  {{created}}\n:END:\n#+title: {{date}}\n\n";
 
-/** JRN-2: a new journal file: `{{date}}` becomes YYYY-MM-DD and `{{id}}` the given UUID, every time they occur. */
-export function journalFileContent(date: Date, template: string, id: string): string {
+/** JRN-2: a new journal file: `{{date}}` becomes YYYY-MM-DD, `{{id}}` the given UUID and `{{created}}` the given stamp, every time they occur. */
+export function journalFileContent(date: Date, template: string, id: string, created = ""): string {
   const day = journalDateString(date);
-  return template.replace(/\{\{\s*(date|id)\s*\}\}/gi, (_m, key: string) => (key.toLowerCase() === "date" ? day : id));
+  return template.replace(/\{\{\s*(date|id|created)\s*\}\}/gi, (_m, key: string) => {
+    const k = key.toLowerCase();
+    return k === "date" ? day : k === "id" ? id : created;
+  });
 }
 
 export interface JournalEntry {

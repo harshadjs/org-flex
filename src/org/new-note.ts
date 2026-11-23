@@ -23,10 +23,10 @@ export function notePath(folder: string, raw: string, denoteId?: string): string
   return dir ? `${dir}/${name}` : name;
 }
 
-/** NOTE-5: the journal header without filetags, with `id` (a UUID) as the :ID:. */
-export function noteFileContent(raw: string, id: string): string {
+/** NOTE-5: the journal header without filetags, with `id` (a UUID) as the :ID: and, when given, `created` as :CREATED: (IDX-4). */
+export function noteFileContent(raw: string, id: string, created?: string): string {
   const title = raw.trim();
-  return `:PROPERTIES:\n:ID:       ${id}\n:END:\n#+title: ${title}\n\n`;
+  return `:PROPERTIES:\n:ID:       ${id}\n${created ? `:CREATED:  ${created}\n` : ""}:END:\n#+title: ${title}\n\n`;
 }
 
 /**

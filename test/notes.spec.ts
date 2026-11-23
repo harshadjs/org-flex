@@ -111,19 +111,19 @@ describe("journal", () => {
   });
 
   test("journalFileContent fills the template's date and ID", () => {
-    expect(journalFileContent(d, DEFAULT_JOURNAL_TEMPLATE, "u-1")).toBe(":PROPERTIES:\n:ID:       u-1\n:END:\n#+title: 2024-03-05\n\n");
+    expect(journalFileContent(d, DEFAULT_JOURNAL_TEMPLATE, "u-1", "[2024-03-05 Tue 09:30]")).toBe(":PROPERTIES:\n:ID:       u-1\n:CREATED:  [2024-03-05 Tue 09:30]\n:END:\n#+title: 2024-03-05\n\n");
     expect(journalFileContent(d, ":ID: {{date}}\n#+filetags: :journal:\n", "u-1")).toBe(":ID: 2024-03-05\n#+filetags: :journal:\n");
     expect(journalFileContent(d, "* {{ DATE }} {{date}}\n", "x")).toBe("* 2024-03-05 2024-03-05\n");
   });
 
-  test("this flavour has TODO IN-PROGRESS WAITING then DONE CANCELLED, org-roam links, timestamp IDs, counted voice notes and CLOSED logging", () => {
+  test("this flavour has TODO IN-PROGRESS WAITING then DONE CANCELLED, org-roam links, UUID IDs, counted voice notes and CLOSED logging", () => {
     expect([FLAVOUR.todoKeywords, FLAVOUR.doneKeywords]).toEqual([["TODO", "IN-PROGRESS", "WAITING"], ["DONE", "CANCELLED"]]);
     expect(FLAVOUR.logDone).toBe(true);
     expect(FLAVOUR.journalTemplate).toBe(DEFAULT_JOURNAL_TEMPLATE);
     expect(FLAVOUR.links).toBe("id");
-    const us = new Date(2026, 9, 29, 14, 30, 12).getTime() * 1000 + 123456;
-    expect(FLAVOUR.orgId(us, new Set())).toBe("20261029T143012.123456");
-    expect(FLAVOUR.orgId(us, new Set(["20261029T143012.123456"]))).toBe("20261029T143012.123457");
+    const id = FLAVOUR.orgId(Date.now() * 1000, new Set());
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(FLAVOUR.orgId(Date.now() * 1000, new Set())).not.toBe(id);
     expect(FLAVOUR.mediaName("recording", new Date(2026, 9, 27), "m4a", new Set(["2610-voice-note-03.mp3"]))).toBe("2610-voice-note-04.m4a");
     expect(FLAVOUR.mediaName("image", new Date(2026, 9, 27), "png", new Set())).toBe("2610-pasted-image-01.png");
   });
@@ -180,6 +180,8 @@ describe("new notes", () => {
   test("noteFileContent uses the UUID as ID and the title as #+title", () => {
     expect(noteFileContent(" My Note ", "0b6e1c3a-1f2d-4c5e-9a8b-7c6d5e4f3a2b"))
       .toBe(":PROPERTIES:\n:ID:       0b6e1c3a-1f2d-4c5e-9a8b-7c6d5e4f3a2b\n:END:\n#+title: My Note\n\n");
+    expect(noteFileContent("N", "u-1", "[2026-11-22 Sun 14:05]"))
+      .toBe(":PROPERTIES:\n:ID:       u-1\n:CREATED:  [2026-11-22 Sun 14:05]\n:END:\n#+title: N\n\n");
   });
 });
 

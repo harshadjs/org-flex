@@ -1,4 +1,4 @@
-// Dialogs: the date picker for SCHEDULED/DEADLINE, the ID time picker (ACT-16), the journal list, the
+// Dialogs: the date picker for SCHEDULED/DEADLINE, the created time picker (ACT-16), the journal list, the
 // journal calendar, the new note dialog, the capture dialog and the voice
 // recorder.
 
